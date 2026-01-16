@@ -147,8 +147,8 @@ function DashboardLayoutContent({
           className="border-r border-orange-500/20 bg-gradient-to-b from-[#141842] to-[#0F1233]"
           disableTransition={isResizing}
         >
-          {/* Header with Logo */}
-          <SidebarHeader className="h-20 justify-center border-b border-orange-500/20 bg-gradient-to-r from-orange-500/5 to-blue-500/5">
+          {/* Header with Logo - background matches logo color */}
+          <SidebarHeader className="h-20 justify-center border-b border-orange-500/20 bg-[#0F1233]">
             <div className="flex items-center gap-3 px-3 transition-all w-full">
               <button
                 onClick={toggleSidebar}
