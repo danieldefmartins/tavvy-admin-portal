@@ -1,22 +1,22 @@
-import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
-import type { TrpcContext } from "./context";
+import type { Context } from "./context";
 
-const t = initTRPC.context<TrpcContext>().create({
+const t = initTRPC.context<Context>().create({
   transformer: superjson,
 });
 
 export const router = t.router;
 export const publicProcedure = t.procedure;
 
-const requireUser = t.middleware(async opts => {
-  const { ctx, next } = opts;
-
+// Protected procedure - requires authentication
+export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
   if (!ctx.user) {
-    throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "You must be logged in to access this resource",
+    });
   }
-
   return next({
     ctx: {
       ...ctx,
@@ -25,21 +25,13 @@ const requireUser = t.middleware(async opts => {
   });
 });
 
-export const protectedProcedure = t.procedure.use(requireUser);
-
-export const adminProcedure = t.procedure.use(
-  t.middleware(async opts => {
-    const { ctx, next } = opts;
-
-    if (!ctx.user || ctx.user.role !== 'admin') {
-      throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
-    }
-
-    return next({
-      ctx: {
-        ...ctx,
-        user: ctx.user,
-      },
+// Admin procedure - requires admin role
+export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  if (ctx.user.role !== "admin") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "You must be an admin to access this resource",
     });
-  }),
-);
+  }
+  return next({ ctx });
+});
