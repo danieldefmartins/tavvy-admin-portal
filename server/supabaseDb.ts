@@ -109,7 +109,7 @@ export async function searchPlaces(
           longitude as lng,
           tel as phone,
           website,
-          fsq_category_labels[1] as category,
+          fsq_category_labels as category,
           'foursquare'::text as source
         FROM fsq_places_raw
         WHERE name ILIKE ${searchPattern}
@@ -177,7 +177,7 @@ export async function getPlaceById(placeId: string): Promise<Place | null> {
         longitude as lng,
         tel as phone,
         website,
-        fsq_category_labels[1] as category,
+        fsq_category_labels as category,
         'foursquare'::text as source
       FROM fsq_places_raw
       WHERE fsq_place_id = ${placeId}
