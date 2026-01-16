@@ -18,15 +18,17 @@ import { eq, desc } from "drizzle-orm";
 import { syncProToGHL } from "./ghl";
 import {
   signInWithEmail,
-  signUpWithEmail,
   verifySupabaseToken,
 } from "./supabaseAuth";
 
 // Cookie name for Supabase auth token
 const AUTH_COOKIE_NAME = "tavvy_auth_token";
 
+// Super admin email
+const SUPER_ADMIN_EMAIL = "daniel@360forbusiness.com";
+
 export const appRouter = router({
-  // Auth router - Supabase email/password authentication
+  // Auth router - Login only (no signup)
   auth: router({
     me: publicProcedure.query(async ({ ctx }) => {
       // Get token from cookie
@@ -37,12 +39,16 @@ export const appRouter = router({
       const user = await verifySupabaseToken(token);
       if (!user) return null;
 
+      // Check if user is the super admin
+      const isSuperAdmin = user.email === SUPER_ADMIN_EMAIL;
+
       return {
         id: user.id,
         openId: user.id,
         email: user.email,
         name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
-        role: user.user_metadata?.role || "user",
+        role: isSuperAdmin ? "super_admin" : "pro",
+        isSuperAdmin,
       };
     }),
 
@@ -54,6 +60,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // For Pros Portal: Allow any registered user to login
         const { user, session, error } = await signInWithEmail(
           input.email,
           input.password
@@ -75,55 +82,15 @@ export const appRouter = router({
           path: "/",
         });
 
+        const isSuperAdmin = user.email === SUPER_ADMIN_EMAIL;
+
         return {
           success: true,
           user: {
             id: user.id,
             email: user.email,
             name: user.user_metadata?.full_name || user.email?.split("@")[0],
-          },
-        };
-      }),
-
-    signup: publicProcedure
-      .input(
-        z.object({
-          email: z.string().email(),
-          password: z.string().min(6),
-          fullName: z.string().optional(),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const { user, session, error } = await signUpWithEmail(
-          input.email,
-          input.password,
-          { full_name: input.fullName }
-        );
-
-        if (error || !user) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: error || "Sign up failed",
-          });
-        }
-
-        // If session exists (email confirmation disabled), set cookie
-        if (session) {
-          ctx.res.cookie(AUTH_COOKIE_NAME, session.access_token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 60 * 60 * 24 * 7 * 1000,
-            path: "/",
-          });
-        }
-
-        return {
-          success: true,
-          needsConfirmation: !session,
-          user: {
-            id: user.id,
-            email: user.email,
+            isSuperAdmin,
           },
         };
       }),
