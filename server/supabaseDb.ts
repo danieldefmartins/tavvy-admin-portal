@@ -1,26 +1,60 @@
 import postgres from "postgres";
 
 let _sql: ReturnType<typeof postgres> | null = null;
+let _connectionAttempted = false;
 
 /**
  * Get Supabase PostgreSQL connection
  * Uses the SUPABASE_DATABASE_URL environment variable
  */
 export function getSupabaseDb() {
-  if (!_sql && process.env.SUPABASE_DATABASE_URL) {
+  if (!_sql && !_connectionAttempted) {
+    _connectionAttempted = true;
+    const dbUrl = process.env.SUPABASE_DATABASE_URL;
+    
+    if (!dbUrl) {
+      console.error("[Supabase] SUPABASE_DATABASE_URL environment variable is not set!");
+      return null;
+    }
+    
+    // Log connection attempt (mask password)
+    const maskedUrl = dbUrl.replace(/:[^:@]+@/, ':****@');
+    console.log("[Supabase] Attempting to connect to:", maskedUrl);
+    
     try {
-      _sql = postgres(process.env.SUPABASE_DATABASE_URL, {
+      _sql = postgres(dbUrl, {
         ssl: { rejectUnauthorized: false },
         max: 10,
         idle_timeout: 20,
         connect_timeout: 30,
+        onnotice: (notice) => console.log("[Supabase] Notice:", notice),
       });
+      console.log("[Supabase] Connection pool created successfully");
     } catch (error) {
-      console.warn("[Supabase] Failed to connect:", error);
+      console.error("[Supabase] Failed to create connection pool:", error);
       _sql = null;
     }
   }
   return _sql;
+}
+
+/**
+ * Test the database connection
+ */
+export async function testConnection(): Promise<{ success: boolean; error?: string }> {
+  const sql = getSupabaseDb();
+  if (!sql) {
+    return { success: false, error: "Database not configured" };
+  }
+  
+  try {
+    const result = await sql`SELECT 1 as test`;
+    console.log("[Supabase] Connection test successful:", result);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[Supabase] Connection test failed:", error);
+    return { success: false, error: error.message || String(error) };
+  }
 }
 
 // ============ PLACES QUERIES ============

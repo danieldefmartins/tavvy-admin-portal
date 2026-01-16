@@ -10,6 +10,7 @@ import {
   getPlaceSignalAggregates,
   batchImportReviews,
   getRepStats,
+  testConnection,
   type BatchReviewInput,
 } from "./supabaseDb";
 import { getDb } from "./db";
@@ -116,6 +117,16 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => {
       ctx.res.clearCookie(AUTH_COOKIE_NAME, { path: "/" });
       return { success: true };
+    }),
+  }),
+
+  // Debug router - for testing connections
+  debug: router({
+    testDbConnection: protectedProcedure.query(async () => {
+      console.log("[Debug] Testing database connection...");
+      const result = await testConnection();
+      console.log("[Debug] Connection test result:", result);
+      return result;
     }),
   }),
 
