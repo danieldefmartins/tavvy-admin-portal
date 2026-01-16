@@ -2,11 +2,11 @@ import { Switch, Route, Redirect } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
+import DashboardLayout from "@/components/DashboardLayout";
 
 // Pages
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
-import Dashboard from "@/pages/Dashboard";
 import Places from "@/pages/Places";
 import QuickEntry from "@/pages/QuickEntry";
 import BatchUpload from "@/pages/BatchUpload";
@@ -15,13 +15,13 @@ import Signals from "@/pages/Signals";
 // Loading component
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900">
+    <div className="min-h-screen flex items-center justify-center bg-[#0F1233]">
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
     </div>
   );
 }
 
-// Protected route wrapper
+// Protected route wrapper with DashboardLayout
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -33,7 +33,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Redirect to="/login" />;
   }
 
-  return <>{children}</>;
+  return (
+    <DashboardLayout>
+      {children}
+    </DashboardLayout>
+  );
 }
 
 function App() {
@@ -49,9 +53,7 @@ function App() {
         </Route>
 
         <Route path="/dashboard">
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
+          <Redirect to="/" />
         </Route>
 
         <Route path="/places">
