@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import path from "path";
 
 const app = express();
 
@@ -15,12 +16,12 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 
-// Health check
+// Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// tRPC handler
+// tRPC endpoint
 app.use(
   "/api/trpc",
   trpcExpress.createExpressMiddleware({
@@ -31,15 +32,14 @@ app.use(
 
 // Serve static files in production
 if (process.env.NODE_ENV === "production") {
-  const path = await import("path");
-  const { fileURLToPath } = await import("url");
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const distPath = path.join(process.cwd(), "dist", "public");
+  app.use(express.static(distPath));
   
-  app.use(express.static(path.join(__dirname, "../public")));
-  
-  // SPA fallback
+  // SPA fallback - serve index.html for all non-API routes
   app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../public/index.html"));
+    if (!req.path.startsWith("/api")) {
+      res.sendFile(path.join(distPath, "index.html"));
+    }
   });
 }
 

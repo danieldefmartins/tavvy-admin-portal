@@ -1,24 +1,32 @@
 import { Switch, Route, Redirect } from "wouter";
-import { Toaster } from "@/components/ui/toaster";
 import { useAuth } from "@/hooks/useAuth";
-import DashboardLayout from "@/components/DashboardLayout";
+import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "@/components/theme-provider";
+
+// Pages
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
+import Dashboard from "@/pages/Dashboard";
 import Places from "@/pages/Places";
 import QuickEntry from "@/pages/QuickEntry";
 import BatchUpload from "@/pages/BatchUpload";
 import Signals from "@/pages/Signals";
+
+// Loading component
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+    </div>
+  );
+}
 
 // Protected route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!isAuthenticated) {
@@ -28,39 +36,55 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Dashboard pages wrapped in layout
-function DashboardPages() {
-  return (
-    <DashboardLayout>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/places" component={Places} />
-        <Route path="/quick-entry" component={QuickEntry} />
-        <Route path="/batch-upload" component={BatchUpload} />
-        <Route path="/signals" component={Signals} />
-        <Route>
-          <div className="p-8">
-            <h1 className="text-2xl font-bold text-white">404 - Page Not Found</h1>
-          </div>
-        </Route>
-      </Switch>
-    </DashboardLayout>
-  );
-}
-
 function App() {
   return (
-    <>
+    <ThemeProvider defaultTheme="dark" storageKey="tavvy-admin-theme">
       <Switch>
         <Route path="/login" component={Login} />
-        <Route>
+        
+        <Route path="/">
           <ProtectedRoute>
-            <DashboardPages />
+            <Home />
           </ProtectedRoute>
+        </Route>
+
+        <Route path="/dashboard">
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/places">
+          <ProtectedRoute>
+            <Places />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/quick-entry">
+          <ProtectedRoute>
+            <QuickEntry />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/batch-upload">
+          <ProtectedRoute>
+            <BatchUpload />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/signals">
+          <ProtectedRoute>
+            <Signals />
+          </ProtectedRoute>
+        </Route>
+
+        {/* Fallback - redirect to home */}
+        <Route>
+          <Redirect to="/" />
         </Route>
       </Switch>
       <Toaster />
-    </>
+    </ThemeProvider>
   );
 }
 

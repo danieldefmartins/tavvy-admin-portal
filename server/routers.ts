@@ -24,11 +24,11 @@ import {
 // Cookie name for Supabase auth token
 const AUTH_COOKIE_NAME = "tavvy_auth_token";
 
-// Super admin email - ONLY this user can access the admin portal
+// Super admin email - ONLY this email can access admin portal
 const SUPER_ADMIN_EMAIL = "daniel@360forbusiness.com";
 
 export const appRouter = router({
-  // Auth router - Login only (no signup)
+  // Auth router - Login only, super admin restricted
   auth: router({
     me: publicProcedure.query(async ({ ctx }) => {
       // Get token from cookie
@@ -40,15 +40,17 @@ export const appRouter = router({
       if (!user) return null;
 
       // Check if user is the super admin
-      const isSuperAdmin = user.email === SUPER_ADMIN_EMAIL;
+      if (user.email !== SUPER_ADMIN_EMAIL) {
+        return null; // Non-admin users get null (treated as not logged in)
+      }
 
       return {
         id: user.id,
         openId: user.id,
         email: user.email,
-        name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
-        role: isSuperAdmin ? "super_admin" : "user",
-        isSuperAdmin,
+        name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Admin",
+        role: "super_admin",
+        isSuperAdmin: true,
       };
     }),
 
@@ -60,11 +62,11 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        // For Admin Portal: Only allow super admin to login
-        if (input.email !== SUPER_ADMIN_EMAIL) {
+        // Check if email is super admin BEFORE attempting login
+        if (input.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "Access denied. Only authorized administrators can access this portal.",
+            message: "Access denied. Admin portal is restricted.",
           });
         }
 
@@ -94,7 +96,7 @@ export const appRouter = router({
           user: {
             id: user.id,
             email: user.email,
-            name: user.user_metadata?.full_name || user.email?.split("@")[0],
+            name: user.user_metadata?.full_name || "Admin",
             isSuperAdmin: true,
           },
         };

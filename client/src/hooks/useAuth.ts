@@ -1,14 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 
-export interface User {
-  id: string;
-  openId: string;
-  email: string | undefined;
-  name: string;
-  role: string;
-}
-
 export function useAuth() {
   const [, setLocation] = useLocation();
   const { data: user, isLoading, error } = trpc.auth.me.useQuery();
@@ -26,15 +18,15 @@ export function useAuth() {
   };
 
   return {
-    user: user as User | null,
+    user,
     isLoading,
     isAuthenticated: !!user,
+    isSuperAdmin: user?.isSuperAdmin || false,
     error,
     logout,
-    isLoggingOut: logoutMutation.isPending,
   };
 }
 
-export function getLoginUrl(): string {
+export function getLoginUrl() {
   return "/login";
 }
