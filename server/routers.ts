@@ -24,8 +24,19 @@ import {
 // Cookie name for Supabase auth token
 const AUTH_COOKIE_NAME = "tavvy_auth_token";
 
-// Super admin email - ONLY this email can access admin portal
-const SUPER_ADMIN_EMAIL = "daniel@360forbusiness.com";
+// Super admin emails - ONLY these emails can access admin portal
+const SUPER_ADMIN_EMAILS = [
+  "daniel@360forbusiness.com",
+  "alineedaniel@gmail.com",
+];
+
+// Helper function to check if email is an admin
+function isAdminEmail(email: string | undefined): boolean {
+  if (!email) return false;
+  return SUPER_ADMIN_EMAILS.some(adminEmail => 
+    adminEmail.toLowerCase() === email.toLowerCase()
+  );
+}
 
 export const appRouter = router({
   // Auth router - Login only, super admin restricted
@@ -39,8 +50,8 @@ export const appRouter = router({
       const user = await verifySupabaseToken(token);
       if (!user) return null;
 
-      // Check if user is the super admin
-      if (user.email !== SUPER_ADMIN_EMAIL) {
+      // Check if user is an admin
+      if (!isAdminEmail(user.email)) {
         return null; // Non-admin users get null (treated as not logged in)
       }
 
@@ -62,8 +73,8 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        // Check if email is super admin BEFORE attempting login
-        if (input.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) {
+        // Check if email is an admin BEFORE attempting login
+        if (!isAdminEmail(input.email)) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "Access denied. Admin portal is restricted.",
