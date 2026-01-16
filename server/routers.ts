@@ -24,7 +24,7 @@ import {
 // Cookie name for Supabase auth token
 const AUTH_COOKIE_NAME = "tavvy_auth_token";
 
-// Super admin email
+// Super admin email - ONLY this user can access the admin portal
 const SUPER_ADMIN_EMAIL = "daniel@360forbusiness.com";
 
 export const appRouter = router({
@@ -47,7 +47,7 @@ export const appRouter = router({
         openId: user.id,
         email: user.email,
         name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
-        role: isSuperAdmin ? "super_admin" : "pro",
+        role: isSuperAdmin ? "super_admin" : "user",
         isSuperAdmin,
       };
     }),
@@ -60,7 +60,14 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        // For Pros Portal: Allow any registered user to login
+        // For Admin Portal: Only allow super admin to login
+        if (input.email !== SUPER_ADMIN_EMAIL) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Access denied. Only authorized administrators can access this portal.",
+          });
+        }
+
         const { user, session, error } = await signInWithEmail(
           input.email,
           input.password
@@ -82,15 +89,13 @@ export const appRouter = router({
           path: "/",
         });
 
-        const isSuperAdmin = user.email === SUPER_ADMIN_EMAIL;
-
         return {
           success: true,
           user: {
             id: user.id,
             email: user.email,
             name: user.user_metadata?.full_name || user.email?.split("@")[0],
-            isSuperAdmin,
+            isSuperAdmin: true,
           },
         };
       }),
