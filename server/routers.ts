@@ -12,6 +12,22 @@ import {
   getRepStats,
   testConnection,
   type BatchReviewInput,
+  // Articles
+  getAllArticles,
+  getArticleCategories,
+  createArticle,
+  updateArticle,
+  deleteArticle,
+  // Cities
+  getAllCities,
+  createCity,
+  updateCity,
+  deleteCity,
+  // Universes
+  getAllUniverses,
+  createUniverse,
+  updateUniverse,
+  deleteUniverse,
 } from "./supabaseDb";
 import { getDb } from "./db";
 import { repActivityLog, batchImportJobs } from "../drizzle/schema";
@@ -356,6 +372,271 @@ export const appRouter = router({
         .orderBy(desc(batchImportJobs.createdAt))
         .limit(20);
     }),
+  }),
+
+  // ============ ARTICLES ROUTER ============
+  articles: router({
+    getAll: protectedProcedure.query(async () => {
+      return getAllArticles();
+    }),
+
+    getCategories: protectedProcedure.query(async () => {
+      return getArticleCategories();
+    }),
+
+    getUniverses: protectedProcedure.query(async () => {
+      return getAllUniverses();
+    }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          title: z.string().min(1),
+          slug: z.string().min(1),
+          excerpt: z.string().optional(),
+          content: z.string().optional(),
+          cover_image_url: z.string().optional(),
+          author_name: z.string().optional(),
+          author_avatar_url: z.string().optional(),
+          category_id: z.string().optional(),
+          universe_id: z.string().optional(),
+          read_time_minutes: z.number().optional(),
+          is_featured: z.boolean().default(false),
+          status: z.string().default("draft"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const id = await createArticle({
+          ...input,
+          excerpt: input.excerpt || null,
+          content: input.content || null,
+          cover_image_url: input.cover_image_url || null,
+          author_name: input.author_name || null,
+          author_avatar_url: input.author_avatar_url || null,
+          category_id: input.category_id || null,
+          universe_id: input.universe_id || null,
+          read_time_minutes: input.read_time_minutes || null,
+          published_at: null,
+        });
+        if (!id) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create article",
+          });
+        }
+        return { id };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          title: z.string().optional(),
+          slug: z.string().optional(),
+          excerpt: z.string().optional(),
+          content: z.string().optional(),
+          cover_image_url: z.string().optional(),
+          author_name: z.string().optional(),
+          author_avatar_url: z.string().optional(),
+          category_id: z.string().optional(),
+          universe_id: z.string().optional(),
+          read_time_minutes: z.number().optional(),
+          is_featured: z.boolean().optional(),
+          status: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        const success = await updateArticle(id, data);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update article",
+          });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        const success = await deleteArticle(input.id);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete article",
+          });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ CITIES ROUTER ============
+  cities: router({
+    getAll: protectedProcedure.query(async () => {
+      return getAllCities();
+    }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().min(1),
+          slug: z.string().min(1),
+          state: z.string().optional(),
+          country: z.string().default("USA"),
+          population: z.number().optional(),
+          cover_image_url: z.string().optional(),
+          description: z.string().optional(),
+          latitude: z.number().optional(),
+          longitude: z.number().optional(),
+          timezone: z.string().optional(),
+          is_featured: z.boolean().default(false),
+          is_active: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const id = await createCity({
+          ...input,
+          state: input.state || null,
+          population: input.population || null,
+          cover_image_url: input.cover_image_url || null,
+          description: input.description || null,
+          latitude: input.latitude || null,
+          longitude: input.longitude || null,
+          timezone: input.timezone || null,
+        });
+        if (!id) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create city",
+          });
+        }
+        return { id };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          name: z.string().optional(),
+          slug: z.string().optional(),
+          state: z.string().optional(),
+          country: z.string().optional(),
+          population: z.number().optional(),
+          cover_image_url: z.string().optional(),
+          description: z.string().optional(),
+          latitude: z.number().optional(),
+          longitude: z.number().optional(),
+          timezone: z.string().optional(),
+          is_featured: z.boolean().optional(),
+          is_active: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        const success = await updateCity(id, data);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update city",
+          });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        const success = await deleteCity(input.id);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete city",
+          });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ UNIVERSES ROUTER ============
+  universes: router({
+    getAll: protectedProcedure.query(async () => {
+      return getAllUniverses();
+    }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().min(1),
+          slug: z.string().min(1),
+          description: z.string().optional(),
+          icon_url: z.string().optional(),
+          cover_image_url: z.string().optional(),
+          primary_color: z.string().optional(),
+          secondary_color: z.string().optional(),
+          is_featured: z.boolean().default(false),
+          is_active: z.boolean().default(true),
+          sort_order: z.number().default(0),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const id = await createUniverse({
+          ...input,
+          description: input.description || null,
+          icon_url: input.icon_url || null,
+          cover_image_url: input.cover_image_url || null,
+          primary_color: input.primary_color || null,
+          secondary_color: input.secondary_color || null,
+        });
+        if (!id) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create universe",
+          });
+        }
+        return { id };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          name: z.string().optional(),
+          slug: z.string().optional(),
+          description: z.string().optional(),
+          icon_url: z.string().optional(),
+          cover_image_url: z.string().optional(),
+          primary_color: z.string().optional(),
+          secondary_color: z.string().optional(),
+          is_featured: z.boolean().optional(),
+          is_active: z.boolean().optional(),
+          sort_order: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        const success = await updateUniverse(id, data);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update universe",
+          });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        const success = await deleteUniverse(input.id);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete universe",
+          });
+        }
+        return { success: true };
+      }),
   }),
 });
 
