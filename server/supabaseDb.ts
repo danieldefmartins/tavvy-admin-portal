@@ -521,3 +521,345 @@ export async function getRepStats(userId: string): Promise<RepStats> {
     return { total_reviews: 0, reviews_today: 0, reviews_this_week: 0, places_reviewed: 0 };
   }
 }
+
+// ============ ARTICLES QUERIES ============
+
+export interface Article {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string | null;
+  cover_image_url: string | null;
+  author_name: string | null;
+  author_avatar_url: string | null;
+  category_id: string | null;
+  category_name?: string | null;
+  universe_id: string | null;
+  universe_name?: string | null;
+  read_time_minutes: number | null;
+  is_featured: boolean;
+  status: string;
+  published_at: string | null;
+  created_at: string;
+}
+
+export interface ArticleCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export async function getAllArticles(): Promise<Article[]> {
+  const sql = getSupabaseDb();
+  if (!sql) return [];
+
+  try {
+    const result = await sql<Article[]>`
+      SELECT 
+        a.id, a.title, a.slug, a.excerpt, a.content, a.cover_image_url,
+        a.author_name, a.author_avatar_url, a.category_id, 
+        c.name as category_name,
+        a.universe_id,
+        u.name as universe_name,
+        a.read_time_minutes, a.is_featured, a.status, 
+        a.published_at, a.created_at
+      FROM atlas_articles a
+      LEFT JOIN atlas_categories c ON c.id = a.category_id
+      LEFT JOIN atlas_universes u ON u.id = a.universe_id
+      ORDER BY a.created_at DESC
+    `;
+    return result;
+  } catch (error) {
+    console.error("[Supabase] Get all articles error:", error);
+    return [];
+  }
+}
+
+export async function getArticleCategories(): Promise<ArticleCategory[]> {
+  const sql = getSupabaseDb();
+  if (!sql) return [];
+
+  try {
+    const result = await sql<ArticleCategory[]>`
+      SELECT id, name, slug
+      FROM atlas_categories
+      ORDER BY name ASC
+    `;
+    return result;
+  } catch (error) {
+    console.error("[Supabase] Get article categories error:", error);
+    return [];
+  }
+}
+
+export async function createArticle(data: Omit<Article, 'id' | 'created_at' | 'category_name' | 'universe_name'>): Promise<string | null> {
+  const sql = getSupabaseDb();
+  if (!sql) return null;
+
+  try {
+    const result = await sql`
+      INSERT INTO atlas_articles (
+        title, slug, excerpt, content, cover_image_url,
+        author_name, author_avatar_url, category_id, universe_id,
+        read_time_minutes, is_featured, status, published_at, created_at
+      ) VALUES (
+        ${data.title}, ${data.slug}, ${data.excerpt || null}, ${data.content || null}, 
+        ${data.cover_image_url || null}, ${data.author_name || null}, ${data.author_avatar_url || null},
+        ${data.category_id || null}, ${data.universe_id || null},
+        ${data.read_time_minutes || 5}, ${data.is_featured}, ${data.status},
+        ${data.status === 'published' ? new Date().toISOString() : null}, NOW()
+      )
+      RETURNING id
+    `;
+    return result.length > 0 ? (result[0].id as string) : null;
+  } catch (error) {
+    console.error("[Supabase] Create article error:", error);
+    return null;
+  }
+}
+
+export async function updateArticle(id: string, data: Partial<Article>): Promise<boolean> {
+  const sql = getSupabaseDb();
+  if (!sql) return false;
+
+  try {
+    await sql`
+      UPDATE atlas_articles SET
+        title = COALESCE(${data.title}, title),
+        slug = COALESCE(${data.slug}, slug),
+        excerpt = ${data.excerpt ?? null},
+        content = ${data.content ?? null},
+        cover_image_url = ${data.cover_image_url ?? null},
+        author_name = ${data.author_name ?? null},
+        author_avatar_url = ${data.author_avatar_url ?? null},
+        category_id = ${data.category_id || null},
+        universe_id = ${data.universe_id || null},
+        read_time_minutes = COALESCE(${data.read_time_minutes}, read_time_minutes),
+        is_featured = COALESCE(${data.is_featured}, is_featured),
+        status = COALESCE(${data.status}, status),
+        published_at = CASE WHEN ${data.status} = 'published' AND published_at IS NULL THEN NOW() ELSE published_at END,
+        updated_at = NOW()
+      WHERE id = ${id}
+    `;
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update article error:", error);
+    return false;
+  }
+}
+
+export async function deleteArticle(id: string): Promise<boolean> {
+  const sql = getSupabaseDb();
+  if (!sql) return false;
+
+  try {
+    await sql`DELETE FROM atlas_articles WHERE id = ${id}`;
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Delete article error:", error);
+    return false;
+  }
+}
+
+// ============ CITIES QUERIES ============
+
+export interface City {
+  id: string;
+  name: string;
+  slug: string;
+  state: string | null;
+  country: string;
+  population: number | null;
+  cover_image_url: string | null;
+  description: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  timezone: string | null;
+  is_featured: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+export async function getAllCities(): Promise<City[]> {
+  const sql = getSupabaseDb();
+  if (!sql) return [];
+
+  try {
+    const result = await sql<City[]>`
+      SELECT id, name, slug, state, country, population, cover_image_url,
+             description, latitude, longitude, timezone, is_featured, is_active, created_at
+      FROM tavvy_cities
+      ORDER BY name ASC
+    `;
+    return result;
+  } catch (error) {
+    console.error("[Supabase] Get all cities error:", error);
+    return [];
+  }
+}
+
+export async function createCity(data: Omit<City, 'id' | 'created_at'>): Promise<string | null> {
+  const sql = getSupabaseDb();
+  if (!sql) return null;
+
+  try {
+    const result = await sql`
+      INSERT INTO tavvy_cities (
+        name, slug, state, country, population, cover_image_url,
+        description, latitude, longitude, timezone, is_featured, is_active, created_at
+      ) VALUES (
+        ${data.name}, ${data.slug}, ${data.state || null}, ${data.country},
+        ${data.population || null}, ${data.cover_image_url || null},
+        ${data.description || null}, ${data.latitude || null}, ${data.longitude || null},
+        ${data.timezone || 'America/New_York'}, ${data.is_featured}, ${data.is_active}, NOW()
+      )
+      RETURNING id
+    `;
+    return result.length > 0 ? (result[0].id as string) : null;
+  } catch (error) {
+    console.error("[Supabase] Create city error:", error);
+    return null;
+  }
+}
+
+export async function updateCity(id: string, data: Partial<City>): Promise<boolean> {
+  const sql = getSupabaseDb();
+  if (!sql) return false;
+
+  try {
+    await sql`
+      UPDATE tavvy_cities SET
+        name = COALESCE(${data.name}, name),
+        slug = COALESCE(${data.slug}, slug),
+        state = ${data.state ?? null},
+        country = COALESCE(${data.country}, country),
+        population = ${data.population ?? null},
+        cover_image_url = ${data.cover_image_url ?? null},
+        description = ${data.description ?? null},
+        latitude = ${data.latitude ?? null},
+        longitude = ${data.longitude ?? null},
+        timezone = ${data.timezone ?? null},
+        is_featured = COALESCE(${data.is_featured}, is_featured),
+        is_active = COALESCE(${data.is_active}, is_active),
+        updated_at = NOW()
+      WHERE id = ${id}
+    `;
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update city error:", error);
+    return false;
+  }
+}
+
+export async function deleteCity(id: string): Promise<boolean> {
+  const sql = getSupabaseDb();
+  if (!sql) return false;
+
+  try {
+    await sql`DELETE FROM tavvy_cities WHERE id = ${id}`;
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Delete city error:", error);
+    return false;
+  }
+}
+
+// ============ UNIVERSES QUERIES ============
+
+export interface Universe {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  icon_url: string | null;
+  cover_image_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  is_featured: boolean;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export async function getAllUniverses(): Promise<Universe[]> {
+  const sql = getSupabaseDb();
+  if (!sql) return [];
+
+  try {
+    const result = await sql<Universe[]>`
+      SELECT id, name, slug, description, icon_url, cover_image_url,
+             primary_color, secondary_color, is_featured, is_active, sort_order, created_at
+      FROM atlas_universes
+      ORDER BY sort_order ASC, name ASC
+    `;
+    return result;
+  } catch (error) {
+    console.error("[Supabase] Get all universes error:", error);
+    return [];
+  }
+}
+
+export async function createUniverse(data: Omit<Universe, 'id' | 'created_at'>): Promise<string | null> {
+  const sql = getSupabaseDb();
+  if (!sql) return null;
+
+  try {
+    const result = await sql`
+      INSERT INTO atlas_universes (
+        name, slug, description, icon_url, cover_image_url,
+        primary_color, secondary_color, is_featured, is_active, sort_order, created_at
+      ) VALUES (
+        ${data.name}, ${data.slug}, ${data.description || null},
+        ${data.icon_url || null}, ${data.cover_image_url || null},
+        ${data.primary_color || '#3B82F6'}, ${data.secondary_color || '#1D4ED8'},
+        ${data.is_featured}, ${data.is_active}, ${data.sort_order || 0}, NOW()
+      )
+      RETURNING id
+    `;
+    return result.length > 0 ? (result[0].id as string) : null;
+  } catch (error) {
+    console.error("[Supabase] Create universe error:", error);
+    return null;
+  }
+}
+
+export async function updateUniverse(id: string, data: Partial<Universe>): Promise<boolean> {
+  const sql = getSupabaseDb();
+  if (!sql) return false;
+
+  try {
+    await sql`
+      UPDATE atlas_universes SET
+        name = COALESCE(${data.name}, name),
+        slug = COALESCE(${data.slug}, slug),
+        description = ${data.description ?? null},
+        icon_url = ${data.icon_url ?? null},
+        cover_image_url = ${data.cover_image_url ?? null},
+        primary_color = ${data.primary_color ?? null},
+        secondary_color = ${data.secondary_color ?? null},
+        is_featured = COALESCE(${data.is_featured}, is_featured),
+        is_active = COALESCE(${data.is_active}, is_active),
+        sort_order = COALESCE(${data.sort_order}, sort_order),
+        updated_at = NOW()
+      WHERE id = ${id}
+    `;
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update universe error:", error);
+    return false;
+  }
+}
+
+export async function deleteUniverse(id: string): Promise<boolean> {
+  const sql = getSupabaseDb();
+  if (!sql) return false;
+
+  try {
+    await sql`DELETE FROM atlas_universes WHERE id = ${id}`;
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Delete universe error:", error);
+    return false;
+  }
+}
