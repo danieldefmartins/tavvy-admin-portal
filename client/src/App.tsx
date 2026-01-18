@@ -11,6 +11,9 @@ import Places from "@/pages/Places";
 import QuickEntry from "@/pages/QuickEntry";
 import BatchUpload from "@/pages/BatchUpload";
 import Signals from "@/pages/Signals";
+import Articles from "@/pages/Articles";
+import Cities from "@/pages/Cities";
+import Universes from "@/pages/Universes";
 
 // Loading component
 function LoadingScreen() {
@@ -77,6 +80,24 @@ function App() {
         <Route path="/signals">
           <ProtectedRoute>
             <Signals />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/articles">
+          <ProtectedRoute>
+            <Articles />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/cities">
+          <ProtectedRoute>
+            <Cities />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/universes">
+          <ProtectedRoute>
+            <Universes />
           </ProtectedRoute>
         </Route>
 
