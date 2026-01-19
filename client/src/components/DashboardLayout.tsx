@@ -20,7 +20,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, MapPin, Zap, Upload, BarChart3, FileText, Building2, Globe } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, MapPin, Zap, Upload, BarChart3, FileText, Building2, Globe, Shield, Flag, History, Edit3 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -34,6 +34,11 @@ const menuItems = [
   { icon: FileText, label: "Articles", path: "/articles" },
   { icon: Building2, label: "Cities", path: "/cities" },
   { icon: Globe, label: "Universes", path: "/universes" },
+  // Admin & Safety
+  { icon: Shield, label: "Business Claims", path: "/business-claims" },
+  { icon: Flag, label: "Moderation", path: "/moderation" },
+  { icon: Edit3, label: "Overrides", path: "/overrides" },
+  { icon: History, label: "Audit Log", path: "/audit-log" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

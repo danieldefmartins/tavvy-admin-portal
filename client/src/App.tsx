@@ -14,6 +14,11 @@ import Signals from "@/pages/Signals";
 import Articles from "@/pages/Articles";
 import Cities from "@/pages/Cities";
 import Universes from "@/pages/Universes";
+// Admin & Safety Pages
+import BusinessClaims from "@/pages/BusinessClaims";
+import Moderation from "@/pages/Moderation";
+import Overrides from "@/pages/Overrides";
+import AuditLog from "@/pages/AuditLog";
 
 // Loading component
 function LoadingScreen() {
@@ -98,6 +103,31 @@ function App() {
         <Route path="/universes">
           <ProtectedRoute>
             <Universes />
+          </ProtectedRoute>
+        </Route>
+
+        {/* Admin & Safety Routes */}
+        <Route path="/business-claims">
+          <ProtectedRoute>
+            <BusinessClaims />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/moderation">
+          <ProtectedRoute>
+            <Moderation />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/overrides">
+          <ProtectedRoute>
+            <Overrides />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/audit-log">
+          <ProtectedRoute>
+            <AuditLog />
           </ProtectedRoute>
         </Route>
 

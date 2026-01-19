@@ -27,10 +27,11 @@ export type InsertUser = typeof users.$inferInsert;
 
 /**
  * Rep activity log - tracks all review submissions by reps
+ * userId is a varchar to store Supabase UUID strings
  */
 export const repActivityLog = mysqlTable("rep_activity_log", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: varchar("userId", { length: 64 }).notNull(),
   placeId: varchar("placeId", { length: 64 }).notNull(),
   signalSlug: varchar("signalSlug", { length: 128 }).notNull(),
   tapCount: int("tapCount").notNull().default(1),
@@ -43,10 +44,11 @@ export type InsertRepActivityLog = typeof repActivityLog.$inferInsert;
 
 /**
  * Batch import jobs - tracks CSV upload history
+ * userId is a varchar to store Supabase UUID strings
  */
 export const batchImportJobs = mysqlTable("batch_import_jobs", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: varchar("userId", { length: 64 }).notNull(),
   fileName: varchar("fileName", { length: 255 }).notNull(),
   totalRows: int("totalRows").notNull().default(0),
   successCount: int("successCount").notNull().default(0),

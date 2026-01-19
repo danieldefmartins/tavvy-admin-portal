@@ -5,7 +5,44 @@ const supabaseKey = process.env.SUPABASE_SERVICE_KEY || "";
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
+// ============ CONNECTION TEST ============
+export async function testConnection(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("review_items")
+      .select("id")
+      .limit(1);
+    
+    if (error) {
+      console.error("[Supabase] Connection test failed:", error);
+      return { success: false, error: error.message };
+    }
+    
+    console.log("[Supabase] Connection test successful");
+    return { success: true };
+  } catch (error: any) {
+    console.error("[Supabase] Connection test failed:", error);
+    return { success: false, error: error.message || String(error) };
+  }
+}
+
 // ============ PLACES ============
+export interface Place {
+  id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postal_code: string | null;
+  lat: number | null;
+  lng: number | null;
+  phone: string | null;
+  website: string | null;
+  category: string | null;
+  source: 'foursquare' | 'user';
+}
+
 export async function getPlaces(limit = 100, offset = 0) {
   const { data, error } = await supabase
     .from("fsq_places_raw")
@@ -17,15 +54,95 @@ export async function getPlaces(limit = 100, offset = 0) {
   return data;
 }
 
+export async function searchPlaces(
+  query: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<Place[]> {
+  try {
+    // Search in fsq_places_raw
+    const { data: fsqData, error: fsqError } = await supabase
+      .from("fsq_places_raw")
+      .select("*")
+      .or(`name.ilike.%${query}%,locality.ilike.%${query}%,address.ilike.%${query}%`)
+      .range(offset, offset + limit - 1)
+      .order("name", { ascending: true });
+
+    if (fsqError) {
+      console.error("[Supabase] Search places error:", fsqError);
+      return [];
+    }
+
+    // Map to Place interface
+    const places: Place[] = (fsqData || []).map((p: any) => ({
+      id: p.fsq_place_id || p.fsq_id || p.id,
+      name: p.name,
+      address: p.address,
+      city: p.locality,
+      state: p.region,
+      country: p.country,
+      postal_code: p.postcode,
+      lat: p.latitude,
+      lng: p.longitude,
+      phone: p.tel,
+      website: p.website,
+      category: p.fsq_category_labels,
+      source: 'foursquare' as const,
+    }));
+
+    console.log(`[Supabase] Found ${places.length} places for query: ${query}`);
+    return places;
+  } catch (error) {
+    console.error("[Supabase] Search places error:", error);
+    return [];
+  }
+}
+
 export async function getPlaceById(id: string) {
+  // Try fsq_places_raw first
   const { data, error } = await supabase
     .from("fsq_places_raw")
     .select("*")
-    .eq("fsq_id", id)
+    .or(`fsq_place_id.eq.${id},fsq_id.eq.${id}`)
     .single();
 
-  if (error) throw error;
-  return data;
+  if (error && error.code !== 'PGRST116') {
+    // PGRST116 = no rows returned, try alternate lookup
+    console.error("[Supabase] Get place by ID error:", error);
+  }
+  
+  if (data) return data;
+
+  // Fallback: try by id column directly
+  const { data: fallbackData, error: fallbackError } = await supabase
+    .from("fsq_places_raw")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (fallbackError && fallbackError.code !== 'PGRST116') {
+    throw fallbackError;
+  }
+
+  return fallbackData;
+}
+
+export async function getPlacesCount(): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from("fsq_places_raw")
+      .select("*", { count: "exact", head: true });
+
+    if (error) {
+      console.error("[Supabase] Get places count error:", error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (error) {
+    console.error("[Supabase] Get places count error:", error);
+    return 0;
+  }
 }
 
 export async function updatePlace(id: string, updates: any) {
@@ -62,6 +179,18 @@ export async function deletePlace(id: string) {
 }
 
 // ============ SIGNALS / REVIEW ITEMS ============
+export interface ReviewItem {
+  id: string;
+  slug: string;
+  label: string;
+  icon_emoji: string | null;
+  signal_type: "best_for" | "vibe" | "heads_up";
+  color: string | null;
+  is_universal: boolean;
+  sort_order: number;
+  is_active: boolean;
+}
+
 export async function getSignals() {
   const { data, error } = await supabase
     .from("review_items")
@@ -70,6 +199,48 @@ export async function getSignals() {
 
   if (error) throw error;
   return data;
+}
+
+export async function getAllReviewItems(): Promise<ReviewItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from("review_items")
+      .select("*")
+      .eq("is_active", true)
+      .order("signal_type", { ascending: true })
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      console.error("[Supabase] Get all review items error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get all review items error:", error);
+    return [];
+  }
+}
+
+export async function getReviewItemsByType(signalType: string): Promise<ReviewItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from("review_items")
+      .select("*")
+      .eq("signal_type", signalType)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      console.error("[Supabase] Get review items by type error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get review items by type error:", error);
+    return [];
+  }
 }
 
 export async function createSignal(signal: any) {
@@ -105,6 +276,242 @@ export async function deleteSignal(id: string) {
   return { success: true };
 }
 
+// ============ PLACE SIGNAL AGGREGATES ============
+export interface PlaceSignalAggregate {
+  place_id: string;
+  signal_id: string;
+  signal_slug: string;
+  signal_type: string;
+  bucket: string;
+  tap_total: number;
+  review_count: number;
+  last_tap_at: Date | null;
+}
+
+export async function getPlaceSignalAggregates(placeId: string): Promise<PlaceSignalAggregate[]> {
+  try {
+    const { data, error } = await supabase
+      .from("place_signal_aggregates")
+      .select(`
+        *,
+        review_items (
+          slug,
+          signal_type
+        )
+      `)
+      .eq("place_id", placeId)
+      .order("tap_total", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get place signal aggregates error:", error);
+      return [];
+    }
+
+    // Map to PlaceSignalAggregate interface
+    return (data || []).map((agg: any) => ({
+      place_id: agg.place_id,
+      signal_id: agg.signal_id,
+      signal_slug: agg.review_items?.slug || '',
+      signal_type: agg.review_items?.signal_type || '',
+      bucket: agg.bucket,
+      tap_total: agg.tap_total,
+      review_count: agg.review_count,
+      last_tap_at: agg.last_tap_at,
+    }));
+  } catch (error) {
+    console.error("[Supabase] Get place signal aggregates error:", error);
+    return [];
+  }
+}
+
+export async function upsertPlaceSignalAggregate(
+  placeId: string,
+  signalId: string,
+  bucket: string,
+  tapCount: number
+): Promise<void> {
+  try {
+    // First try to get existing aggregate
+    const { data: existing } = await supabase
+      .from("place_signal_aggregates")
+      .select("*")
+      .eq("place_id", placeId)
+      .eq("signal_id", signalId)
+      .eq("bucket", bucket)
+      .single();
+
+    if (existing) {
+      // Update existing
+      await supabase
+        .from("place_signal_aggregates")
+        .update({
+          tap_total: existing.tap_total + tapCount,
+          review_count: existing.review_count + 1,
+          last_tap_at: new Date().toISOString(),
+        })
+        .eq("place_id", placeId)
+        .eq("signal_id", signalId)
+        .eq("bucket", bucket);
+    } else {
+      // Insert new
+      await supabase
+        .from("place_signal_aggregates")
+        .insert({
+          place_id: placeId,
+          signal_id: signalId,
+          bucket: bucket,
+          tap_total: tapCount,
+          review_count: 1,
+          last_tap_at: new Date().toISOString(),
+        });
+    }
+  } catch (error) {
+    console.error("[Supabase] Upsert place signal aggregate error:", error);
+  }
+}
+
+// ============ BATCH IMPORT ============
+export interface BatchReviewInput {
+  place_id: string;
+  signal_slug: string;
+  tap_count: number;
+  rep_id?: string;
+}
+
+export async function batchImportReviews(
+  reviews: BatchReviewInput[],
+  repUserId: string
+): Promise<{ success: number; failed: number; errors: string[] }> {
+  let success = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const review of reviews) {
+    try {
+      // Get signal info by slug
+      const { data: signalData, error: signalError } = await supabase
+        .from("review_items")
+        .select("id, signal_type")
+        .eq("slug", review.signal_slug)
+        .single();
+
+      if (signalError || !signalData) {
+        errors.push(`Signal not found: ${review.signal_slug}`);
+        failed++;
+        continue;
+      }
+
+      const signalId = signalData.id;
+      const signalType = signalData.signal_type;
+
+      // Determine bucket based on signal type
+      const bucket = signalType === "best_for" ? "positive" :
+                     signalType === "heads_up" ? "negative" : "neutral";
+
+      // Create review
+      const { data: reviewData, error: reviewError } = await supabase
+        .from("reviews")
+        .insert({
+          place_id: review.place_id,
+          user_id: repUserId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (reviewError || !reviewData) {
+        errors.push(`Failed to create review for place: ${review.place_id}`);
+        failed++;
+        continue;
+      }
+
+      // Add review signal
+      const { error: signalInsertError } = await supabase
+        .from("review_signals")
+        .insert({
+          review_id: reviewData.id,
+          signal_id: signalId,
+          intensity: review.tap_count,
+          created_at: new Date().toISOString(),
+        });
+
+      if (signalInsertError) {
+        errors.push(`Failed to add signal for review: ${reviewData.id}`);
+        failed++;
+        continue;
+      }
+
+      // Update aggregates
+      await upsertPlaceSignalAggregate(review.place_id, signalId, bucket, review.tap_count);
+
+      success++;
+    } catch (error) {
+      errors.push(`Error processing review for place ${review.place_id}: ${error}`);
+      failed++;
+    }
+  }
+
+  return { success, failed, errors };
+}
+
+// ============ REP STATS ============
+export interface RepStats {
+  total_reviews: number;
+  reviews_today: number;
+  reviews_this_week: number;
+  places_reviewed: number;
+}
+
+export async function getRepStats(userId: string): Promise<RepStats> {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    weekAgo.setHours(0, 0, 0, 0);
+
+    // Get total reviews
+    const { count: totalCount } = await supabase
+      .from("reviews")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    // Get reviews today
+    const { count: todayCount } = await supabase
+      .from("reviews")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("created_at", today.toISOString());
+
+    // Get reviews this week
+    const { count: weekCount } = await supabase
+      .from("reviews")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("created_at", weekAgo.toISOString());
+
+    // Get distinct places reviewed
+    const { data: placesData } = await supabase
+      .from("reviews")
+      .select("place_id")
+      .eq("user_id", userId);
+
+    const uniquePlaces = new Set(placesData?.map(r => r.place_id) || []);
+
+    return {
+      total_reviews: totalCount || 0,
+      reviews_today: todayCount || 0,
+      reviews_this_week: weekCount || 0,
+      places_reviewed: uniquePlaces.size,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get rep stats error:", error);
+    return { total_reviews: 0, reviews_today: 0, reviews_this_week: 0, places_reviewed: 0 };
+  }
+}
+
 // ============ ARTICLES ============
 // Matches your existing atlas_articles table structure
 export async function getArticles() {
@@ -127,6 +534,9 @@ export async function getArticles() {
   }));
 }
 
+// Alias for router compatibility
+export const getAllArticles = getArticles;
+
 export async function getArticleById(id: string) {
   const { data, error } = await supabase
     .from("atlas_articles")
@@ -145,16 +555,17 @@ export async function getArticleById(id: string) {
 export async function createArticle(article: {
   title: string;
   slug: string;
-  excerpt?: string;
-  content?: string;
-  cover_image_url?: string;
-  author_name?: string;
-  author_avatar_url?: string;
-  category_id?: string;
-  universe_id?: string;
-  read_time_minutes?: number;
+  excerpt?: string | null;
+  content?: string | null;
+  cover_image_url?: string | null;
+  author_name?: string | null;
+  author_avatar_url?: string | null;
+  category_id?: string | null;
+  universe_id?: string | null;
+  read_time_minutes?: number | null;
   is_featured?: boolean;
   status?: string;
+  published_at?: string | null;
 }) {
   const { data, error } = await supabase
     .from("atlas_articles")
@@ -168,10 +579,10 @@ export async function createArticle(article: {
     .single();
 
   if (error) throw error;
-  return data;
+  return data?.id || null;
 }
 
-export async function updateArticle(id: string, updates: any) {
+export async function updateArticle(id: string, updates: any): Promise<boolean> {
   // If status is changing to published, set published_at
   if (updates.status === "published") {
     const { data: existing } = await supabase
@@ -185,7 +596,7 @@ export async function updateArticle(id: string, updates: any) {
     }
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("atlas_articles")
     .update({
       ...updates,
@@ -193,22 +604,26 @@ export async function updateArticle(id: string, updates: any) {
       universe_id: updates.universe_id || null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id)
-    .select()
-    .single();
+    .eq("id", id);
 
-  if (error) throw error;
-  return data;
+  if (error) {
+    console.error("[Supabase] Update article error:", error);
+    return false;
+  }
+  return true;
 }
 
-export async function deleteArticle(id: string) {
+export async function deleteArticle(id: string): Promise<boolean> {
   const { error } = await supabase
     .from("atlas_articles")
     .delete()
     .eq("id", id);
 
-  if (error) throw error;
-  return { success: true };
+  if (error) {
+    console.error("[Supabase] Delete article error:", error);
+    return false;
+  }
+  return true;
 }
 
 // ============ CATEGORIES (for articles) ============
@@ -222,6 +637,9 @@ export async function getCategories() {
   if (error) throw error;
   return data;
 }
+
+// Alias for router compatibility
+export const getArticleCategories = getCategories;
 
 export async function createCategory(category: {
   name: string;
@@ -278,6 +696,9 @@ export async function getUniverses() {
   return data;
 }
 
+// Alias for router compatibility
+export const getAllUniverses = getUniverses;
+
 export async function getUniverseById(id: string) {
   const { data, error } = await supabase
     .from("atlas_universes")
@@ -292,72 +713,54 @@ export async function getUniverseById(id: string) {
 export async function createUniverse(universe: {
   name: string;
   slug: string;
-  description?: string;
-  location?: string;
-  banner_image_url?: string;
-  thumbnail_image_url?: string;
-  category_id?: string;
-  parent_universe_id?: string;
+  description?: string | null;
+  icon_url?: string | null;
+  cover_image_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
   is_featured?: boolean;
-  status?: string;
+  is_active?: boolean;
+  sort_order?: number;
 }) {
   const { data, error } = await supabase
     .from("atlas_universes")
     .insert({
       ...universe,
-      category_id: universe.category_id || null,
-      parent_universe_id: universe.parent_universe_id || null,
-      place_count: 0,
-      article_count: 0,
-      sub_universe_count: 0,
-      total_signals: 0,
-      published_at: universe.status === "published" ? new Date().toISOString() : null,
     })
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data?.id || null;
 }
 
-export async function updateUniverse(id: string, updates: any) {
-  // If status is changing to published, set published_at
-  if (updates.status === "published") {
-    const { data: existing } = await supabase
-      .from("atlas_universes")
-      .select("published_at")
-      .eq("id", id)
-      .single();
-    
-    if (!existing?.published_at) {
-      updates.published_at = new Date().toISOString();
-    }
-  }
-
-  const { data, error } = await supabase
+export async function updateUniverse(id: string, updates: any): Promise<boolean> {
+  const { error } = await supabase
     .from("atlas_universes")
     .update({
       ...updates,
-      category_id: updates.category_id || null,
-      parent_universe_id: updates.parent_universe_id || null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id)
-    .select()
-    .single();
+    .eq("id", id);
 
-  if (error) throw error;
-  return data;
+  if (error) {
+    console.error("[Supabase] Update universe error:", error);
+    return false;
+  }
+  return true;
 }
 
-export async function deleteUniverse(id: string) {
+export async function deleteUniverse(id: string): Promise<boolean> {
   const { error } = await supabase
     .from("atlas_universes")
     .delete()
     .eq("id", id);
 
-  if (error) throw error;
-  return { success: true };
+  if (error) {
+    console.error("[Supabase] Delete universe error:", error);
+    return false;
+  }
+  return true;
 }
 
 // ============ CITIES ============
@@ -371,6 +774,9 @@ export async function getCities() {
   if (error) throw error;
   return data;
 }
+
+// Alias for router compatibility
+export const getAllCities = getCities;
 
 export async function getCityById(id: string) {
   const { data, error } = await supabase
@@ -386,17 +792,17 @@ export async function getCityById(id: string) {
 export async function createCity(city: {
   name: string;
   slug: string;
-  state?: string;
+  state?: string | null;
   country?: string;
   region?: string;
-  population?: number;
+  population?: number | null;
   timezone?: string;
   airport_code?: string;
-  latitude?: number;
-  longitude?: number;
-  cover_image_url?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  cover_image_url?: string | null;
   thumbnail_image_url?: string;
-  description?: string;
+  description?: string | null;
   history?: string;
   culture?: string;
   famous_people?: string;
@@ -420,32 +826,36 @@ export async function createCity(city: {
     .single();
 
   if (error) throw error;
-  return data;
+  return data?.id || null;
 }
 
-export async function updateCity(id: string, updates: any) {
-  const { data, error } = await supabase
+export async function updateCity(id: string, updates: any): Promise<boolean> {
+  const { error } = await supabase
     .from("tavvy_cities")
     .update({
       ...updates,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id)
-    .select()
-    .single();
+    .eq("id", id);
 
-  if (error) throw error;
-  return data;
+  if (error) {
+    console.error("[Supabase] Update city error:", error);
+    return false;
+  }
+  return true;
 }
 
-export async function deleteCity(id: string) {
+export async function deleteCity(id: string): Promise<boolean> {
   const { error } = await supabase
     .from("tavvy_cities")
     .delete()
     .eq("id", id);
 
-  if (error) throw error;
-  return { success: true };
+  if (error) {
+    console.error("[Supabase] Delete city error:", error);
+    return false;
+  }
+  return true;
 }
 
 // ============ DASHBOARD STATS ============
@@ -465,4 +875,455 @@ export async function getDashboardStats() {
     universesCount: universes.count || 0,
     citiesCount: cities.count || 0,
   };
+}
+
+
+// ============ BUSINESS CLAIMS ============
+export interface BusinessClaim {
+  id: string;
+  user_id: string;
+  provider_id: string | null;
+  place_id: string | null;
+  business_name: string;
+  business_phone: string | null;
+  business_email: string | null;
+  business_address: string | null;
+  verification_code: string | null;
+  verification_code_expires_at: string | null;
+  verification_attempts: number;
+  status: 'pending' | 'verified' | 'rejected' | 'expired';
+  created_at: string;
+  verified_at: string | null;
+}
+
+export async function getBusinessClaims(status?: string): Promise<BusinessClaim[]> {
+  try {
+    let query = supabase
+      .from("pro_business_claims")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[Supabase] Get business claims error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get business claims error:", error);
+    return [];
+  }
+}
+
+export async function getBusinessClaimById(id: string): Promise<BusinessClaim | null> {
+  try {
+    const { data, error } = await supabase
+      .from("pro_business_claims")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Get business claim by ID error:", error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("[Supabase] Get business claim by ID error:", error);
+    return null;
+  }
+}
+
+export async function updateBusinessClaimStatus(
+  id: string,
+  status: 'verified' | 'rejected',
+  adminId: string
+): Promise<boolean> {
+  try {
+    const updates: any = {
+      status,
+    };
+
+    if (status === 'verified') {
+      updates.verified_at = new Date().toISOString();
+    }
+
+    const { error } = await supabase
+      .from("pro_business_claims")
+      .update(updates)
+      .eq("id", id);
+
+    if (error) {
+      console.error("[Supabase] Update business claim status error:", error);
+      return false;
+    }
+
+    // Log admin action
+    await logAdminActivity(adminId, `claim_${status}`, id, 'business_claim');
+
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update business claim status error:", error);
+    return false;
+  }
+}
+
+// ============ CONTENT FLAGS / MODERATION ============
+export interface ContentFlag {
+  id: string;
+  content_type: string;
+  content_id: string;
+  flagged_by: string | null;
+  reason: string;
+  note: string | null;
+  created_at: string;
+  status: 'pending' | 'reviewed' | 'dismissed' | 'actioned';
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+}
+
+export interface ModerationQueueItem {
+  id: string;
+  item_type: string;
+  item_id: string;
+  submitted_by: string | null;
+  content: any;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+}
+
+export async function getContentFlags(status?: string): Promise<ContentFlag[]> {
+  try {
+    let query = supabase
+      .from("content_flags")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[Supabase] Get content flags error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get content flags error:", error);
+    return [];
+  }
+}
+
+export async function getModerationQueue(status?: string): Promise<ModerationQueueItem[]> {
+  try {
+    let query = supabase
+      .from("moderation_queue")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[Supabase] Get moderation queue error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get moderation queue error:", error);
+    return [];
+  }
+}
+
+export async function reviewContentFlag(
+  id: string,
+  status: 'reviewed' | 'dismissed' | 'actioned',
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("content_flags")
+      .update({
+        status,
+        reviewed_by: adminId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) {
+      console.error("[Supabase] Review content flag error:", error);
+      return false;
+    }
+
+    // Log admin action
+    await logAdminActivity(adminId, `flag_${status}`, id, 'content_flag');
+
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Review content flag error:", error);
+    return false;
+  }
+}
+
+export async function reviewModerationItem(
+  id: string,
+  status: 'approved' | 'rejected',
+  adminId: string,
+  rejectionReason?: string
+): Promise<boolean> {
+  try {
+    const updates: any = {
+      status,
+      reviewed_by: adminId,
+      reviewed_at: new Date().toISOString(),
+    };
+
+    if (status === 'rejected' && rejectionReason) {
+      updates.rejection_reason = rejectionReason;
+    }
+
+    const { error } = await supabase
+      .from("moderation_queue")
+      .update(updates)
+      .eq("id", id);
+
+    if (error) {
+      console.error("[Supabase] Review moderation item error:", error);
+      return false;
+    }
+
+    // Log admin action
+    await logAdminActivity(adminId, `moderation_${status}`, id, 'moderation_item');
+
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Review moderation item error:", error);
+    return false;
+  }
+}
+
+// ============ ADMIN ACTIVITY LOG (AUDIT) ============
+export interface AdminActivityLog {
+  id: string;
+  admin_id: string;
+  action_type: string;
+  target_id: string | null;
+  target_type: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export async function getAdminActivityLog(
+  limit: number = 100,
+  adminId?: string
+): Promise<AdminActivityLog[]> {
+  try {
+    let query = supabase
+      .from("admin_activity_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (adminId) {
+      query = query.eq("admin_id", adminId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[Supabase] Get admin activity log error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get admin activity log error:", error);
+    return [];
+  }
+}
+
+export async function logAdminActivity(
+  adminId: string,
+  actionType: string,
+  targetId?: string,
+  targetType?: string,
+  notes?: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("admin_activity_log")
+      .insert({
+        admin_id: adminId,
+        action_type: actionType,
+        target_id: targetId || null,
+        target_type: targetType || null,
+        notes: notes || null,
+      });
+
+    if (error) {
+      console.error("[Supabase] Log admin activity error:", error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Log admin activity error:", error);
+    return false;
+  }
+}
+
+// ============ PLACE OVERRIDES ============
+export interface PlaceOverride {
+  id: string;
+  place_id: string;
+  field_name: string;
+  override_value: string;
+  override_by: string;
+  override_reason: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getPlaceOverrides(status?: string): Promise<PlaceOverride[]> {
+  try {
+    let query = supabase
+      .from("place_overrides")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[Supabase] Get place overrides error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get place overrides error:", error);
+    return [];
+  }
+}
+
+export async function createPlaceOverride(
+  placeId: string,
+  fieldName: string,
+  overrideValue: string,
+  overrideBy: string,
+  overrideReason?: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from("place_overrides")
+      .insert({
+        place_id: placeId,
+        field_name: fieldName,
+        override_value: overrideValue,
+        override_by: overrideBy,
+        override_reason: overrideReason || null,
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Create place override error:", error);
+      return null;
+    }
+
+    // Log admin action
+    await logAdminActivity(overrideBy, 'override_created', data.id, 'place_override', `Field: ${fieldName}`);
+
+    return data.id;
+  } catch (error) {
+    console.error("[Supabase] Create place override error:", error);
+    return null;
+  }
+}
+
+export async function reviewPlaceOverride(
+  id: string,
+  status: 'approved' | 'rejected',
+  reviewedBy: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("place_overrides")
+      .update({
+        status,
+        reviewed_by: reviewedBy,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) {
+      console.error("[Supabase] Review place override error:", error);
+      return false;
+    }
+
+    // Log admin action
+    await logAdminActivity(reviewedBy, `override_${status}`, id, 'place_override');
+
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Review place override error:", error);
+    return false;
+  }
+}
+
+// ============ MODERATION STATS ============
+export async function getModerationStats(): Promise<{
+  pendingClaims: number;
+  pendingFlags: number;
+  pendingModeration: number;
+  pendingOverrides: number;
+}> {
+  try {
+    const [claims, flags, moderation, overrides] = await Promise.all([
+      supabase.from("pro_business_claims").select("*", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("content_flags").select("*", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("moderation_queue").select("*", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("place_overrides").select("*", { count: "exact", head: true }).eq("status", "pending"),
+    ]);
+
+    return {
+      pendingClaims: claims.count || 0,
+      pendingFlags: flags.count || 0,
+      pendingModeration: moderation.count || 0,
+      pendingOverrides: overrides.count || 0,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get moderation stats error:", error);
+    return {
+      pendingClaims: 0,
+      pendingFlags: 0,
+      pendingModeration: 0,
+      pendingOverrides: 0,
+    };
+  }
 }

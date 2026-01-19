@@ -28,6 +28,24 @@ import {
   createUniverse,
   updateUniverse,
   deleteUniverse,
+  // Business Claims
+  getBusinessClaims,
+  getBusinessClaimById,
+  updateBusinessClaimStatus,
+  // Moderation
+  getContentFlags,
+  getModerationQueue,
+  reviewContentFlag,
+  reviewModerationItem,
+  // Audit Log
+  getAdminActivityLog,
+  logAdminActivity,
+  // Place Overrides
+  getPlaceOverrides,
+  createPlaceOverride,
+  reviewPlaceOverride,
+  // Stats
+  getModerationStats,
 } from "./supabaseDb";
 import { getDb } from "./db";
 import { repActivityLog, batchImportJobs } from "../drizzle/schema";
@@ -217,7 +235,7 @@ export const appRouter = router({
         // Log each signal submission
         for (const signal of input.signals) {
           await db.insert(repActivityLog).values({
-            oderId: userId,
+            userId: userId,
             placeId: input.placeId,
             signalSlug: signal.signalSlug,
             tapCount: signal.tapCount,
@@ -261,7 +279,7 @@ export const appRouter = router({
 
         // Create batch import job
         const jobResult = await db.insert(batchImportJobs).values({
-          oderId: userId,
+          userId: userId,
           fileName: input.fileName,
           totalRows: input.reviews.length,
           status: "processing",
@@ -272,7 +290,7 @@ export const appRouter = router({
         // Log each review
         for (const review of input.reviews) {
           await db.insert(repActivityLog).values({
-            oderId: userId,
+            userId: userId,
             placeId: review.place_id,
             signalSlug: review.signal_slug,
             tapCount: review.tap_count,
@@ -349,12 +367,12 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) return [];
 
-        const oderId = ctx.user?.id || "anonymous";
+        const userId = ctx.user?.id || "anonymous";
 
         return db
           .select()
           .from(repActivityLog)
-          .where(eq(repActivityLog.oderId, oderId))
+          .where(eq(repActivityLog.userId, userId))
           .orderBy(desc(repActivityLog.createdAt))
           .limit(50);
       }),
@@ -363,12 +381,12 @@ export const appRouter = router({
       const db = await getDb();
       if (!db) return [];
 
-      const oderId = ctx.user?.id || "anonymous";
+      const userId = ctx.user?.id || "anonymous";
 
       return db
         .select()
         .from(batchImportJobs)
-        .where(eq(batchImportJobs.oderId, oderId))
+        .where(eq(batchImportJobs.userId, userId))
         .orderBy(desc(batchImportJobs.createdAt))
         .limit(20);
     }),
@@ -503,7 +521,7 @@ export const appRouter = router({
           description: input.description || null,
           latitude: input.latitude || null,
           longitude: input.longitude || null,
-          timezone: input.timezone || null,
+          timezone: input.timezone || undefined,
         });
         if (!id) {
           throw new TRPCError({
@@ -633,6 +651,231 @@ export const appRouter = router({
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: "Failed to delete universe",
+          });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ BUSINESS CLAIMS ROUTER ============
+  businessClaims: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          status: z.enum(["pending", "verified", "rejected", "expired"]).optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getBusinessClaims(input?.status);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        const claim = await getBusinessClaimById(input.id);
+        if (!claim) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Business claim not found",
+          });
+        }
+        return claim;
+      }),
+
+    approve: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await updateBusinessClaimStatus(input.id, "verified", adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to approve business claim",
+          });
+        }
+        return { success: true };
+      }),
+
+    reject: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await updateBusinessClaimStatus(input.id, "rejected", adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to reject business claim",
+          });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ MODERATION ROUTER ============
+  moderation: router({
+    getFlags: protectedProcedure
+      .input(
+        z.object({
+          status: z.enum(["pending", "reviewed", "dismissed", "actioned"]).optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getContentFlags(input?.status);
+      }),
+
+    getQueue: protectedProcedure
+      .input(
+        z.object({
+          status: z.enum(["pending", "approved", "rejected"]).optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getModerationQueue(input?.status);
+      }),
+
+    reviewFlag: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          status: z.enum(["reviewed", "dismissed", "actioned"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await reviewContentFlag(input.id, input.status, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to review content flag",
+          });
+        }
+        return { success: true };
+      }),
+
+    reviewQueueItem: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          status: z.enum(["approved", "rejected"]),
+          rejectionReason: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await reviewModerationItem(
+          input.id,
+          input.status,
+          adminId,
+          input.rejectionReason
+        );
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to review moderation item",
+          });
+        }
+        return { success: true };
+      }),
+
+    getStats: protectedProcedure.query(async () => {
+      return getModerationStats();
+    }),
+  }),
+
+  // ============ AUDIT LOG ROUTER ============
+  auditLog: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().min(1).max(500).default(100),
+          adminId: z.string().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getAdminActivityLog(input?.limit || 100, input?.adminId);
+      }),
+
+    log: protectedProcedure
+      .input(
+        z.object({
+          actionType: z.string(),
+          targetId: z.string().optional(),
+          targetType: z.string().optional(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await logAdminActivity(
+          adminId,
+          input.actionType,
+          input.targetId,
+          input.targetType,
+          input.notes
+        );
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to log admin activity",
+          });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ PLACE OVERRIDES ROUTER ============
+  overrides: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          status: z.enum(["pending", "approved", "rejected"]).optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getPlaceOverrides(input?.status);
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          placeId: z.string(),
+          fieldName: z.string(),
+          overrideValue: z.string(),
+          overrideReason: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const id = await createPlaceOverride(
+          input.placeId,
+          input.fieldName,
+          input.overrideValue,
+          adminId,
+          input.overrideReason
+        );
+        if (!id) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create place override",
+          });
+        }
+        return { id };
+      }),
+
+    review: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          status: z.enum(["approved", "rejected"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await reviewPlaceOverride(input.id, input.status, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to review place override",
           });
         }
         return { success: true };

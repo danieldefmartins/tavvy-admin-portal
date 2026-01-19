@@ -24,3 +24,7 @@ export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
     },
   });
 });
+
+// Admin procedure - requires authentication and admin role
+// For now, this is an alias to protectedProcedure since all portal users are super admins
+export const adminProcedure = protectedProcedure;

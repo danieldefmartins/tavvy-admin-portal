@@ -90,7 +90,7 @@ export default function Places() {
                     <div>
                       <h3 className="font-semibold">{place.name}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {place.address_line1 || place.city || "No address"}
+                        {place.address || place.city || "No address"}
                       </p>
                       {place.category && (
                         <p className="text-xs text-muted-foreground mt-1">
