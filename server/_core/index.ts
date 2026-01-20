@@ -16,9 +16,20 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 
-// Health check endpoint
+// Health check endpoint for API
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Root health check for Railway deployment (responds before static files)
+app.get("/", (req, res, next) => {
+  // If this is a health check (no Accept header for HTML), respond immediately
+  const acceptHeader = req.headers.accept || '';
+  if (!acceptHeader.includes('text/html')) {
+    return res.json({ status: "ok", timestamp: new Date().toISOString() });
+  }
+  // Otherwise, let it fall through to static file serving
+  next();
 });
 
 // tRPC endpoint
