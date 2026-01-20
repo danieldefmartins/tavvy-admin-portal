@@ -52,7 +52,7 @@ export async function createGHLContact(
       body: JSON.stringify({
         ...contactData,
         locationId,
-        source: 'TavvY Pros Portal',
+        source: 'Tavvy Pros Portal',
       }),
     });
 
@@ -191,7 +191,7 @@ export async function addGHLContactTags(
 }
 
 /**
- * Sync a new TavvY Pro to GoHighLevel
+ * Sync a new Tavvy Pro to GoHighLevel
  * This is the main function to call after a Pro signs up
  */
 export async function syncProToGHL(
@@ -239,7 +239,7 @@ export async function syncProToGHL(
       // Add Pro tags
       await addGHLContactTags(
         existing.contactId,
-        ['TavvY Pro', 'Paid Member', ...(proData.services || [])],
+        ['Tavvy Pro', 'Paid Member', ...(proData.services || [])],
         apiKey
       );
     }
@@ -263,7 +263,7 @@ export async function syncProToGHL(
       state: proData.state,
       postalCode: proData.zipCode,
       website: proData.website,
-      tags: ['TavvY Pro', 'New Signup', ...(proData.services || [])],
+      tags: ['Tavvy Pro', 'New Signup', ...(proData.services || [])],
       customField: proData.yearsExperience 
         ? { years_experience: String(proData.yearsExperience) }
         : undefined,

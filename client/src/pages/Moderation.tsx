@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { 
@@ -14,7 +16,13 @@ import {
   Eye,
   MessageSquare,
   Image,
-  FileText
+  FileText,
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+  X
 } from "lucide-react";
 import {
   AlertDialog,
@@ -33,6 +41,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
@@ -59,6 +72,9 @@ const contentTypeIcons: Record<string, React.ReactNode> = {
   default: <Flag className="h-4 w-4" />,
 };
 
+const contentTypes = ["review", "photo", "post", "comment", "profile"];
+const flagReasons = ["spam", "inappropriate", "misleading", "harassment", "other"];
+
 export default function Moderation() {
   const [view, setView] = useState<"flags" | "queue">("flags");
   const [flagFilter, setFlagFilter] = useState<FlagStatus | "all">("pending");
@@ -71,6 +87,20 @@ export default function Moderation() {
   const [queueAction, setQueueAction] = useState<QueueStatus | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
+  // Search/filter state
+  const [showFilters, setShowFilters] = useState(false);
+  const [flagFilters, setFlagFilters] = useState({
+    contentType: "",
+    reason: "",
+    contentId: "",
+    flaggedBy: "",
+  });
+  const [queueFilters, setQueueFilters] = useState({
+    itemType: "",
+    itemId: "",
+    submittedBy: "",
+  });
+
   const { data: stats } = trpc.moderation.getStats.useQuery();
 
   const { data: flags, isLoading: flagsLoading, refetch: refetchFlags } = trpc.moderation.getFlags.useQuery(
@@ -80,6 +110,43 @@ export default function Moderation() {
   const { data: queue, isLoading: queueLoading, refetch: refetchQueue } = trpc.moderation.getQueue.useQuery(
     queueFilter === "all" ? undefined : { status: queueFilter }
   );
+
+  // Filter flags client-side
+  const filteredFlags = useMemo(() => {
+    if (!flags) return [];
+    return flags.filter(flag => {
+      if (flagFilters.contentType && flag.content_type !== flagFilters.contentType) return false;
+      if (flagFilters.reason && !flag.reason?.toLowerCase().includes(flagFilters.reason.toLowerCase())) return false;
+      if (flagFilters.contentId && !flag.content_id?.toLowerCase().includes(flagFilters.contentId.toLowerCase())) return false;
+      if (flagFilters.flaggedBy && !flag.flagged_by?.toLowerCase().includes(flagFilters.flaggedBy.toLowerCase())) return false;
+      return true;
+    });
+  }, [flags, flagFilters]);
+
+  // Filter queue client-side
+  const filteredQueue = useMemo(() => {
+    if (!queue) return [];
+    return queue.filter(item => {
+      if (queueFilters.itemType && item.item_type !== queueFilters.itemType) return false;
+      if (queueFilters.itemId && !item.item_id?.toLowerCase().includes(queueFilters.itemId.toLowerCase())) return false;
+      if (queueFilters.submittedBy && !item.submitted_by?.toLowerCase().includes(queueFilters.submittedBy.toLowerCase())) return false;
+      return true;
+    });
+  }, [queue, queueFilters]);
+
+  const hasFlagFilters = Object.values(flagFilters).some(v => v.length > 0);
+  const hasQueueFilters = Object.values(queueFilters).some(v => v.length > 0);
+  const activeFilterCount = view === "flags" 
+    ? Object.values(flagFilters).filter(v => v.length > 0).length
+    : Object.values(queueFilters).filter(v => v.length > 0).length;
+
+  const handleClearFilters = () => {
+    if (view === "flags") {
+      setFlagFilters({ contentType: "", reason: "", contentId: "", flaggedBy: "" });
+    } else {
+      setQueueFilters({ itemType: "", itemId: "", submittedBy: "" });
+    }
+  };
 
   const reviewFlagMutation = trpc.moderation.reviewFlag.useMutation({
     onSuccess: () => {
@@ -179,6 +246,164 @@ export default function Moderation() {
         </Card>
       </div>
 
+      {/* Search/Filter Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <Collapsible open={showFilters} onOpenChange={setShowFilters}>
+            <div className="flex items-center justify-between">
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <Filter className="h-4 w-4" />
+                  Search & Filter
+                  {activeFilterCount > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                  {showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              {(hasFlagFilters || hasQueueFilters) && (
+                <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-2 text-muted-foreground">
+                  <RotateCcw className="h-4 w-4" />
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+
+            <CollapsibleContent className="pt-4">
+              {view === "flags" ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label>Content Type</Label>
+                    <Select value={flagFilters.contentType} onValueChange={(v) => setFlagFilters({ ...flagFilters, contentType: v === "all" ? "" : v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        {contentTypes.map(type => (
+                          <SelectItem key={type} value={type} className="capitalize">{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Reason</Label>
+                    <Input
+                      placeholder="Search by reason..."
+                      value={flagFilters.reason}
+                      onChange={(e) => setFlagFilters({ ...flagFilters, reason: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Content ID</Label>
+                    <Input
+                      placeholder="Search by content ID..."
+                      value={flagFilters.contentId}
+                      onChange={(e) => setFlagFilters({ ...flagFilters, contentId: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Flagged By</Label>
+                    <Input
+                      placeholder="Search by user..."
+                      value={flagFilters.flaggedBy}
+                      onChange={(e) => setFlagFilters({ ...flagFilters, flaggedBy: e.target.value })}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>Item Type</Label>
+                    <Select value={queueFilters.itemType} onValueChange={(v) => setQueueFilters({ ...queueFilters, itemType: v === "all" ? "" : v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        {contentTypes.map(type => (
+                          <SelectItem key={type} value={type} className="capitalize">{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Item ID</Label>
+                    <Input
+                      placeholder="Search by item ID..."
+                      value={queueFilters.itemId}
+                      onChange={(e) => setQueueFilters({ ...queueFilters, itemId: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Submitted By</Label>
+                    <Input
+                      placeholder="Search by user..."
+                      value={queueFilters.submittedBy}
+                      onChange={(e) => setQueueFilters({ ...queueFilters, submittedBy: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </CardContent>
+      </Card>
+
+      {/* Active Filters Display */}
+      {view === "flags" && hasFlagFilters && (
+        <div className="flex flex-wrap gap-2">
+          {flagFilters.contentType && (
+            <Badge variant="secondary" className="gap-1">
+              Type: {flagFilters.contentType}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setFlagFilters({ ...flagFilters, contentType: "" })} />
+            </Badge>
+          )}
+          {flagFilters.reason && (
+            <Badge variant="secondary" className="gap-1">
+              Reason: {flagFilters.reason}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setFlagFilters({ ...flagFilters, reason: "" })} />
+            </Badge>
+          )}
+          {flagFilters.contentId && (
+            <Badge variant="secondary" className="gap-1">
+              Content: {flagFilters.contentId}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setFlagFilters({ ...flagFilters, contentId: "" })} />
+            </Badge>
+          )}
+          {flagFilters.flaggedBy && (
+            <Badge variant="secondary" className="gap-1">
+              By: {flagFilters.flaggedBy}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setFlagFilters({ ...flagFilters, flaggedBy: "" })} />
+            </Badge>
+          )}
+        </div>
+      )}
+      {view === "queue" && hasQueueFilters && (
+        <div className="flex flex-wrap gap-2">
+          {queueFilters.itemType && (
+            <Badge variant="secondary" className="gap-1">
+              Type: {queueFilters.itemType}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setQueueFilters({ ...queueFilters, itemType: "" })} />
+            </Badge>
+          )}
+          {queueFilters.itemId && (
+            <Badge variant="secondary" className="gap-1">
+              Item: {queueFilters.itemId}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setQueueFilters({ ...queueFilters, itemId: "" })} />
+            </Badge>
+          )}
+          {queueFilters.submittedBy && (
+            <Badge variant="secondary" className="gap-1">
+              By: {queueFilters.submittedBy}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setQueueFilters({ ...queueFilters, submittedBy: "" })} />
+            </Badge>
+          )}
+        </div>
+      )}
+
       <Tabs value={view} onValueChange={(v) => setView(v as "flags" | "queue")}>
         <TabsList>
           <TabsTrigger value="flags">Content Flags</TabsTrigger>
@@ -200,15 +425,18 @@ export default function Moderation() {
                 <SelectItem value="actioned">Actioned</SelectItem>
               </SelectContent>
             </Select>
+            <span className="text-sm text-muted-foreground">
+              Showing {filteredFlags.length} of {flags?.length || 0} flags
+            </span>
           </div>
 
           {flagsLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : flags && flags.length > 0 ? (
+          ) : filteredFlags && filteredFlags.length > 0 ? (
             <div className="grid gap-4">
-              {flags.map((flag) => (
+              {filteredFlags.map((flag) => (
                 <Card key={flag.id}>
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -297,7 +525,14 @@ export default function Moderation() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Flag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No content flags found</p>
+                <p className="text-muted-foreground">
+                  {hasFlagFilters ? "No flags match your filters" : "No content flags found"}
+                </p>
+                {hasFlagFilters && (
+                  <Button variant="outline" className="mt-4" onClick={handleClearFilters}>
+                    Clear Filters
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
@@ -317,15 +552,18 @@ export default function Moderation() {
                 <SelectItem value="rejected">Rejected</SelectItem>
               </SelectContent>
             </Select>
+            <span className="text-sm text-muted-foreground">
+              Showing {filteredQueue.length} of {queue?.length || 0} items
+            </span>
           </div>
 
           {queueLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : queue && queue.length > 0 ? (
+          ) : filteredQueue && filteredQueue.length > 0 ? (
             <div className="grid gap-4">
-              {queue.map((item) => (
+              {filteredQueue.map((item) => (
                 <Card key={item.id}>
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -406,7 +644,14 @@ export default function Moderation() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No items in moderation queue</p>
+                <p className="text-muted-foreground">
+                  {hasQueueFilters ? "No items match your filters" : "No items in moderation queue"}
+                </p>
+                {hasQueueFilters && (
+                  <Button variant="outline" className="mt-4" onClick={handleClearFilters}>
+                    Clear Filters
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}

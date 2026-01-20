@@ -46,7 +46,7 @@ export default function Login() {
           <div className="mx-auto mb-4 p-3 bg-orange-500/10 rounded-full w-fit">
             <Shield className="h-8 w-8 text-orange-500" />
           </div>
-          <CardTitle className="text-2xl text-white">TavvY Admin</CardTitle>
+          <CardTitle className="text-2xl text-white">Tavvy Admin</CardTitle>
           <CardDescription className="text-slate-400">
             Restricted access - Authorized administrators only
           </CardDescription>
@@ -91,7 +91,7 @@ export default function Login() {
           </form>
           <div className="mt-6 p-3 bg-slate-700/30 rounded-lg">
             <p className="text-center text-xs text-slate-500">
-              This portal is restricted to authorized TavvY administrators only.
+              This portal is restricted to authorized Tavvy administrators only.
             </p>
           </div>
         </CardContent>

@@ -3,6 +3,11 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   searchPlaces,
+  searchPlacesAdvanced,
+  getDistinctCountries,
+  getDistinctRegions,
+  getDistinctCities,
+  getDistinctCategories,
   getPlaceById,
   getPlacesCount,
   getAllReviewItems,
@@ -193,6 +198,50 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return getPlaceSignalAggregates(input.placeId);
       }),
+
+    // Advanced search with filters
+    advancedSearch: protectedProcedure
+      .input(
+        z.object({
+          filters: z.object({
+            name: z.string().optional(),
+            address: z.string().optional(),
+            city: z.string().optional(),
+            state: z.string().optional(),
+            country: z.string().optional(),
+            category: z.string().optional(),
+          }),
+          limit: z.number().min(1).max(200).default(50),
+          offset: z.number().min(0).default(0),
+        })
+      )
+      .query(async ({ input }) => {
+        return searchPlacesAdvanced(input.filters, input.limit, input.offset);
+      }),
+
+    // Get distinct countries for dropdown
+    getCountries: protectedProcedure.query(async () => {
+      return getDistinctCountries();
+    }),
+
+    // Get distinct regions/states for dropdown
+    getRegions: protectedProcedure
+      .input(z.object({ country: z.string().optional() }))
+      .query(async ({ input }) => {
+        return getDistinctRegions(input.country);
+      }),
+
+    // Get distinct cities for dropdown
+    getCities: protectedProcedure
+      .input(z.object({ country: z.string().optional(), region: z.string().optional() }))
+      .query(async ({ input }) => {
+        return getDistinctCities(input.country, input.region);
+      }),
+
+    // Get distinct categories for dropdown
+    getCategories: protectedProcedure.query(async () => {
+      return getDistinctCategories();
+    }),
   }),
 
   // Signals router - get signal definitions

@@ -16,7 +16,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome to the TavvY Admin Portal</p>
+          <p className="text-muted-foreground">Welcome to the Tavvy Admin Portal</p>
         </div>
         <div className="flex gap-3">
           <Link href="/quick-entry">

@@ -307,7 +307,7 @@ export default function Cities() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Cities</h1>
-          <p className="text-muted-foreground">Manage cities in the TavvY platform</p>
+          <p className="text-muted-foreground">Manage cities in the Tavvy platform</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);

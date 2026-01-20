@@ -102,14 +102,14 @@ export default function Signup() {
                 Payment Successful!
               </div>
               <p className="text-green-600 text-sm">
-                Welcome to TavvY Pros! Create your account to get started.
+                Welcome to Tavvy Pros! Create your account to get started.
               </p>
             </div>
           )}
           <div className="flex justify-center mb-4">
             <img 
               src="/tavvy-logo.png" 
-              alt="TavvY" 
+              alt="Tavvy" 
               className="h-12 w-auto"
             />
           </div>
@@ -117,7 +117,7 @@ export default function Signup() {
           <CardDescription className="text-slate-600">
             {paymentSuccess 
               ? "Complete your registration to access your Pro dashboard"
-              : "Join TavvY Pros and start growing your business"
+              : "Join Tavvy Pros and start growing your business"
             }
           </CardDescription>
         </CardHeader>

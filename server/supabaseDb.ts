@@ -98,6 +98,181 @@ export async function searchPlaces(
   }
 }
 
+// ============ ADVANCED PLACES SEARCH ============
+export interface PlaceSearchFilters {
+  name?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  category?: string;
+}
+
+export async function searchPlacesAdvanced(
+  filters: PlaceSearchFilters,
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ places: Place[]; total: number }> {
+  try {
+    let query = supabase
+      .from("places")
+      .select("*", { count: "exact" });
+
+    // Apply filters
+    if (filters.name) {
+      query = query.ilike("name", `%${filters.name}%`);
+    }
+    if (filters.address) {
+      query = query.ilike("street", `%${filters.address}%`);
+    }
+    if (filters.city) {
+      query = query.ilike("city", `%${filters.city}%`);
+    }
+    if (filters.state) {
+      query = query.eq("region", filters.state);
+    }
+    if (filters.country) {
+      query = query.eq("country", filters.country);
+    }
+    if (filters.category) {
+      query = query.ilike("tavvy_category", `%${filters.category}%`);
+    }
+
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1)
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.error("[Supabase] Advanced search places error:", error);
+      return { places: [], total: 0 };
+    }
+
+    const places: Place[] = (data || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      address: p.street,
+      city: p.city,
+      state: p.region,
+      country: p.country,
+      postal_code: p.postcode,
+      lat: p.latitude,
+      lng: p.longitude,
+      phone: p.phone,
+      website: p.website,
+      category: p.tavvy_category,
+      source: 'foursquare' as const,
+    }));
+
+    console.log(`[Supabase] Advanced search found ${places.length} places (total: ${count})`);
+    return { places, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Advanced search places error:", error);
+    return { places: [], total: 0 };
+  }
+}
+
+// Get distinct countries for dropdown
+export async function getDistinctCountries(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("places")
+      .select("country")
+      .not("country", "is", null)
+      .order("country", { ascending: true });
+
+    if (error) {
+      console.error("[Supabase] Get distinct countries error:", error);
+      return [];
+    }
+
+    // Get unique values
+    const countries = Array.from(new Set((data || []).map((d: any) => d.country).filter(Boolean)));
+    return countries;
+  } catch (error) {
+    console.error("[Supabase] Get distinct countries error:", error);
+    return [];
+  }
+}
+
+// Get distinct regions/states for dropdown (optionally filtered by country)
+export async function getDistinctRegions(country?: string): Promise<string[]> {
+  try {
+    let query = supabase
+      .from("places")
+      .select("region")
+      .not("region", "is", null);
+
+    if (country) {
+      query = query.eq("country", country);
+    }
+
+    const { data, error } = await query.order("region", { ascending: true });
+
+    if (error) {
+      console.error("[Supabase] Get distinct regions error:", error);
+      return [];
+    }
+
+    const regions = Array.from(new Set((data || []).map((d: any) => d.region).filter(Boolean)));
+    return regions;
+  } catch (error) {
+    console.error("[Supabase] Get distinct regions error:", error);
+    return [];
+  }
+}
+
+// Get distinct cities for dropdown (optionally filtered by country and/or region)
+export async function getDistinctCities(country?: string, region?: string): Promise<string[]> {
+  try {
+    let query = supabase
+      .from("places")
+      .select("city")
+      .not("city", "is", null);
+
+    if (country) {
+      query = query.eq("country", country);
+    }
+    if (region) {
+      query = query.eq("region", region);
+    }
+
+    const { data, error } = await query.order("city", { ascending: true });
+
+    if (error) {
+      console.error("[Supabase] Get distinct cities error:", error);
+      return [];
+    }
+
+    const cities = Array.from(new Set((data || []).map((d: any) => d.city).filter(Boolean)));
+    return cities;
+  } catch (error) {
+    console.error("[Supabase] Get distinct cities error:", error);
+    return [];
+  }
+}
+
+// Get distinct categories for dropdown
+export async function getDistinctCategories(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("places")
+      .select("tavvy_category")
+      .not("tavvy_category", "is", null)
+      .order("tavvy_category", { ascending: true });
+
+    if (error) {
+      console.error("[Supabase] Get distinct categories error:", error);
+      return [];
+    }
+
+    const categories = Array.from(new Set((data || []).map((d: any) => d.tavvy_category).filter(Boolean)));
+    return categories;
+  } catch (error) {
+    console.error("[Supabase] Get distinct categories error:", error);
+    return [];
+  }
+}
+
 export async function getPlaceById(id: string) {
   // Try fsq_places_raw first
   const { data, error } = await supabase
