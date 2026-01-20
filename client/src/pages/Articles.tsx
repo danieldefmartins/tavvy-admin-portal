@@ -301,7 +301,6 @@ export default function Articles() {
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">None</SelectItem>
               {categories?.map((cat) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   {cat.name}
@@ -320,7 +319,6 @@ export default function Articles() {
               <SelectValue placeholder="Select universe" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">None</SelectItem>
               {universes?.map((uni) => (
                 <SelectItem key={uni.id} value={uni.id}>
                   {uni.name}
