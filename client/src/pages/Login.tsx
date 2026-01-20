@@ -17,12 +17,13 @@ export default function Login() {
   const [password, setPassword] = useState("");
 
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({
         title: "Welcome back!",
         description: "You have been logged in successfully.",
       });
-      utils.auth.me.invalidate();
+      // Refetch auth state after login to ensure cookie is properly recognized
+      await utils.auth.me.refetch();
       setLocation("/");
     },
     onError: (error) => {
