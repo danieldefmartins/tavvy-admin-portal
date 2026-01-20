@@ -23,6 +23,8 @@ import {
   createArticle,
   updateArticle,
   deleteArticle,
+  bulkImportArticles,
+  type BulkArticleInput,
   // Cities
   getAllCities,
   createCity,
@@ -535,6 +537,31 @@ export const appRouter = router({
           });
         }
         return { success: true };
+      }),
+
+    bulkImport: protectedProcedure
+      .input(
+        z.object({
+          articles: z.array(z.object({
+            title: z.string(),
+            slug: z.string(),
+            excerpt: z.string().optional(),
+            content: z.string().optional(),
+            author_name: z.string().optional(),
+            category_id: z.string().nullable().optional(),
+            content_blocks: z.any().optional(),
+            section_images: z.any().optional(),
+            cover_image_url: z.string().optional(),
+            read_time_minutes: z.number().optional(),
+            article_template_type: z.string().optional(),
+            is_featured: z.boolean().optional(),
+            status: z.string().optional(),
+          })),
+          updateExisting: z.boolean().default(false),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return bulkImportArticles(input.articles, input.updateExisting);
       }),
   }),
 
