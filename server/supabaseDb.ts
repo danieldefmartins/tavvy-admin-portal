@@ -174,19 +174,23 @@ export async function searchPlacesAdvanced(
 // Get distinct countries for dropdown
 export async function getDistinctCountries(): Promise<string[]> {
   try {
+    // Use a larger limit to ensure we get all records for deduplication
+    // Supabase default limit is 1000, but we need all rows to find all unique countries
     const { data, error } = await supabase
       .from("places")
       .select("country")
       .not("country", "is", null)
-      .order("country", { ascending: true });
+      .order("country", { ascending: true })
+      .limit(50000); // Increase limit to capture all records
 
     if (error) {
       console.error("[Supabase] Get distinct countries error:", error);
       return [];
     }
 
-    // Get unique values
-    const countries = Array.from(new Set((data || []).map((d: any) => d.country).filter(Boolean)));
+    // Get unique values and sort them
+    const countries = Array.from(new Set((data || []).map((d: any) => d.country).filter(Boolean))).sort();
+    console.log(`[Supabase] Found ${countries.length} distinct countries`);
     return countries;
   } catch (error) {
     console.error("[Supabase] Get distinct countries error:", error);
@@ -206,14 +210,17 @@ export async function getDistinctRegions(country?: string): Promise<string[]> {
       query = query.eq("country", country);
     }
 
-    const { data, error } = await query.order("region", { ascending: true });
+    const { data, error } = await query
+      .order("region", { ascending: true })
+      .limit(50000); // Increase limit to capture all records
 
     if (error) {
       console.error("[Supabase] Get distinct regions error:", error);
       return [];
     }
 
-    const regions = Array.from(new Set((data || []).map((d: any) => d.region).filter(Boolean)));
+    const regions = Array.from(new Set((data || []).map((d: any) => d.region).filter(Boolean))).sort();
+    console.log(`[Supabase] Found ${regions.length} distinct regions${country ? ` for ${country}` : ''}`);
     return regions;
   } catch (error) {
     console.error("[Supabase] Get distinct regions error:", error);
@@ -236,14 +243,17 @@ export async function getDistinctCities(country?: string, region?: string): Prom
       query = query.eq("region", region);
     }
 
-    const { data, error } = await query.order("city", { ascending: true });
+    const { data, error } = await query
+      .order("city", { ascending: true })
+      .limit(50000); // Increase limit to capture all records
 
     if (error) {
       console.error("[Supabase] Get distinct cities error:", error);
       return [];
     }
 
-    const cities = Array.from(new Set((data || []).map((d: any) => d.city).filter(Boolean)));
+    const cities = Array.from(new Set((data || []).map((d: any) => d.city).filter(Boolean))).sort();
+    console.log(`[Supabase] Found ${cities.length} distinct cities${country ? ` for ${country}` : ''}${region ? ` / ${region}` : ''}`);
     return cities;
   } catch (error) {
     console.error("[Supabase] Get distinct cities error:", error);
@@ -258,14 +268,16 @@ export async function getDistinctCategories(): Promise<string[]> {
       .from("places")
       .select("tavvy_category")
       .not("tavvy_category", "is", null)
-      .order("tavvy_category", { ascending: true });
+      .order("tavvy_category", { ascending: true })
+      .limit(50000); // Increase limit to capture all records
 
     if (error) {
       console.error("[Supabase] Get distinct categories error:", error);
       return [];
     }
 
-    const categories = Array.from(new Set((data || []).map((d: any) => d.tavvy_category).filter(Boolean)));
+    const categories = Array.from(new Set((data || []).map((d: any) => d.tavvy_category).filter(Boolean))).sort();
+    console.log(`[Supabase] Found ${categories.length} distinct categories`);
     return categories;
   } catch (error) {
     console.error("[Supabase] Get distinct categories error:", error);
