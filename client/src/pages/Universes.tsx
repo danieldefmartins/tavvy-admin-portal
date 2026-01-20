@@ -41,13 +41,11 @@ interface Universe {
   name: string;
   slug: string;
   description: string | null;
-  icon_url: string | null;
-  cover_image_url: string | null;
-  primary_color: string | null;
-  secondary_color: string | null;
+  thumbnail_image_url: string | null;
+  banner_image_url: string | null;
+  location: string | null;
   is_featured: boolean;
-  is_active: boolean;
-  sort_order: number;
+  status: string;
   created_at: string;
 }
 
@@ -62,13 +60,11 @@ export default function Universes() {
     name: "",
     slug: "",
     description: "",
-    icon_url: "",
-    cover_image_url: "",
-    primary_color: "#3B82F6",
-    secondary_color: "#1D4ED8",
+    thumbnail_image_url: "",
+    banner_image_url: "",
+    location: "",
     is_featured: false,
-    is_active: true,
-    sort_order: 0,
+    status: "active",
   });
 
   // Queries
@@ -115,13 +111,11 @@ export default function Universes() {
       name: "",
       slug: "",
       description: "",
-      icon_url: "",
-      cover_image_url: "",
-      primary_color: "#3B82F6",
-      secondary_color: "#1D4ED8",
+      thumbnail_image_url: "",
+      banner_image_url: "",
+      location: "",
       is_featured: false,
-      is_active: true,
-      sort_order: 0,
+      status: "active",
     });
   };
 
@@ -150,13 +144,11 @@ export default function Universes() {
       name: universe.name,
       slug: universe.slug,
       description: universe.description || "",
-      icon_url: universe.icon_url || "",
-      cover_image_url: universe.cover_image_url || "",
-      primary_color: universe.primary_color || "#3B82F6",
-      secondary_color: universe.secondary_color || "#1D4ED8",
+      thumbnail_image_url: universe.thumbnail_image_url || "",
+      banner_image_url: universe.banner_image_url || "",
+      location: universe.location || "",
       is_featured: universe.is_featured,
-      is_active: universe.is_active,
-      sort_order: universe.sort_order,
+      status: universe.status || "active",
     });
     setIsEditDialogOpen(true);
   };
@@ -216,75 +208,36 @@ export default function Universes() {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="icon_url">Icon URL</Label>
+          <Label htmlFor="thumbnail_image_url">Thumbnail Image URL</Label>
           <Input
-            id="icon_url"
-            value={formData.icon_url}
-            onChange={(e) => setFormData({ ...formData, icon_url: e.target.value })}
+            id="thumbnail_image_url"
+            value={formData.thumbnail_image_url}
+            onChange={(e) => setFormData({ ...formData, thumbnail_image_url: e.target.value })}
             placeholder="https://..."
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="cover_image_url">Cover Image URL</Label>
+          <Label htmlFor="banner_image_url">Banner Image URL</Label>
           <Input
-            id="cover_image_url"
-            value={formData.cover_image_url}
-            onChange={(e) => setFormData({ ...formData, cover_image_url: e.target.value })}
+            id="banner_image_url"
+            value={formData.banner_image_url}
+            onChange={(e) => setFormData({ ...formData, banner_image_url: e.target.value })}
             placeholder="https://..."
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="location">Location</Label>
+        <Input
+          id="location"
+          value={formData.location}
+          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+          placeholder="e.g., Orlando, FL"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="primary_color">Primary Color</Label>
-          <div className="flex gap-2">
-            <Input
-              id="primary_color"
-              type="color"
-              value={formData.primary_color}
-              onChange={(e) => setFormData({ ...formData, primary_color: e.target.value })}
-              className="w-14 h-10 p-1"
-            />
-            <Input
-              value={formData.primary_color}
-              onChange={(e) => setFormData({ ...formData, primary_color: e.target.value })}
-              placeholder="#3B82F6"
-              className="flex-1"
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="secondary_color">Secondary Color</Label>
-          <div className="flex gap-2">
-            <Input
-              id="secondary_color"
-              type="color"
-              value={formData.secondary_color}
-              onChange={(e) => setFormData({ ...formData, secondary_color: e.target.value })}
-              className="w-14 h-10 p-1"
-            />
-            <Input
-              value={formData.secondary_color}
-              onChange={(e) => setFormData({ ...formData, secondary_color: e.target.value })}
-              placeholder="#1D4ED8"
-              className="flex-1"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="sort_order">Sort Order</Label>
-          <Input
-            id="sort_order"
-            type="number"
-            value={formData.sort_order}
-            onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
-            placeholder="0"
-          />
-        </div>
         <div className="space-y-2">
           <Label>Featured</Label>
           <div className="flex items-center h-10">
@@ -298,16 +251,17 @@ export default function Universes() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label>Active</Label>
-          <div className="flex items-center h-10">
-            <input
-              type="checkbox"
-              checked={formData.is_active}
-              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <span className="ml-2 text-sm">Active/visible</span>
-          </div>
+          <Label htmlFor="status">Status</Label>
+          <select
+            id="status"
+            value={formData.status}
+            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="active">Active</option>
+            <option value="draft">Draft</option>
+            <option value="archived">Archived</option>
+          </select>
         </div>
       </div>
     </div>
@@ -383,8 +337,7 @@ export default function Universes() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Universe</TableHead>
-                  <TableHead>Colors</TableHead>
-                  <TableHead>Order</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -394,15 +347,15 @@ export default function Universes() {
                   <TableRow key={universe.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        {universe.icon_url ? (
+                        {universe.thumbnail_image_url ? (
                           <img
-                            src={universe.icon_url}
+                            src={universe.thumbnail_image_url}
                             alt={universe.name}
                             className="h-10 w-10 object-cover rounded"
                           />
-                        ) : universe.cover_image_url ? (
+                        ) : universe.banner_image_url ? (
                           <img
-                            src={universe.cover_image_url}
+                            src={universe.banner_image_url}
                             alt={universe.name}
                             className="h-10 w-10 object-cover rounded"
                           />
@@ -418,26 +371,12 @@ export default function Universes() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="h-6 w-6 rounded border"
-                          style={{ backgroundColor: universe.primary_color || "#3B82F6" }}
-                          title={`Primary: ${universe.primary_color}`}
-                        />
-                        <div
-                          className="h-6 w-6 rounded border"
-                          style={{ backgroundColor: universe.secondary_color || "#1D4ED8" }}
-                          title={`Secondary: ${universe.secondary_color}`}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">{universe.sort_order}</span>
+                      <span className="text-sm text-muted-foreground">{universe.location || "—"}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Badge variant={universe.is_active ? "default" : "secondary"}>
-                          {universe.is_active ? "Active" : "Inactive"}
+                        <Badge variant={universe.status === "active" ? "default" : "secondary"}>
+                          {universe.status || "active"}
                         </Badge>
                         {universe.is_featured && (
                           <Badge variant="outline" className="text-yellow-500 border-yellow-500">

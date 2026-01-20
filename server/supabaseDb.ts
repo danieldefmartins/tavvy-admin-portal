@@ -986,13 +986,11 @@ export async function createUniverse(universe: {
   name: string;
   slug: string;
   description?: string | null;
-  icon_url?: string | null;
-  cover_image_url?: string | null;
-  primary_color?: string | null;
-  secondary_color?: string | null;
+  thumbnail_image_url?: string | null;
+  banner_image_url?: string | null;
+  location?: string | null;
   is_featured?: boolean;
-  is_active?: boolean;
-  sort_order?: number;
+  status?: string;
 }) {
   const { data, error } = await supabase
     .from("atlas_universes")

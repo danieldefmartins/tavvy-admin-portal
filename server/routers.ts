@@ -664,23 +664,20 @@ export const appRouter = router({
           name: z.string().min(1),
           slug: z.string().min(1),
           description: z.string().optional(),
-          icon_url: z.string().optional(),
-          cover_image_url: z.string().optional(),
-          primary_color: z.string().optional(),
-          secondary_color: z.string().optional(),
+          thumbnail_image_url: z.string().optional(),
+          banner_image_url: z.string().optional(),
+          location: z.string().optional(),
           is_featured: z.boolean().default(false),
-          is_active: z.boolean().default(true),
-          sort_order: z.number().default(0),
+          status: z.string().default("active"),
         })
       )
       .mutation(async ({ input }) => {
         const id = await createUniverse({
           ...input,
           description: input.description || null,
-          icon_url: input.icon_url || null,
-          cover_image_url: input.cover_image_url || null,
-          primary_color: input.primary_color || null,
-          secondary_color: input.secondary_color || null,
+          thumbnail_image_url: input.thumbnail_image_url || null,
+          banner_image_url: input.banner_image_url || null,
+          location: input.location || null,
         });
         if (!id) {
           throw new TRPCError({
@@ -698,13 +695,11 @@ export const appRouter = router({
           name: z.string().optional(),
           slug: z.string().optional(),
           description: z.string().optional(),
-          icon_url: z.string().optional(),
-          cover_image_url: z.string().optional(),
-          primary_color: z.string().optional(),
-          secondary_color: z.string().optional(),
+          thumbnail_image_url: z.string().optional(),
+          banner_image_url: z.string().optional(),
+          location: z.string().optional(),
           is_featured: z.boolean().optional(),
-          is_active: z.boolean().optional(),
-          sort_order: z.number().optional(),
+          status: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
