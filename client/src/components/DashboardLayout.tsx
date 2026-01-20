@@ -20,7 +20,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, MapPin, Zap, Upload, BarChart3, FileText, Building2, Globe, Shield, Flag, History, Edit3 } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, MapPin, Zap, Upload, BarChart3, FileText, Building2, Globe, Shield, Flag, History, Edit3, BookOpen } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -32,6 +32,7 @@ const menuItems = [
   { icon: Upload, label: "Batch Upload", path: "/batch-upload" },
   { icon: BarChart3, label: "Signals", path: "/signals" },
   { icon: FileText, label: "Articles", path: "/articles" },
+  { icon: BookOpen, label: "Atlas Import", path: "/atlas-import" },
   { icon: Building2, label: "Cities", path: "/cities" },
   { icon: Globe, label: "Universes", path: "/universes" },
   // Admin & Safety

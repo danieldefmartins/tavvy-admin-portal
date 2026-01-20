@@ -801,6 +801,103 @@ export async function deleteArticle(id: string): Promise<boolean> {
   return true;
 }
 
+export interface BulkArticleInput {
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content?: string;
+  author_name?: string;
+  category_id?: string | null;
+  content_blocks?: any[];
+  section_images?: any[];
+  cover_image_url?: string;
+  read_time_minutes?: number;
+  article_template_type?: string;
+  is_featured?: boolean;
+  status?: string;
+}
+
+export async function bulkImportArticles(
+  articles: BulkArticleInput[],
+  updateExisting: boolean = false
+): Promise<{ inserted: number; updated: number; skipped: number; errors: string[] }> {
+  const result = { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
+
+  for (const article of articles) {
+    try {
+      // Check if article exists by slug
+      const { data: existing } = await supabase
+        .from("atlas_articles")
+        .select("id")
+        .eq("slug", article.slug)
+        .single();
+
+      if (existing) {
+        if (updateExisting) {
+          // Update existing article
+          const { error } = await supabase
+            .from("atlas_articles")
+            .update({
+              title: article.title,
+              excerpt: article.excerpt || null,
+              content: article.content || article.excerpt || '',
+              author_name: article.author_name || "Tavvy Atlas Team",
+              category_id: article.category_id || null,
+              content_blocks: article.content_blocks || [],
+              section_images: article.section_images || [],
+              cover_image_url: article.cover_image_url || null,
+              read_time_minutes: article.read_time_minutes || 5,
+              article_template_type: article.article_template_type || "city_guide",
+              is_featured: article.is_featured || false,
+              status: article.status || "published",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+
+          if (error) {
+            result.errors.push(`Failed to update ${article.slug}: ${error.message}`);
+          } else {
+            result.updated++;
+          }
+        } else {
+          result.skipped++;
+        }
+      } else {
+        // Insert new article
+        const { error } = await supabase
+          .from("atlas_articles")
+          .insert({
+            title: article.title,
+            slug: article.slug,
+            excerpt: article.excerpt || null,
+            content: article.content || article.excerpt || '',
+            author_name: article.author_name || "Tavvy Atlas Team",
+            category_id: article.category_id || null,
+            content_blocks: article.content_blocks || [],
+            section_images: article.section_images || [],
+            cover_image_url: article.cover_image_url || null,
+            read_time_minutes: article.read_time_minutes || 5,
+            article_template_type: article.article_template_type || "city_guide",
+            is_featured: article.is_featured || false,
+            status: article.status || "published",
+            published_at: article.status === "published" ? new Date().toISOString() : null,
+          });
+
+        if (error) {
+          result.errors.push(`Failed to insert ${article.slug}: ${error.message}`);
+        } else {
+          result.inserted++;
+        }
+      }
+    } catch (err: any) {
+      result.errors.push(`Error processing ${article.slug}: ${err.message}`);
+    }
+  }
+
+  console.log(`[Supabase] Bulk import complete: ${result.inserted} inserted, ${result.updated} updated, ${result.skipped} skipped`);
+  return result;
+}
+
 // ============ CATEGORIES (for articles) ============
 // Matches your existing atlas_categories table structure
 export async function getCategories() {
