@@ -15,27 +15,67 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, MapPin, Zap, Upload, BarChart3, FileText, Building2, Globe, Shield, Flag, History, Edit3, BookOpen } from "lucide-react";
+import { 
+  LayoutDashboard, 
+  LogOut, 
+  PanelLeft, 
+  MapPin, 
+  Zap, 
+  Upload, 
+  BarChart3, 
+  FileText, 
+  Building2, 
+  Globe, 
+  Shield, 
+  Flag, 
+  History, 
+  Edit3, 
+  BookOpen,
+  ChevronRight,
+  FileUp,
+  FileCode
+} from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 
+// Regular menu items (non-grouped)
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: MapPin, label: "Places", path: "/places" },
   { icon: Zap, label: "Quick Entry", path: "/quick-entry" },
   { icon: Upload, label: "Batch Upload", path: "/batch-upload" },
   { icon: BarChart3, label: "Signals", path: "/signals" },
+];
+
+// Atlas section items
+const atlasItems = [
   { icon: FileText, label: "Articles", path: "/articles" },
-  { icon: BookOpen, label: "Atlas Import", path: "/atlas-import" },
+  { icon: FileUp, label: "CSV Import", path: "/atlas-import" },
+  { icon: FileCode, label: "Markdown Import", path: "/markdown-import" },
+];
+
+// Other menu items
+const otherItems = [
   { icon: Building2, label: "Cities", path: "/cities" },
   { icon: Globe, label: "Universes", path: "/universes" },
-  // Admin & Safety
+];
+
+// Admin & Safety items
+const adminItems = [
   { icon: Shield, label: "Business Claims", path: "/business-claims" },
   { icon: Flag, label: "Moderation", path: "/moderation" },
   { icon: Edit3, label: "Overrides", path: "/overrides" },
@@ -65,9 +105,6 @@ export default function DashboardLayout({
   if (loading) {
     return <DashboardLayoutSkeleton />
   }
-
-  // Auth check is now handled by ProtectedRoute in App.tsx
-  // This component assumes user is authenticated
 
   return (
     <SidebarProvider
@@ -99,8 +136,11 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
+  
+  // Check if current path is in Atlas section
+  const isAtlasActive = atlasItems.some(item => item.path === location);
+  const [atlasOpen, setAtlasOpen] = useState(isAtlasActive);
 
   // Get user display info from Supabase user metadata
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
@@ -112,6 +152,13 @@ function DashboardLayoutContent({
       setIsResizing(false);
     }
   }, [isCollapsed]);
+
+  // Open Atlas section when navigating to an Atlas page
+  useEffect(() => {
+    if (isAtlasActive) {
+      setAtlasOpen(true);
+    }
+  }, [isAtlasActive]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -148,6 +195,29 @@ function DashboardLayoutContent({
     setLocation("/login");
   };
 
+  const renderMenuItem = (item: typeof menuItems[0]) => {
+    const isActive = location === item.path;
+    return (
+      <SidebarMenuItem key={item.path}>
+        <SidebarMenuButton
+          isActive={isActive}
+          onClick={() => setLocation(item.path)}
+          tooltip={item.label}
+          className={`h-11 transition-all font-medium rounded-lg mb-1 ${
+            isActive 
+              ? 'bg-gradient-to-r from-orange-500/25 to-orange-500/10 text-orange-400 border border-orange-500/30 hover:from-orange-500/30 hover:to-orange-500/15' 
+              : 'text-white/70 hover:bg-white/8 hover:text-white border border-transparent'
+          }`}
+        >
+          <item.icon
+            className={`h-5 w-5 shrink-0 ${isActive ? "text-orange-400" : "text-white/50"}`}
+          />
+          <span className="truncate">{item.label}</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
+
   return (
     <>
       <div className="relative" ref={sidebarRef}>
@@ -156,7 +226,7 @@ function DashboardLayoutContent({
           className="border-r border-orange-500/20 bg-gradient-to-b from-[#141842] to-[#0F1233]"
           disableTransition={isResizing}
         >
-          {/* Header with Logo - background matches logo color */}
+          {/* Header with Logo */}
           <SidebarHeader className="h-20 justify-center border-b border-orange-500/20 bg-[#0F1233]">
             <div className="flex items-center gap-3 px-3 transition-all w-full">
               <button
@@ -181,28 +251,65 @@ function DashboardLayoutContent({
           {/* Navigation Menu */}
           <SidebarContent className="gap-0 px-2 py-4">
             <SidebarMenu>
-              {menuItems.map(item => {
-                const isActive = location === item.path;
-                return (
-                  <SidebarMenuItem key={item.path}>
+              {/* Main menu items */}
+              {menuItems.map(renderMenuItem)}
+              
+              {/* Atlas Section - Collapsible */}
+              <Collapsible
+                open={atlasOpen}
+                onOpenChange={setAtlasOpen}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
                     <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => setLocation(item.path)}
-                      tooltip={item.label}
+                      tooltip="Atlas"
                       className={`h-11 transition-all font-medium rounded-lg mb-1 ${
-                        isActive 
-                          ? 'bg-gradient-to-r from-orange-500/25 to-orange-500/10 text-orange-400 border border-orange-500/30 hover:from-orange-500/30 hover:to-orange-500/15' 
+                        isAtlasActive 
+                          ? 'bg-gradient-to-r from-green-500/25 to-green-500/10 text-green-400 border border-green-500/30 hover:from-green-500/30 hover:to-green-500/15' 
                           : 'text-white/70 hover:bg-white/8 hover:text-white border border-transparent'
                       }`}
                     >
-                      <item.icon
-                        className={`h-5 w-5 shrink-0 ${isActive ? "text-orange-400" : "text-white/50"}`}
+                      <BookOpen
+                        className={`h-5 w-5 shrink-0 ${isAtlasActive ? "text-green-400" : "text-white/50"}`}
                       />
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate">Atlas</span>
+                      <ChevronRight className={`ml-auto h-4 w-4 transition-transform duration-200 ${atlasOpen ? 'rotate-90' : ''}`} />
                     </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {atlasItems.map((item) => {
+                        const isActive = location === item.path;
+                        return (
+                          <SidebarMenuSubItem key={item.path}>
+                            <SidebarMenuSubButton
+                              onClick={() => setLocation(item.path)}
+                              className={`transition-all ${
+                                isActive 
+                                  ? 'text-green-400 bg-green-500/10' 
+                                  : 'text-white/60 hover:text-white hover:bg-white/5'
+                              }`}
+                            >
+                              <item.icon className={`h-4 w-4 mr-2 ${isActive ? 'text-green-400' : 'text-white/40'}`} />
+                              <span>{item.label}</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
+              {/* Other items */}
+              {otherItems.map(renderMenuItem)}
+              
+              {/* Divider */}
+              <div className="my-3 mx-2 border-t border-white/10" />
+              
+              {/* Admin items */}
+              {adminItems.map(renderMenuItem)}
             </SidebarMenu>
           </SidebarContent>
 

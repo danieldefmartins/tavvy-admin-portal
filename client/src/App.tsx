@@ -13,6 +13,7 @@ import BatchUpload from "@/pages/BatchUpload";
 import Signals from "@/pages/Signals";
 import Articles from "@/pages/Articles";
 import AtlasBulkImport from "@/pages/AtlasBulkImport";
+import MarkdownImport from "@/pages/MarkdownImport";
 import Cities from "@/pages/Cities";
 import Universes from "@/pages/Universes";
 // Admin & Safety Pages
@@ -98,6 +99,12 @@ function App() {
         <Route path="/atlas-import">
           <ProtectedRoute>
             <AtlasBulkImport />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/markdown-import">
+          <ProtectedRoute>
+            <MarkdownImport />
           </ProtectedRoute>
         </Route>
 
