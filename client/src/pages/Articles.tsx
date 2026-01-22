@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import ImageUpload from "@/components/ImageUpload";
 
 interface Article {
   id: string;
@@ -259,15 +260,12 @@ export default function Articles() {
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="cover_image_url">Cover Image URL</Label>
-        <Input
-          id="cover_image_url"
-          value={formData.cover_image_url}
-          onChange={(e) => setFormData({ ...formData, cover_image_url: e.target.value })}
-          placeholder="https://..."
-        />
-      </div>
+      <ImageUpload
+        value={formData.cover_image_url}
+        onChange={(url) => setFormData({ ...formData, cover_image_url: url })}
+        label="Cover Image"
+        placeholder="Enter image URL or upload a file"
+      />
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">

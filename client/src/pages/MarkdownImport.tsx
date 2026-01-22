@@ -20,6 +20,7 @@ import {
   Hash
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import ImageUpload from "@/components/ImageUpload";
 
 interface ContentBlock {
   type: string;
@@ -229,6 +230,7 @@ export default function MarkdownImport() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [coverImageUrl, setCoverImageUrl] = useState("");
 
   // Fetch categories and universes
   const { data: categories } = trpc.articles.getCategories.useQuery();
@@ -305,6 +307,7 @@ export default function MarkdownImport() {
         content_blocks: parsedArticle.content_blocks,
         read_time_minutes: parsedArticle.read_time_minutes,
         category_id: selectedCategory || null,
+        cover_image_url: coverImageUrl || undefined,
         status: "published",
         author_name: "Tavvy Team"
       };
@@ -322,6 +325,7 @@ export default function MarkdownImport() {
       setCustomSlug("");
       setSelectedCategory("");
       setSelectedUniverse("");
+      setCoverImageUrl("");
     } catch (error) {
       setImportResult({ 
         success: false, 
@@ -474,6 +478,13 @@ export default function MarkdownImport() {
                     className="mt-1 bg-[#0F1233] border-white/20 text-white"
                   />
                 </div>
+
+                <ImageUpload
+                  value={coverImageUrl}
+                  onChange={setCoverImageUrl}
+                  label="Cover Image"
+                  placeholder="Enter image URL or upload"
+                />
 
                 <div>
                   <Label className="text-white/80">Category</Label>
