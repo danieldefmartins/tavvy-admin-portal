@@ -71,6 +71,19 @@ import {
   AuditActions,
   ResourceTypes,
 } from "./auditLog";
+import {
+  createSession,
+  revokeSessionByToken,
+  getUserSessions,
+  revokeAllUserSessions,
+  generateDeviceFingerprint,
+} from "./sessionManager";
+import {
+  trackFailedLogin,
+  runLoginAnomalyChecks,
+  getUnacknowledgedAnomalies,
+  acknowledgeAnomaly,
+} from "./anomalyDetection";
 
 // Cookie name for Supabase auth token
 const AUTH_COOKIE_NAME = "tavvy_auth_token";
@@ -146,14 +159,19 @@ export const appRouter = router({
           input.password
         );
 
+        const clientIp = ctx.req.ip || ctx.req.headers['x-forwarded-for']?.toString();
+        const userAgent = ctx.req.headers['user-agent'];
+
         if (error || !user || !session) {
           // Log failed login attempt
           await logFailedLogin(
             input.email,
             error || "Invalid credentials",
-            ctx.req.ip || ctx.req.headers['x-forwarded-for']?.toString(),
-            ctx.req.headers['user-agent']
+            clientIp,
+            userAgent
           );
+          // Track for anomaly detection (brute force detection)
+          await trackFailedLogin(input.email, clientIp, userAgent);
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message: error || "Invalid credentials",
@@ -167,9 +185,11 @@ export const appRouter = router({
           await logFailedLogin(
             input.email,
             "User is not a super_admin",
-            ctx.req.ip || ctx.req.headers['x-forwarded-for']?.toString(),
-            ctx.req.headers['user-agent']
+            clientIp,
+            userAgent
           );
+          // Track for anomaly detection
+          await trackFailedLogin(input.email, clientIp, userAgent);
           // Don't reveal that the user exists but isn't an admin
           // Use the same error message as invalid credentials
           throw new TRPCError({
@@ -182,9 +202,37 @@ export const appRouter = router({
         await logLogin(
           user.id,
           user.email || input.email,
-          ctx.req.ip || ctx.req.headers['x-forwarded-for']?.toString(),
-          ctx.req.headers['user-agent']
+          clientIp,
+          userAgent
         );
+
+        // Generate device fingerprint for anomaly detection
+        const deviceFingerprint = generateDeviceFingerprint(userAgent, clientIp);
+
+        // Run anomaly detection checks
+        const anomalyResult = await runLoginAnomalyChecks(
+          user.id,
+          user.email || input.email,
+          deviceFingerprint,
+          clientIp,
+          userAgent
+        );
+
+        if (anomalyResult.anomaliesDetected.length > 0) {
+          console.log(`[Auth] Anomalies detected for ${user.email}:`, anomalyResult.anomaliesDetected);
+        }
+
+        // Create tracked session (enforces concurrent session limits)
+        const sessionResult = await createSession(
+          user.id,
+          session.access_token,
+          clientIp,
+          userAgent
+        );
+
+        if (sessionResult.revokedSessionId) {
+          console.log(`[Auth] Revoked old session ${sessionResult.revokedSessionId} due to session limit`);
+        }
 
         // Set auth cookie with enhanced security settings
         ctx.res.cookie(AUTH_COOKIE_NAME, session.access_token, {
@@ -206,10 +254,54 @@ export const appRouter = router({
         };
       }),
 
-    logout: publicProcedure.mutation(({ ctx }) => {
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      // Revoke the session in the database
+      const token = ctx.req.cookies?.[AUTH_COOKIE_NAME];
+      if (token) {
+        await revokeSessionByToken(token, 'user_logout');
+      }
       ctx.res.clearCookie(AUTH_COOKIE_NAME, { path: "/" });
       return { success: true };
     }),
+
+    // Get all active sessions for the current user
+    getSessions: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user?.id) return [];
+      const sessions = await getUserSessions(ctx.user.id);
+      return sessions.map(s => ({
+        id: s.id,
+        ipAddress: s.ipAddress,
+        userAgent: s.userAgent,
+        createdAt: s.createdAt.toISOString(),
+        lastActivityAt: s.lastActivityAt.toISOString(),
+        isCurrent: s.sessionToken === ctx.req.cookies?.[AUTH_COOKIE_NAME],
+      }));
+    }),
+
+    // Logout from all devices
+    logoutAll: protectedProcedure.mutation(async ({ ctx }) => {
+      if (!ctx.user?.id) return { success: false, count: 0 };
+      const count = await revokeAllUserSessions(ctx.user.id, 'user_logout_all');
+      ctx.res.clearCookie(AUTH_COOKIE_NAME, { path: "/" });
+      return { success: true, count };
+    }),
+
+    // Get security anomalies (super admin only)
+    getAnomalies: protectedProcedure
+      .input(z.object({ limit: z.number().min(1).max(100).default(50) }).optional())
+      .query(async ({ input }) => {
+        const anomalies = await getUnacknowledgedAnomalies(input?.limit || 50);
+        return anomalies;
+      }),
+
+    // Acknowledge a security anomaly
+    acknowledgeAnomaly: protectedProcedure
+      .input(z.object({ anomalyId: z.string().uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user?.id) return { success: false };
+        const success = await acknowledgeAnomaly(input.anomalyId, ctx.user.id);
+        return { success };
+      }),
   }),
 
   // Debug router - for testing connections
