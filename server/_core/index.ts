@@ -5,6 +5,7 @@ import * as trpcExpress from "@trpc/server/adapters/express";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import path from "path";
+import { adminPortalSecurityHeaders } from "./securityHeaders";
 
 // ============================================================
 // CORS Configuration - Environment-based allowlist
@@ -148,6 +149,9 @@ app.use(cors({
 }));
 app.use(cookieParser());
 app.use(express.json());
+
+// Security headers
+app.use(adminPortalSecurityHeaders);
 
 // Apply rate limiting to auth endpoints (login)
 app.use('/api/trpc/auth.login', authRateLimiter);

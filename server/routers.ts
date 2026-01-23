@@ -63,6 +63,14 @@ import {
   verifySupabaseToken,
 } from "./supabaseAuth";
 import { supabase } from "./supabaseDb";
+import {
+  logLogin,
+  logFailedLogin,
+  logBulkOperation,
+  logModerationAction,
+  AuditActions,
+  ResourceTypes,
+} from "./auditLog";
 
 // Cookie name for Supabase auth token
 const AUTH_COOKIE_NAME = "tavvy_auth_token";
@@ -139,6 +147,13 @@ export const appRouter = router({
         );
 
         if (error || !user || !session) {
+          // Log failed login attempt
+          await logFailedLogin(
+            input.email,
+            error || "Invalid credentials",
+            ctx.req.ip || ctx.req.headers['x-forwarded-for']?.toString(),
+            ctx.req.headers['user-agent']
+          );
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message: error || "Invalid credentials",
@@ -148,6 +163,13 @@ export const appRouter = router({
         // Check if user has super_admin role in database (RBAC)
         const isSuperAdmin = await isUserSuperAdmin(user.id);
         if (!isSuperAdmin) {
+          // Log failed login (non-admin trying to access admin portal)
+          await logFailedLogin(
+            input.email,
+            "User is not a super_admin",
+            ctx.req.ip || ctx.req.headers['x-forwarded-for']?.toString(),
+            ctx.req.headers['user-agent']
+          );
           // Don't reveal that the user exists but isn't an admin
           // Use the same error message as invalid credentials
           throw new TRPCError({
@@ -156,12 +178,20 @@ export const appRouter = router({
           });
         }
 
-        // Set auth cookie
+        // Log successful login
+        await logLogin(
+          user.id,
+          user.email || input.email,
+          ctx.req.ip || ctx.req.headers['x-forwarded-for']?.toString(),
+          ctx.req.headers['user-agent']
+        );
+
+        // Set auth cookie with enhanced security settings
         ctx.res.cookie(AUTH_COOKIE_NAME, session.access_token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: 60 * 60 * 24 * 7 * 1000, // 7 days
+          httpOnly: true,  // Prevent XSS access to cookie
+          secure: process.env.NODE_ENV === "production",  // HTTPS only in production
+          sameSite: "strict",  // Strict CSRF protection (changed from lax)
+          maxAge: 60 * 60 * 24 * 1 * 1000, // 1 day (reduced from 7 days for security)
           path: "/",
         });
 
@@ -384,6 +414,20 @@ export const appRouter = router({
             completedAt: new Date(),
           })
           .where(eq(batchImportJobs.id, Number(jobId)));
+
+        // Audit log the bulk import
+        await logBulkOperation(
+          ctx.user?.id || 'unknown',
+          ctx.user?.email || 'unknown',
+          AuditActions.BULK_IMPORT,
+          ResourceTypes.REVIEW,
+          input.reviews.length,
+          {
+            fileName: input.fileName,
+            successCount: result.success,
+            failedCount: result.failed,
+          }
+        );
 
         return { jobId, ...result };
       }),
