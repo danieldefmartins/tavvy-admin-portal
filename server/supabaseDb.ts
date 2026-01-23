@@ -60,11 +60,20 @@ export async function searchPlaces(
   offset: number = 0
 ): Promise<Place[]> {
   try {
-    // Search in fsq_places_raw
+    // Sanitize query: escape special characters that could break filter parsing
+    const sanitizedQuery = query
+      .replace(/[%_\\]/g, '\\$&')  // Escape SQL LIKE wildcards
+      .trim();
+    
+    if (!sanitizedQuery) {
+      return [];
+    }
+
+    // Search in fsq_places_raw with sanitized query
     const { data: fsqData, error: fsqError } = await supabase
       .from("fsq_places_raw")
       .select("*")
-      .or(`name.ilike.%${query}%,locality.ilike.%${query}%,address.ilike.%${query}%`)
+      .or(`name.ilike.%${sanitizedQuery}%,locality.ilike.%${sanitizedQuery}%,address.ilike.%${sanitizedQuery}%`)
       .range(offset, offset + limit - 1)
       .order("name", { ascending: true });
 
@@ -286,16 +295,28 @@ export async function getDistinctCategories(): Promise<string[]> {
 }
 
 export async function getPlaceById(id: string) {
+  // Validate id format to prevent injection
+  if (!id || typeof id !== 'string') {
+    return null;
+  }
+  
+  // Sanitize: only allow alphanumeric, hyphens, and underscores
+  const sanitizedId = id.replace(/[^a-zA-Z0-9\-_]/g, '');
+  if (sanitizedId !== id) {
+    console.warn(`[Supabase] Suspicious place ID rejected: ${id}`);
+    return null;
+  }
+
   // Try fsq_places_raw first
   const { data, error } = await supabase
     .from("fsq_places_raw")
     .select("*")
-    .or(`fsq_place_id.eq.${id},fsq_id.eq.${id}`)
-    .single();
+    .or(`fsq_place_id.eq.${sanitizedId},fsq_id.eq.${sanitizedId}`)
+    .maybeSingle();
 
-  if (error && error.code !== 'PGRST116') {
-    // PGRST116 = no rows returned, try alternate lookup
+  if (error) {
     console.error("[Supabase] Get place by ID error:", error);
+    return null;
   }
   
   if (data) return data;
@@ -304,11 +325,12 @@ export async function getPlaceById(id: string) {
   const { data: fallbackData, error: fallbackError } = await supabase
     .from("fsq_places_raw")
     .select("*")
-    .eq("id", id)
-    .single();
+    .eq("id", sanitizedId)
+    .maybeSingle();
 
-  if (fallbackError && fallbackError.code !== 'PGRST116') {
-    throw fallbackError;
+  if (fallbackError) {
+    console.error("[Supabase] Get place by ID fallback error:", fallbackError);
+    return null;
   }
 
   return fallbackData;

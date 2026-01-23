@@ -62,22 +62,35 @@ import {
   signInWithEmail,
   verifySupabaseToken,
 } from "./supabaseAuth";
+import { supabase } from "./supabaseDb";
 
 // Cookie name for Supabase auth token
 const AUTH_COOKIE_NAME = "tavvy_auth_token";
 
-// Super admin emails - ONLY these emails can access admin portal
-const SUPER_ADMIN_EMAILS = [
-  "daniel@360forbusiness.com",
-  "alineedaniel@gmail.com",
-];
-
-// Helper function to check if email is an admin
-function isAdminEmail(email: string | undefined): boolean {
-  if (!email) return false;
-  return SUPER_ADMIN_EMAILS.some(adminEmail => 
-    adminEmail.toLowerCase() === email.toLowerCase()
-  );
+// Helper function to check if user has super_admin role via database
+// This replaces the hardcoded SUPER_ADMIN_EMAILS array with RBAC
+async function isUserSuperAdmin(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'super_admin')
+      .or('expires_at.is.null,expires_at.gt.now()')
+      .maybeSingle();
+    
+    if (error) {
+      console.error('[Auth] Error checking admin role:', error);
+      return false;
+    }
+    
+    return !!data;
+  } catch (err) {
+    console.error('[Auth] Exception checking admin role:', err);
+    return false;
+  }
 }
 
 export const appRouter = router({
@@ -92,8 +105,9 @@ export const appRouter = router({
       const user = await verifySupabaseToken(token);
       if (!user) return null;
 
-      // Check if user is an admin
-      if (!isAdminEmail(user.email)) {
+      // Check if user has super_admin role in database (RBAC)
+      const isSuperAdmin = await isUserSuperAdmin(user.id);
+      if (!isSuperAdmin) {
         return null; // Non-admin users get null (treated as not logged in)
       }
 
@@ -115,13 +129,9 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        // Check if email is an admin BEFORE attempting login
-        if (!isAdminEmail(input.email)) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Access denied. Admin portal is restricted.",
-          });
-        }
+        // NOTE: We no longer check email before login.
+        // This prevents email enumeration attacks.
+        // Role check happens AFTER successful auth.
 
         const { user, session, error } = await signInWithEmail(
           input.email,
@@ -132,6 +142,17 @@ export const appRouter = router({
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message: error || "Invalid credentials",
+          });
+        }
+
+        // Check if user has super_admin role in database (RBAC)
+        const isSuperAdmin = await isUserSuperAdmin(user.id);
+        if (!isSuperAdmin) {
+          // Don't reveal that the user exists but isn't an admin
+          // Use the same error message as invalid credentials
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Invalid credentials",
           });
         }
 
