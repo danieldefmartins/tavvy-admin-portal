@@ -34,7 +34,97 @@ function getAllowedOrigins(): string[] {
 
 const ALLOWED_ORIGINS = getAllowedOrigins();
 
+// ============================================================
+// Rate Limiting - In-memory sliding window implementation
+// ============================================================
+
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+// Clean up expired entries periodically (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore.entries()) {
+    if (entry.resetTime < now) {
+      rateLimitStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+interface RateLimitConfig {
+  windowMs: number;  // Time window in milliseconds
+  maxRequests: number;  // Max requests per window
+  message?: string;
+}
+
+function createRateLimiter(config: RateLimitConfig) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // Get client identifier (IP address, with fallback)
+    const clientIp = req.ip || 
+      req.headers['x-forwarded-for']?.toString().split(',')[0] || 
+      req.socket.remoteAddress || 
+      'unknown';
+    
+    const key = `${clientIp}:${req.path}`;
+    const now = Date.now();
+    
+    let entry = rateLimitStore.get(key);
+    
+    if (!entry || entry.resetTime < now) {
+      // Create new entry or reset expired one
+      entry = {
+        count: 1,
+        resetTime: now + config.windowMs,
+      };
+      rateLimitStore.set(key, entry);
+    } else {
+      entry.count++;
+    }
+    
+    // Set rate limit headers
+    res.setHeader('X-RateLimit-Limit', config.maxRequests);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, config.maxRequests - entry.count));
+    res.setHeader('X-RateLimit-Reset', Math.ceil(entry.resetTime / 1000));
+    
+    if (entry.count > config.maxRequests) {
+      console.warn(`[RateLimit] Exceeded for ${clientIp} on ${req.path}`);
+      return res.status(429).json({
+        error: config.message || 'Too many requests, please try again later.',
+        retryAfter: Math.ceil((entry.resetTime - now) / 1000),
+      });
+    }
+    
+    next();
+  };
+}
+
+// Rate limiters for different endpoints
+const authRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  maxRequests: 10,  // 10 login attempts per 15 minutes
+  message: 'Too many login attempts. Please try again in 15 minutes.',
+});
+
+const apiRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,  // 1 minute
+  maxRequests: 100,  // 100 requests per minute
+  message: 'API rate limit exceeded. Please slow down.',
+});
+
+const strictRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,  // 1 minute
+  maxRequests: 20,  // 20 requests per minute for sensitive operations
+  message: 'Rate limit exceeded for this operation.',
+});
+
 const app = express();
+
+// Trust proxy for accurate IP detection behind Railway/load balancers
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(cors({
@@ -59,7 +149,17 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 
-// Health check endpoint for API
+// Apply rate limiting to auth endpoints (login)
+app.use('/api/trpc/auth.login', authRateLimiter);
+
+// Apply strict rate limiting to sensitive operations
+app.use('/api/trpc/reviews.batchImport', strictRateLimiter);
+app.use('/api/trpc/articles.bulkImport', strictRateLimiter);
+
+// Apply general rate limiting to all API endpoints
+app.use('/api/trpc', apiRateLimiter);
+
+// Health check endpoint for API (no rate limiting)
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
