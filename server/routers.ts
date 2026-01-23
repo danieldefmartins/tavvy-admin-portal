@@ -84,6 +84,11 @@ import {
   getUnacknowledgedAnomalies,
   acknowledgeAnomaly,
 } from "./anomalyDetection";
+import {
+  createRefreshToken,
+  rotateRefreshToken,
+  revokeAllUserTokens,
+} from "./tokenRotation";
 
 // Cookie name for Supabase auth token
 const AUTH_COOKIE_NAME = "tavvy_auth_token";
@@ -234,6 +239,14 @@ export const appRouter = router({
           console.log(`[Auth] Revoked old session ${sessionResult.revokedSessionId} due to session limit`);
         }
 
+        // Create refresh token for token rotation
+        const refreshTokenResult = await createRefreshToken(
+          user.id,
+          sessionResult.session?.id,
+          clientIp,
+          userAgent
+        );
+
         // Set auth cookie with enhanced security settings
         ctx.res.cookie(AUTH_COOKIE_NAME, session.access_token, {
           httpOnly: true,  // Prevent XSS access to cookie
@@ -242,6 +255,17 @@ export const appRouter = router({
           maxAge: 60 * 60 * 24 * 1 * 1000, // 1 day (reduced from 7 days for security)
           path: "/",
         });
+
+        // Set refresh token cookie (longer lived, but also httpOnly)
+        if (refreshTokenResult) {
+          ctx.res.cookie('tavvy_refresh_token', refreshTokenResult.token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            maxAge: 60 * 60 * 24 * 7 * 1000, // 7 days
+            path: "/",
+          });
+        }
 
         return {
           success: true,
@@ -254,13 +278,64 @@ export const appRouter = router({
         };
       }),
 
+    // Refresh access token using refresh token rotation
+    refresh: publicProcedure.mutation(async ({ ctx }) => {
+      const refreshToken = ctx.req.cookies?.['tavvy_refresh_token'];
+      
+      if (!refreshToken) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "No refresh token provided",
+        });
+      }
+
+      const clientIp = ctx.req.ip || ctx.req.headers['x-forwarded-for']?.toString();
+      const userAgent = ctx.req.headers['user-agent'];
+
+      const result = await rotateRefreshToken(refreshToken, clientIp, userAgent);
+
+      if (!result.success) {
+        // Clear cookies on failure
+        ctx.res.clearCookie(AUTH_COOKIE_NAME, { path: "/" });
+        ctx.res.clearCookie('tavvy_refresh_token', { path: "/" });
+        
+        throw new TRPCError({
+          code: result.securityAlert ? "FORBIDDEN" : "UNAUTHORIZED",
+          message: result.error || "Token refresh failed",
+        });
+      }
+
+      // Set new tokens
+      if (result.tokenPair) {
+        ctx.res.cookie(AUTH_COOKIE_NAME, result.tokenPair.accessToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          maxAge: 60 * 60 * 1000, // 1 hour
+          path: "/",
+        });
+
+        ctx.res.cookie('tavvy_refresh_token', result.tokenPair.refreshToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          maxAge: 60 * 60 * 24 * 7 * 1000, // 7 days
+          path: "/",
+        });
+      }
+
+      return { success: true };
+    }),
+
     logout: publicProcedure.mutation(async ({ ctx }) => {
       // Revoke the session in the database
       const token = ctx.req.cookies?.[AUTH_COOKIE_NAME];
       if (token) {
         await revokeSessionByToken(token, 'user_logout');
       }
+      // Clear both auth and refresh token cookies
       ctx.res.clearCookie(AUTH_COOKIE_NAME, { path: "/" });
+      ctx.res.clearCookie('tavvy_refresh_token', { path: "/" });
       return { success: true };
     }),
 
@@ -281,9 +356,13 @@ export const appRouter = router({
     // Logout from all devices
     logoutAll: protectedProcedure.mutation(async ({ ctx }) => {
       if (!ctx.user?.id) return { success: false, count: 0 };
-      const count = await revokeAllUserSessions(ctx.user.id, 'user_logout_all');
+      // Revoke all sessions and refresh tokens
+      const sessionCount = await revokeAllUserSessions(ctx.user.id, 'user_logout_all');
+      const tokenCount = await revokeAllUserTokens(ctx.user.id, 'user_logout_all');
+      // Clear cookies
       ctx.res.clearCookie(AUTH_COOKIE_NAME, { path: "/" });
-      return { success: true, count };
+      ctx.res.clearCookie('tavvy_refresh_token', { path: "/" });
+      return { success: true, sessionsRevoked: sessionCount, tokensRevoked: tokenCount };
     }),
 
     // Get security anomalies (super admin only)

@@ -6,6 +6,12 @@
  */
 
 import { supabaseAdmin } from "./supabaseDb";
+import { sendSecurityAlert, SecurityAlerts } from "./alertService";
+import {
+  analyzeTravelBetweenLogins,
+  getLastKnownLocation,
+  formatLocation,
+} from "./geoipService";
 
 // Anomaly types
 export const AnomalyTypes = {
@@ -46,7 +52,7 @@ const FAILED_LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const BRUTE_FORCE_THRESHOLD = 10; // Number of attempts that indicate brute force
 
 /**
- * Log an anomaly to the database
+ * Log an anomaly to the database and send alerts for critical/high severity
  */
 export async function logAnomaly(anomaly: AnomalyDetails): Promise<boolean> {
   try {
@@ -71,6 +77,22 @@ export async function logAnomaly(anomaly: AnomalyDetails): Promise<boolean> {
       user: anomaly.userEmail,
       ip: anomaly.ipAddress,
     });
+
+    // Send alerts for critical and high severity anomalies
+    if (anomaly.severity === SeverityLevels.CRITICAL || anomaly.severity === SeverityLevels.HIGH) {
+      // Fire and forget - don't block on alert sending
+      sendSecurityAlert({
+        title: anomaly.anomalyType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        severity: anomaly.severity as 'low' | 'medium' | 'high' | 'critical',
+        description: `Security anomaly detected: ${anomaly.anomalyType}`,
+        userId: anomaly.userId,
+        userEmail: anomaly.userEmail,
+        ipAddress: anomaly.ipAddress,
+        userAgent: anomaly.userAgent,
+        timestamp: new Date(),
+        details: anomaly.details,
+      }).catch(err => console.error('[AnomalyDetection] Failed to send alert:', err));
+    }
 
     return true;
   } catch (err) {
@@ -238,6 +260,84 @@ export async function checkNewIPAddress(
 }
 
 /**
+ * Check for impossible travel (geographic anomaly)
+ */
+export async function checkImpossibleTravel(
+  userId: string,
+  userEmail: string,
+  currentIp?: string,
+  userAgent?: string
+): Promise<boolean> {
+  if (!currentIp) return false;
+
+  try {
+    // Get last known location
+    const lastLocation = await getLastKnownLocation(userId, supabaseAdmin);
+    if (!lastLocation) {
+      return false;
+    }
+
+    // Analyze travel
+    const analysis = await analyzeTravelBetweenLogins(
+      lastLocation.ip,
+      currentIp,
+      lastLocation.timestamp,
+      new Date()
+    );
+
+    if (!analysis) {
+      return false;
+    }
+
+    // Log if impossible travel detected
+    if (analysis.isImpossible && analysis.confidence !== 'low') {
+      const fromLocationStr = formatLocation(analysis.fromLocation);
+      const toLocationStr = formatLocation(analysis.toLocation);
+
+      await logAnomaly({
+        userId,
+        userEmail,
+        anomalyType: AnomalyTypes.IMPOSSIBLE_TRAVEL,
+        severity: analysis.confidence === 'high' ? SeverityLevels.CRITICAL : SeverityLevels.HIGH,
+        ipAddress: currentIp,
+        userAgent,
+        details: {
+          fromLocation: fromLocationStr,
+          toLocation: toLocationStr,
+          fromIp: lastLocation.ip,
+          toIp: currentIp,
+          distanceKm: Math.round(analysis.distanceKm),
+          timeMinutes: Math.round(analysis.timeMinutes),
+          requiredSpeedKmh: Math.round(analysis.requiredSpeedKmh),
+          confidence: analysis.confidence,
+          message: `Login from ${toLocationStr} only ${Math.round(analysis.timeMinutes)} minutes after login from ${fromLocationStr}`,
+        },
+      });
+
+      // Send specific impossible travel alert
+      sendSecurityAlert(
+        SecurityAlerts.impossibleTravel(
+          userId,
+          userEmail,
+          fromLocationStr,
+          toLocationStr,
+          analysis.distanceKm,
+          analysis.timeMinutes,
+          currentIp
+        )
+      ).catch(err => console.error('[AnomalyDetection] Failed to send impossible travel alert:', err));
+
+      return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.error('[AnomalyDetection] Exception checking impossible travel:', err);
+    return false;
+  }
+}
+
+/**
  * Run all anomaly checks for a login
  */
 export async function runLoginAnomalyChecks(
@@ -262,6 +362,14 @@ export async function runLoginAnomalyChecks(
   const isNewIP = await checkNewIPAddress(userId, userEmail, ipAddress, userAgent);
   if (isNewIP) {
     anomaliesDetected.push(AnomalyTypes.NEW_LOCATION);
+  }
+
+  // Check for impossible travel (only if we have an IP)
+  if (ipAddress) {
+    const isImpossibleTravel = await checkImpossibleTravel(userId, userEmail, ipAddress, userAgent);
+    if (isImpossibleTravel) {
+      anomaliesDetected.push(AnomalyTypes.IMPOSSIBLE_TRAVEL);
+    }
   }
 
   return { anomaliesDetected };
