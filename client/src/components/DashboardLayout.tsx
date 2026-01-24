@@ -46,7 +46,8 @@ import {
   BookOpen,
   ChevronRight,
   FileUp,
-  FileCode
+  FileCode,
+  BadgeCheck
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -76,6 +77,7 @@ const otherItems = [
 
 // Admin & Safety items
 const adminItems = [
+  { icon: BadgeCheck, label: "Verifications", path: "/verifications" },
   { icon: Shield, label: "Business Claims", path: "/business-claims" },
   { icon: Flag, label: "Moderation", path: "/moderation" },
   { icon: Edit3, label: "Overrides", path: "/overrides" },

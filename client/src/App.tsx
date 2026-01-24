@@ -21,6 +21,7 @@ import BusinessClaims from "@/pages/BusinessClaims";
 import Moderation from "@/pages/Moderation";
 import Overrides from "@/pages/Overrides";
 import AuditLog from "@/pages/AuditLog";
+import Verifications from "@/pages/Verifications";
 
 // Loading component
 function LoadingScreen() {
@@ -142,6 +143,12 @@ function App() {
         <Route path="/audit-log">
           <ProtectedRoute>
             <AuditLog />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/verifications">
+          <ProtectedRoute>
+            <Verifications />
           </ProtectedRoute>
         </Route>
 
