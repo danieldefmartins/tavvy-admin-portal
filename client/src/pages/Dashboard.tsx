@@ -34,7 +34,7 @@ export default function Dashboard() {
   const { data: proStats, isLoading: proStatsLoading } = trpc.pros.getStats.useQuery();
   const { data: storyStats, isLoading: storyStatsLoading } = trpc.stories.getStats.useQuery();
   const { data: photoStats, isLoading: photoStatsLoading } = trpc.photos.getStats.useQuery();
-  const { data: reviewStats, isLoading: reviewStatsLoading } = trpc.reviews.getStats.useQuery();
+  const { data: reviewStats, isLoading: reviewStatsLoading } = trpc.reviewModeration.getStats.useQuery();
 
   // Calculate total items needing attention
   const pendingItems = (storyStats?.reportedStories || 0) + 

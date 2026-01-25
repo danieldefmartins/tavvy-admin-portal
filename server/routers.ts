@@ -115,9 +115,9 @@ import {
   dismissReviewReports,
   getReviewStats,
   // Place Editing
-  createPlace,
-  updatePlace,
-  deletePlace,
+  createPlaceAdmin,
+  updatePlaceAdmin,
+  deletePlaceAdmin,
   getPlaceForEdit,
   verifyPlace,
   unverifyPlace,
@@ -132,10 +132,10 @@ import {
   approveVerificationWithSync,
   rejectVerificationWithSync,
   // Place Overrides
-  getPlaceOverrides,
-  createPlaceOverride,
-  revertPlaceOverride,
-  deletePlaceOverride,
+  getPlaceOverridesAdmin,
+  createPlaceOverrideAdmin,
+  revertPlaceOverrideAdmin,
+  deletePlaceOverrideAdmin,
 } from "./supabaseDb";
 import { getDb } from "./db";
 import { repActivityLog, batchImportJobs } from "../drizzle/schema";
@@ -1821,7 +1821,7 @@ export const appRouter = router({
   }),
 
   // ============ REVIEW MODERATION ============
-  reviews: router({
+  reviewModeration: router({
     getAll: protectedProcedure
       .input(
         z.object({
@@ -1986,7 +1986,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const result = await createPlace(input, adminId);
+        const result = await createPlaceAdmin(input, adminId);
         if (!result.success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -2005,7 +2005,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const success = await updatePlace(input.id, input.updates, adminId);
+        const success = await updatePlaceAdmin(input.id, input.updates, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -2019,7 +2019,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const success = await deletePlace(input.id, adminId);
+        const success = await deletePlaceAdmin(input.id, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -2230,7 +2230,7 @@ export const appRouter = router({
       )
       .query(async ({ input }) => {
         const { limit, offset, placeId } = input || {};
-        return getPlaceOverrides(limit, offset, placeId);
+        return getPlaceOverridesAdmin(limit, offset, placeId);
       }),
 
     create: protectedProcedure
@@ -2245,7 +2245,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const result = await createPlaceOverride(
+        const result = await createPlaceOverrideAdmin(
           input.placeId,
           input.fieldName,
           input.originalValue,
@@ -2266,7 +2266,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const success = await revertPlaceOverride(input.id, adminId);
+        const success = await revertPlaceOverrideAdmin(input.id, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -2280,7 +2280,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const success = await deletePlaceOverride(input.id, adminId);
+        const success = await deletePlaceOverrideAdmin(input.id, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",

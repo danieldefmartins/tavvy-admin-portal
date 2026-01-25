@@ -3682,7 +3682,7 @@ export interface PlaceCreateInput {
   tags?: string[];
 }
 
-export async function createPlace(
+export async function createPlaceAdmin(
   placeData: PlaceCreateInput,
   adminId: string
 ): Promise<{ success: boolean; placeId?: string; error?: string }> {
@@ -3720,7 +3720,7 @@ export async function createPlace(
   }
 }
 
-export async function updatePlace(
+export async function updatePlaceAdmin(
   placeId: string,
   updates: Partial<PlaceDetails>,
   adminId: string
@@ -3750,7 +3750,7 @@ export async function updatePlace(
   }
 }
 
-export async function deletePlace(
+export async function deletePlaceAdmin(
   placeId: string,
   adminId: string
 ): Promise<boolean> {
@@ -3977,25 +3977,6 @@ export async function getPlacePhotosForEdit(placeId: string): Promise<PlacePhoto
   }
 }
 
-export async function getDistinctCategories(): Promise<string[]> {
-  try {
-    const { data, error } = await supabase
-      .from("places")
-      .select("category")
-      .not("category", "is", null);
-
-    if (error) {
-      console.error("[Supabase] Get categories error:", error);
-      return [];
-    }
-
-    const categories = [...new Set((data || []).map((d: any) => d.category).filter(Boolean))];
-    return categories.sort();
-  } catch (error) {
-    console.error("[Supabase] Get categories error:", error);
-    return [];
-  }
-}
 
 
 // ============ VERIFICATION SYNC ============
@@ -4149,8 +4130,8 @@ export async function rejectVerificationWithSync(
   }
 }
 
-// ============ PLACE OVERRIDE FUNCTIONS ============
-export interface PlaceOverride {
+// ============ PLACE OVERRIDE FUNCTIONS (ADMIN) ============
+export interface PlaceOverrideAdmin {
   id: string;
   place_id: string;
   field_name: string;
@@ -4165,11 +4146,11 @@ export interface PlaceOverride {
   admin_email?: string;
 }
 
-export async function getPlaceOverrides(
+export async function getPlaceOverridesAdmin(
   limit: number = 50,
   offset: number = 0,
   placeId?: string
-): Promise<{ overrides: PlaceOverride[]; total: number }> {
+): Promise<{ overrides: PlaceOverrideAdmin[]; total: number }> {
   try {
     let query = supabase
       .from("place_overrides")
@@ -4191,7 +4172,7 @@ export async function getPlaceOverrides(
       return { overrides: [], total: 0 };
     }
 
-    const overrides: PlaceOverride[] = (data || []).map((o: any) => ({
+    const overrides: PlaceOverrideAdmin[] = (data || []).map((o: any) => ({
       ...o,
       place_name: o.places?.name,
     }));
@@ -4203,7 +4184,7 @@ export async function getPlaceOverrides(
   }
 }
 
-export async function createPlaceOverride(
+export async function createPlaceOverrideAdmin(
   placeId: string,
   fieldName: string,
   originalValue: any,
@@ -4257,7 +4238,7 @@ export async function createPlaceOverride(
   }
 }
 
-export async function revertPlaceOverride(
+export async function revertPlaceOverrideAdmin(
   overrideId: string,
   adminId: string
 ): Promise<boolean> {
@@ -4308,7 +4289,7 @@ export async function revertPlaceOverride(
   }
 }
 
-export async function deletePlaceOverride(
+export async function deletePlaceOverrideAdmin(
   overrideId: string,
   adminId: string
 ): Promise<boolean> {

@@ -5,7 +5,7 @@
  * All logs are stored in the audit_log table in Supabase.
  */
 
-import { supabaseAdmin } from "./supabaseDb";
+import { supabaseAdmin } from "./supabaseAuth";
 
 export interface AuditLogEntry {
   userId?: string;

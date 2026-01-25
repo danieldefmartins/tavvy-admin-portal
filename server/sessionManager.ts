@@ -5,7 +5,7 @@
  * Works alongside Supabase Auth for enhanced session control.
  */
 
-import { supabaseAdmin } from "./supabaseDb";
+import { supabaseAdmin } from "./supabaseAuth";
 import crypto from "crypto";
 
 // Configuration

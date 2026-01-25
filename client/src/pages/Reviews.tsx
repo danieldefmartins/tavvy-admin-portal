@@ -83,33 +83,33 @@ export default function Reviews() {
   const limit = 50;
 
   // Queries
-  const { data: stats, isLoading: statsLoading } = trpc.reviews.getStats.useQuery();
-  const { data: reviewsData, isLoading: reviewsLoading, refetch: refetchReviews } = trpc.reviews.getAll.useQuery({
+  const { data: stats, isLoading: statsLoading } = trpc.reviewModeration.getStats.useQuery();
+  const { data: reviewsData, isLoading: reviewsLoading, refetch: refetchReviews } = trpc.reviewModeration.getAll.useQuery({
     limit,
     offset: page * limit,
     status: filterStatus !== "all" ? filterStatus : undefined,
     minRating: filterRating !== "all" ? parseInt(filterRating) : undefined,
     maxRating: filterRating !== "all" ? parseInt(filterRating) : undefined,
   });
-  const { data: reportedData, isLoading: reportedLoading, refetch: refetchReported } = trpc.reviews.getReported.useQuery({
+  const { data: reportedData, isLoading: reportedLoading, refetch: refetchReported } = trpc.reviewModeration.getReported.useQuery({
     limit,
     offset: page * limit,
   });
-  const { data: flaggedData, isLoading: flaggedLoading, refetch: refetchFlagged } = trpc.reviews.getFlagged.useQuery({
+  const { data: flaggedData, isLoading: flaggedLoading, refetch: refetchFlagged } = trpc.reviewModeration.getFlagged.useQuery({
     limit,
     offset: page * limit,
   });
-  const { data: reviewDetails, isLoading: reviewLoading } = trpc.reviews.getById.useQuery(
+  const { data: reviewDetails, isLoading: reviewLoading } = trpc.reviewModeration.getById.useQuery(
     { id: selectedReviewId! },
     { enabled: !!selectedReviewId }
   );
-  const { data: reviewReports } = trpc.reviews.getReports.useQuery(
+  const { data: reviewReports } = trpc.reviewModeration.getReports.useQuery(
     { reviewId: selectedReviewId! },
     { enabled: !!selectedReviewId }
   );
 
   // Mutations
-  const approveMutation = trpc.reviews.approve.useMutation({
+  const approveMutation = trpc.reviewModeration.approve.useMutation({
     onSuccess: () => {
       toast.success("Review approved");
       refetchAll();
@@ -117,7 +117,7 @@ export default function Reviews() {
     onError: (error) => toast.error(`Failed to approve: ${error.message}`),
   });
 
-  const rejectMutation = trpc.reviews.reject.useMutation({
+  const rejectMutation = trpc.reviewModeration.reject.useMutation({
     onSuccess: () => {
       toast.success("Review rejected");
       refetchAll();
@@ -127,7 +127,7 @@ export default function Reviews() {
     onError: (error) => toast.error(`Failed to reject: ${error.message}`),
   });
 
-  const deleteMutation = trpc.reviews.delete.useMutation({
+  const deleteMutation = trpc.reviewModeration.delete.useMutation({
     onSuccess: () => {
       toast.success("Review deleted");
       refetchAll();
@@ -137,7 +137,7 @@ export default function Reviews() {
     onError: (error) => toast.error(`Failed to delete: ${error.message}`),
   });
 
-  const dismissReportsMutation = trpc.reviews.dismissReports.useMutation({
+  const dismissReportsMutation = trpc.reviewModeration.dismissReports.useMutation({
     onSuccess: () => {
       toast.success("Reports dismissed");
       refetchAll();

@@ -7,7 +7,7 @@
  */
 
 import crypto from "crypto";
-import { supabaseAdmin } from "./supabaseDb";
+import { supabaseAdmin } from "./supabaseAuth";
 import { logAnomaly, AnomalyTypes, SeverityLevels } from "./anomalyDetection";
 
 // Configuration

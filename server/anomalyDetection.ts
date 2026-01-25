@@ -5,7 +5,7 @@
  * Provides alerting for security monitoring.
  */
 
-import { supabaseAdmin } from "./supabaseDb";
+import { supabaseAdmin } from "./supabaseAuth";
 import { sendSecurityAlert, SecurityAlerts } from "./alertService";
 import {
   analyzeTravelBetweenLogins,
