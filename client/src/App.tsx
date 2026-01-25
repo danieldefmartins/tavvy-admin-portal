@@ -23,6 +23,7 @@ import Overrides from "@/pages/Overrides";
 import AuditLog from "@/pages/AuditLog";
 import Verifications from "@/pages/Verifications";
 import Realtors from "@/pages/Realtors";
+import StrategicAudit from "@/pages/StrategicAudit";
 
 // Loading component
 function LoadingScreen() {
@@ -156,6 +157,12 @@ function App() {
         <Route path="/verifications">
           <ProtectedRoute>
             <Verifications />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/strategic-audit">
+          <ProtectedRoute>
+            <StrategicAudit />
           </ProtectedRoute>
         </Route>
 

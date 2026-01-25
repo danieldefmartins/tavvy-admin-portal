@@ -84,6 +84,7 @@ const adminItems = [
   { icon: Flag, label: "Moderation", path: "/moderation" },
   { icon: Edit3, label: "Overrides", path: "/overrides" },
   { icon: History, label: "Audit Log", path: "/audit-log" },
+  { icon: BarChart3, label: "Strategic Audit", path: "/strategic-audit" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
