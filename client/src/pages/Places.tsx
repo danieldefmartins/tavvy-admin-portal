@@ -449,10 +449,22 @@ export default function Places() {
   const getCountryName = (code: string) => countryNames[code] || code;
 
   // Sort countries with US first, then alphabetically by name
+  // Also consolidate duplicate entries (e.g., "US" and "United States")
   const sortedCountries = useMemo(() => {
     if (!countries) return [];
     const getName = (code: string) => countryNames[code] || code;
-    return [...countries].sort((a, b) => {
+    
+    // Consolidate duplicates: if both "US" and "United States" exist, keep only "US"
+    const hasUS = countries.includes("US");
+    const hasUnitedStates = countries.includes("United States");
+    
+    let filteredCountries = [...countries];
+    if (hasUS && hasUnitedStates) {
+      // Remove "United States" since we'll use "US" (which maps to "United States")
+      filteredCountries = filteredCountries.filter(c => c !== "United States");
+    }
+    
+    return filteredCountries.sort((a, b) => {
       // US always first
       if (a === "US" || a === "United States") return -1;
       if (b === "US" || b === "United States") return 1;

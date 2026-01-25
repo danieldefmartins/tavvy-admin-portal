@@ -151,7 +151,12 @@ export async function searchPlacesAdvanced(
       query = query.eq("region", filters.state);
     }
     if (filters.country) {
-      query = query.eq("country", filters.country);
+      // Handle US/United States consolidation - search for both values
+      if (filters.country === "US" || filters.country === "United States") {
+        query = query.or('country.eq.US,country.eq.United States');
+      } else {
+        query = query.eq("country", filters.country);
+      }
     }
     if (filters.category) {
       query = query.ilike("tavvy_category", `%${filters.category}%`);
