@@ -22,6 +22,7 @@ import Moderation from "@/pages/Moderation";
 import Overrides from "@/pages/Overrides";
 import AuditLog from "@/pages/AuditLog";
 import Verifications from "@/pages/Verifications";
+import Realtors from "@/pages/Realtors";
 
 // Loading component
 function LoadingScreen() {
@@ -122,6 +123,12 @@ function App() {
         </Route>
 
         {/* Admin & Safety Routes */}
+        <Route path="/realtors">
+          <ProtectedRoute>
+            <Realtors />
+          </ProtectedRoute>
+        </Route>
+
         <Route path="/business-claims">
           <ProtectedRoute>
             <BusinessClaims />
