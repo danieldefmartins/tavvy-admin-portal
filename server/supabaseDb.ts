@@ -198,24 +198,45 @@ export async function searchPlacesAdvanced(
 // Get distinct countries for dropdown
 export async function getDistinctCountries(): Promise<string[]> {
   try {
-    // Use a larger limit to ensure we get all records for deduplication
-    // Supabase default limit is 1000, but we need all rows to find all unique countries
-    const { data, error } = await supabase
-      .from("places")
-      .select("country")
-      .not("country", "is", null)
-      .order("country", { ascending: true })
-      .limit(50000); // Increase limit to capture all records
+    // Query places table and get unique countries
+    // Use pagination to ensure we get all records
+    const allCountries: string[] = [];
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from("places")
+        .select("country")
+        .not("country", "is", null)
+        .range(offset, offset + batchSize - 1);
 
-    if (error) {
-      console.error("[Supabase] Get distinct countries error:", error);
-      return [];
+      if (error) {
+        console.error("[Supabase] Get distinct countries error:", error);
+        break;
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        data.forEach((d: any) => {
+          if (d.country && !allCountries.includes(d.country)) {
+            allCountries.push(d.country);
+          }
+        });
+        offset += batchSize;
+        // If we got less than batch size, we've reached the end
+        if (data.length < batchSize) {
+          hasMore = false;
+        }
+      }
     }
 
-    // Get unique values and sort them
-    const countries = Array.from(new Set((data || []).map((d: any) => d.country).filter(Boolean))).sort();
-    console.log(`[Supabase] Found ${countries.length} distinct countries`);
-    return countries;
+    // Sort alphabetically
+    const sortedCountries = allCountries.sort();
+    console.log(`[Supabase] Found ${sortedCountries.length} distinct countries`);
+    return sortedCountries;
   } catch (error) {
     console.error("[Supabase] Get distinct countries error:", error);
     return [];

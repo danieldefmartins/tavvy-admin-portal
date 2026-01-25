@@ -567,7 +567,7 @@ export default function Places() {
                             {sortedCountries.map((country) => (
                               <CommandItem
                                 key={country}
-                                value={getCountryName(country)}
+                                value={`${country} ${getCountryName(country)}`}
                                 onSelect={() => {
                                   setFilters({ ...filters, country: country });
                                   setCountryOpen(false);
