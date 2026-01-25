@@ -32,6 +32,20 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 export default function Places() {
   // Simple search state
@@ -51,6 +65,7 @@ export default function Places() {
   });
   const [appliedFilters, setAppliedFilters] = useState(filters);
   const [page, setPage] = useState(0);
+  const [countryOpen, setCountryOpen] = useState(false);
   const limit = 50;
 
   // Fetch dropdown data
@@ -433,6 +448,18 @@ export default function Places() {
 
   const getCountryName = (code: string) => countryNames[code] || code;
 
+  // Sort countries with US first, then alphabetically by name
+  const sortedCountries = React.useMemo(() => {
+    if (!countries) return [];
+    return [...countries].sort((a, b) => {
+      // US always first
+      if (a === "US" || a === "United States") return -1;
+      if (b === "US" || b === "United States") return 1;
+      // Then alphabetically by display name
+      return getCountryName(a).localeCompare(getCountryName(b));
+    });
+  }, [countries]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -501,25 +528,61 @@ export default function Places() {
 
             <CollapsibleContent className="pt-4">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {/* Country */}
+                {/* Country - Searchable Combobox */}
                 <div className="space-y-2">
                   <Label>Country</Label>
-                  <Select
-                    value={filters.country}
-                    onValueChange={(v) => setFilters({ ...filters, country: v === "all" ? "" : v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select country" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Countries</SelectItem>
-                      {countries?.map((country) => (
-                        <SelectItem key={country} value={country}>
-                          {getCountryName(country)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={countryOpen}
+                        className="w-full justify-between font-normal"
+                      >
+                        {filters.country
+                          ? getCountryName(filters.country)
+                          : "Select country..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search country..." />
+                        <CommandList>
+                          <CommandEmpty>No country found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="all-countries"
+                              onSelect={() => {
+                                setFilters({ ...filters, country: "" });
+                                setCountryOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${!filters.country ? "opacity-100" : "opacity-0"}`}
+                              />
+                              All Countries
+                            </CommandItem>
+                            {sortedCountries.map((country) => (
+                              <CommandItem
+                                key={country}
+                                value={getCountryName(country)}
+                                onSelect={() => {
+                                  setFilters({ ...filters, country: country });
+                                  setCountryOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${filters.country === country ? "opacity-100" : "opacity-0"}`}
+                                />
+                                {getCountryName(country)}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 {/* State/Region */}
