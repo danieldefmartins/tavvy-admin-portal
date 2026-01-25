@@ -40,7 +40,12 @@ export interface Place {
   phone: string | null;
   website: string | null;
   category: string | null;
-  source: 'foursquare' | 'user';
+  subcategory?: string | null;
+  source: string;
+  cover_image_url?: string | null;
+  photos?: any;
+  status?: string | null;
+  is_active?: boolean;
 }
 
 export async function getPlaces(limit = 100, offset = 0) {
@@ -69,34 +74,39 @@ export async function searchPlaces(
       return [];
     }
 
-    // Search in fsq_places_raw with sanitized query
-    const { data: fsqData, error: fsqError } = await supabase
-      .from("fsq_places_raw")
+    // Search in places table with sanitized query
+    const { data: placesData, error: placesError } = await supabase
+      .from("places")
       .select("*")
-      .or(`name.ilike.%${sanitizedQuery}%,locality.ilike.%${sanitizedQuery}%,address.ilike.%${sanitizedQuery}%`)
+      .or(`name.ilike.%${sanitizedQuery}%,city.ilike.%${sanitizedQuery}%,street.ilike.%${sanitizedQuery}%`)
       .range(offset, offset + limit - 1)
       .order("name", { ascending: true });
 
-    if (fsqError) {
-      console.error("[Supabase] Search places error:", fsqError);
+    if (placesError) {
+      console.error("[Supabase] Search places error:", placesError);
       return [];
     }
 
     // Map to Place interface
-    const places: Place[] = (fsqData || []).map((p: any) => ({
-      id: p.fsq_place_id || p.fsq_id || p.id,
+    const places: Place[] = (placesData || []).map((p: any) => ({
+      id: p.id,
       name: p.name,
-      address: p.address,
-      city: p.locality,
+      address: p.street,
+      city: p.city,
       state: p.region,
       country: p.country,
       postal_code: p.postcode,
       lat: p.latitude,
       lng: p.longitude,
-      phone: p.tel,
+      phone: p.phone,
       website: p.website,
-      category: p.fsq_category_labels,
-      source: 'foursquare' as const,
+      category: p.tavvy_category,
+      subcategory: p.tavvy_subcategory,
+      source: p.source_type || 'tavvy',
+      cover_image_url: p.cover_image_url,
+      photos: p.photos,
+      status: p.status,
+      is_active: p.is_active,
     }));
 
     console.log(`[Supabase] Found ${places.length} places for query: ${query}`);
@@ -169,7 +179,12 @@ export async function searchPlacesAdvanced(
       phone: p.phone,
       website: p.website,
       category: p.tavvy_category,
-      source: 'foursquare' as const,
+      subcategory: p.tavvy_subcategory,
+      source: p.source_type || 'tavvy',
+      cover_image_url: p.cover_image_url,
+      photos: p.photos,
+      status: p.status,
+      is_active: p.is_active,
     }));
 
     console.log(`[Supabase] Advanced search found ${places.length} places (total: ${count})`);
