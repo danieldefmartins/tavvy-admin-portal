@@ -354,38 +354,6 @@ export async function getPlacesCount(): Promise<number> {
   }
 }
 
-export async function updatePlace(id: string, updates: any) {
-  const { data, error } = await supabase
-    .from("fsq_places_raw")
-    .update(updates)
-    .eq("fsq_id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function createPlace(place: any) {
-  const { data, error } = await supabase
-    .from("fsq_places_raw")
-    .insert(place)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function deletePlace(id: string) {
-  const { error } = await supabase
-    .from("fsq_places_raw")
-    .delete()
-    .eq("fsq_id", id);
-
-  if (error) throw error;
-  return { success: true };
-}
 
 // ============ SIGNALS / REVIEW ITEMS ============
 export interface ReviewItem {
