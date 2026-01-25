@@ -1631,3 +1631,2702 @@ export async function getModerationStats(): Promise<{
     };
   }
 }
+
+
+// ============ USER MANAGEMENT ============
+export interface User {
+  id: string;
+  email: string | null;
+  phone_e164: string | null;
+  is_phone_verified: boolean;
+  is_email_verified: boolean;
+  created_at: string;
+  last_login_at: string | null;
+  // From profiles
+  display_name?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+}
+
+export interface UserRole {
+  id: string;
+  user_id: string;
+  role: string;
+  granted_by: string | null;
+  granted_at: string;
+  expires_at: string | null;
+}
+
+export interface UserStrike {
+  id: string;
+  user_id: string;
+  reason: string;
+  story_id: string | null;
+  issued_by: string | null;
+  created_at: string;
+  expires_at: string | null;
+}
+
+export interface UserGamification {
+  id: string;
+  user_id: string;
+  total_points: number;
+  total_taps: number;
+  current_streak: number;
+  longest_streak: number;
+  last_tap_date: string | null;
+  badges: string[];
+  impact_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BlockedUser {
+  user_id: string;
+  blocked_user_id: string;
+  created_at: string;
+}
+
+export async function getUsers(
+  limit: number = 50,
+  offset: number = 0,
+  search?: string
+): Promise<{ users: User[]; total: number }> {
+  try {
+    let query = supabase
+      .from("users")
+      .select(`
+        *,
+        profiles:profiles(display_name, avatar_url, bio)
+      `, { count: "exact" });
+
+    if (search) {
+      query = query.or(`email.ilike.%${search}%,phone_e164.ilike.%${search}%`);
+    }
+
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get users error:", error);
+      return { users: [], total: 0 };
+    }
+
+    const users: User[] = (data || []).map((u: any) => ({
+      id: u.id,
+      email: u.email,
+      phone_e164: u.phone_e164,
+      is_phone_verified: u.is_phone_verified,
+      is_email_verified: u.is_email_verified,
+      created_at: u.created_at,
+      last_login_at: u.last_login_at,
+      display_name: u.profiles?.display_name,
+      avatar_url: u.profiles?.avatar_url,
+      bio: u.profiles?.bio,
+    }));
+
+    return { users, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get users error:", error);
+    return { users: [], total: 0 };
+  }
+}
+
+export async function getUserById(userId: string): Promise<User | null> {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select(`
+        *,
+        profiles:profiles(display_name, avatar_url, bio)
+      `)
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Get user by ID error:", error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      email: data.email,
+      phone_e164: data.phone_e164,
+      is_phone_verified: data.is_phone_verified,
+      is_email_verified: data.is_email_verified,
+      created_at: data.created_at,
+      last_login_at: data.last_login_at,
+      display_name: data.profiles?.display_name,
+      avatar_url: data.profiles?.avatar_url,
+      bio: data.profiles?.bio,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get user by ID error:", error);
+    return null;
+  }
+}
+
+export async function getUserRoles(userId: string): Promise<UserRole[]> {
+  try {
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("*")
+      .eq("user_id", userId)
+      .order("granted_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get user roles error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get user roles error:", error);
+    return [];
+  }
+}
+
+export async function addUserRole(
+  userId: string,
+  role: string,
+  grantedBy: string,
+  expiresAt?: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("user_roles")
+      .insert({
+        user_id: userId,
+        role,
+        granted_by: grantedBy,
+        granted_at: new Date().toISOString(),
+        expires_at: expiresAt || null,
+      });
+
+    if (error) {
+      console.error("[Supabase] Add user role error:", error);
+      return false;
+    }
+
+    await logAdminActivity(grantedBy, "role_granted", userId, "user", `Role: ${role}`);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Add user role error:", error);
+    return false;
+  }
+}
+
+export async function removeUserRole(
+  userId: string,
+  role: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId)
+      .eq("role", role);
+
+    if (error) {
+      console.error("[Supabase] Remove user role error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "role_removed", userId, "user", `Role: ${role}`);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Remove user role error:", error);
+    return false;
+  }
+}
+
+export async function getUserStrikes(userId: string): Promise<UserStrike[]> {
+  try {
+    const { data, error } = await supabase
+      .from("user_strikes")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get user strikes error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get user strikes error:", error);
+    return [];
+  }
+}
+
+export async function addUserStrike(
+  userId: string,
+  reason: string,
+  issuedBy: string,
+  storyId?: string,
+  expiresAt?: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("user_strikes")
+      .insert({
+        user_id: userId,
+        reason,
+        issued_by: issuedBy,
+        story_id: storyId || null,
+        created_at: new Date().toISOString(),
+        expires_at: expiresAt || null,
+      });
+
+    if (error) {
+      console.error("[Supabase] Add user strike error:", error);
+      return false;
+    }
+
+    await logAdminActivity(issuedBy, "strike_issued", userId, "user", `Reason: ${reason}`);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Add user strike error:", error);
+    return false;
+  }
+}
+
+export async function removeUserStrike(
+  strikeId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    // Get strike info first for logging
+    const { data: strike } = await supabase
+      .from("user_strikes")
+      .select("user_id")
+      .eq("id", strikeId)
+      .single();
+
+    const { error } = await supabase
+      .from("user_strikes")
+      .delete()
+      .eq("id", strikeId);
+
+    if (error) {
+      console.error("[Supabase] Remove user strike error:", error);
+      return false;
+    }
+
+    if (strike) {
+      await logAdminActivity(adminId, "strike_removed", strike.user_id, "user");
+    }
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Remove user strike error:", error);
+    return false;
+  }
+}
+
+export async function getUserGamification(userId: string): Promise<UserGamification | null> {
+  try {
+    const { data, error } = await supabase
+      .from("user_gamification")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      console.error("[Supabase] Get user gamification error:", error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("[Supabase] Get user gamification error:", error);
+    return null;
+  }
+}
+
+export async function blockUser(
+  userId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    // Add to blocked_users table (system-level block)
+    const { error } = await supabase
+      .from("blocked_users")
+      .insert({
+        user_id: adminId, // The admin blocking
+        blocked_user_id: userId, // The user being blocked
+        created_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error("[Supabase] Block user error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "user_blocked", userId, "user");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Block user error:", error);
+    return false;
+  }
+}
+
+export async function unblockUser(
+  userId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("blocked_users")
+      .delete()
+      .eq("blocked_user_id", userId);
+
+    if (error) {
+      console.error("[Supabase] Unblock user error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "user_unblocked", userId, "user");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Unblock user error:", error);
+    return false;
+  }
+}
+
+export async function isUserBlocked(userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from("blocked_users")
+      .select("blocked_user_id")
+      .eq("blocked_user_id", userId)
+      .limit(1);
+
+    if (error) {
+      console.error("[Supabase] Check blocked user error:", error);
+      return false;
+    }
+
+    return (data?.length || 0) > 0;
+  } catch (error) {
+    console.error("[Supabase] Check blocked user error:", error);
+    return false;
+  }
+}
+
+export async function getUserStats(): Promise<{
+  totalUsers: number;
+  verifiedUsers: number;
+  activeToday: number;
+  newThisWeek: number;
+}> {
+  try {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [totalResult, verifiedResult, activeTodayResult, newThisWeekResult] = await Promise.all([
+      supabase.from("users").select("*", { count: "exact", head: true }),
+      supabase.from("users").select("*", { count: "exact", head: true }).eq("is_email_verified", true),
+      supabase.from("users").select("*", { count: "exact", head: true }).gte("last_login_at", todayStart),
+      supabase.from("users").select("*", { count: "exact", head: true }).gte("created_at", weekAgo),
+    ]);
+
+    return {
+      totalUsers: totalResult.count || 0,
+      verifiedUsers: verifiedResult.count || 0,
+      activeToday: activeTodayResult.count || 0,
+      newThisWeek: newThisWeekResult.count || 0,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get user stats error:", error);
+    return { totalUsers: 0, verifiedUsers: 0, activeToday: 0, newThisWeek: 0 };
+  }
+}
+
+
+// ============ PRO PROVIDERS MANAGEMENT ============
+export interface ProProvider {
+  id: string;
+  user_id: string;
+  business_name: string | null;
+  slug: string | null;
+  description: string | null;
+  short_description: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  logo_url: string | null;
+  cover_image_url: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  service_radius: number | null;
+  years_in_business: number | null;
+  license_number: string | null;
+  is_insured: boolean;
+  is_licensed: boolean;
+  is_verified: boolean;
+  is_active: boolean;
+  is_featured: boolean;
+  average_rating: number | null;
+  total_reviews: number | null;
+  response_time: string | null;
+  created_at: string;
+  updated_at: string;
+  verified_at: string | null;
+  provider_type: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  bio: string | null;
+  profile_photo_url: string | null;
+  brokerage_name: string | null;
+  mls_id: string | null;
+  trade_category: string | null;
+  specialties: string[] | null;
+  years_experience: number | null;
+  subscription_plan: string | null;
+  subscription_status: string | null;
+  subscription_started_at: string | null;
+  subscription_expires_at: string | null;
+  total_leads: number | null;
+  active_leads: number | null;
+  response_rate: number | null;
+  review_count: number | null;
+  service_areas: string[] | null;
+}
+
+export interface ProReview {
+  id: string;
+  pro_id: string;
+  user_id: string;
+  rating: number;
+  review_text: string | null;
+  created_at: string;
+  updated_at: string | null;
+  is_verified: boolean;
+}
+
+export async function getProProviders(
+  limit: number = 50,
+  offset: number = 0,
+  search?: string,
+  providerType?: string,
+  isVerified?: boolean,
+  isActive?: boolean
+): Promise<{ providers: ProProvider[]; total: number }> {
+  try {
+    let query = supabase
+      .from("pro_providers")
+      .select("*", { count: "exact" });
+
+    if (search) {
+      query = query.or(`business_name.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    if (providerType) {
+      query = query.eq("provider_type", providerType);
+    }
+
+    if (isVerified !== undefined) {
+      query = query.eq("is_verified", isVerified);
+    }
+
+    if (isActive !== undefined) {
+      query = query.eq("is_active", isActive);
+    }
+
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get pro providers error:", error);
+      return { providers: [], total: 0 };
+    }
+
+    return { providers: data || [], total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get pro providers error:", error);
+    return { providers: [], total: 0 };
+  }
+}
+
+export async function getProProviderById(proId: string): Promise<ProProvider | null> {
+  try {
+    const { data, error } = await supabase
+      .from("pro_providers")
+      .select("*")
+      .eq("id", proId)
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Get pro provider by ID error:", error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("[Supabase] Get pro provider by ID error:", error);
+    return null;
+  }
+}
+
+export async function updateProProvider(
+  proId: string,
+  updates: Partial<ProProvider>,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("pro_providers")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", proId);
+
+    if (error) {
+      console.error("[Supabase] Update pro provider error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "pro_updated", proId, "pro_provider", JSON.stringify(updates));
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update pro provider error:", error);
+    return false;
+  }
+}
+
+export async function verifyProProvider(
+  proId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("pro_providers")
+      .update({
+        is_verified: true,
+        verified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", proId);
+
+    if (error) {
+      console.error("[Supabase] Verify pro provider error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "pro_verified", proId, "pro_provider");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Verify pro provider error:", error);
+    return false;
+  }
+}
+
+export async function unverifyProProvider(
+  proId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("pro_providers")
+      .update({
+        is_verified: false,
+        verified_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", proId);
+
+    if (error) {
+      console.error("[Supabase] Unverify pro provider error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "pro_unverified", proId, "pro_provider");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Unverify pro provider error:", error);
+    return false;
+  }
+}
+
+export async function activateProProvider(
+  proId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("pro_providers")
+      .update({
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", proId);
+
+    if (error) {
+      console.error("[Supabase] Activate pro provider error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "pro_activated", proId, "pro_provider");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Activate pro provider error:", error);
+    return false;
+  }
+}
+
+export async function deactivateProProvider(
+  proId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("pro_providers")
+      .update({
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", proId);
+
+    if (error) {
+      console.error("[Supabase] Deactivate pro provider error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "pro_deactivated", proId, "pro_provider");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Deactivate pro provider error:", error);
+    return false;
+  }
+}
+
+export async function featureProProvider(
+  proId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("pro_providers")
+      .update({
+        is_featured: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", proId);
+
+    if (error) {
+      console.error("[Supabase] Feature pro provider error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "pro_featured", proId, "pro_provider");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Feature pro provider error:", error);
+    return false;
+  }
+}
+
+export async function unfeatureProProvider(
+  proId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("pro_providers")
+      .update({
+        is_featured: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", proId);
+
+    if (error) {
+      console.error("[Supabase] Unfeature pro provider error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "pro_unfeatured", proId, "pro_provider");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Unfeature pro provider error:", error);
+    return false;
+  }
+}
+
+export async function getProReviews(proId: string): Promise<ProReview[]> {
+  try {
+    const { data, error } = await supabase
+      .from("pro_reviews")
+      .select("*")
+      .eq("pro_id", proId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get pro reviews error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get pro reviews error:", error);
+    return [];
+  }
+}
+
+export async function getProStats(): Promise<{
+  totalPros: number;
+  verifiedPros: number;
+  activePros: number;
+  featuredPros: number;
+  realtors: number;
+  contractors: number;
+}> {
+  try {
+    const [totalResult, verifiedResult, activeResult, featuredResult, realtorResult, contractorResult] = await Promise.all([
+      supabase.from("pro_providers").select("*", { count: "exact", head: true }),
+      supabase.from("pro_providers").select("*", { count: "exact", head: true }).eq("is_verified", true),
+      supabase.from("pro_providers").select("*", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("pro_providers").select("*", { count: "exact", head: true }).eq("is_featured", true),
+      supabase.from("pro_providers").select("*", { count: "exact", head: true }).eq("provider_type", "realtor"),
+      supabase.from("pro_providers").select("*", { count: "exact", head: true }).eq("provider_type", "contractor"),
+    ]);
+
+    return {
+      totalPros: totalResult.count || 0,
+      verifiedPros: verifiedResult.count || 0,
+      activePros: activeResult.count || 0,
+      featuredPros: featuredResult.count || 0,
+      realtors: realtorResult.count || 0,
+      contractors: contractorResult.count || 0,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get pro stats error:", error);
+    return { totalPros: 0, verifiedPros: 0, activePros: 0, featuredPros: 0, realtors: 0, contractors: 0 };
+  }
+}
+
+export async function getDistinctProviderTypes(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("pro_providers")
+      .select("provider_type")
+      .not("provider_type", "is", null);
+
+    if (error) {
+      console.error("[Supabase] Get provider types error:", error);
+      return [];
+    }
+
+    const types = [...new Set((data || []).map((d: any) => d.provider_type).filter(Boolean))];
+    return types;
+  } catch (error) {
+    console.error("[Supabase] Get provider types error:", error);
+    return [];
+  }
+}
+
+
+// ============ STORY MODERATION ============
+export interface PlaceStory {
+  id: string;
+  place_id: string;
+  user_id: string;
+  media_url: string;
+  media_type: string | null;
+  caption: string | null;
+  created_at: string;
+  expires_at: string | null;
+  thumbnail_url: string | null;
+  status: string | null;
+  is_permanent: boolean;
+  tags: string[] | null;
+  updated_at: string | null;
+  // Joined data
+  place_name?: string;
+  user_email?: string;
+  report_count?: number;
+}
+
+export interface StoryReport {
+  id: string;
+  story_id: string;
+  reporter_user_id: string;
+  reason: string;
+  created_at: string;
+  // Joined data
+  reporter_email?: string;
+}
+
+export async function getStories(
+  limit: number = 50,
+  offset: number = 0,
+  status?: string,
+  hasReports?: boolean
+): Promise<{ stories: PlaceStory[]; total: number }> {
+  try {
+    let query = supabase
+      .from("place_stories")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `, { count: "exact" });
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get stories error:", error);
+      return { stories: [], total: 0 };
+    }
+
+    // Get report counts for each story
+    const storyIds = (data || []).map((s: any) => s.id);
+    let reportCounts: Record<string, number> = {};
+    
+    if (storyIds.length > 0) {
+      const { data: reports } = await supabase
+        .from("story_reports")
+        .select("story_id")
+        .in("story_id", storyIds);
+      
+      if (reports) {
+        reports.forEach((r: any) => {
+          reportCounts[r.story_id] = (reportCounts[r.story_id] || 0) + 1;
+        });
+      }
+    }
+
+    const stories: PlaceStory[] = (data || []).map((s: any) => ({
+      ...s,
+      place_name: s.places?.name,
+      user_email: s.users?.email,
+      report_count: reportCounts[s.id] || 0,
+    }));
+
+    // Filter by reports if requested
+    if (hasReports === true) {
+      const filtered = stories.filter(s => s.report_count && s.report_count > 0);
+      return { stories: filtered, total: filtered.length };
+    }
+
+    return { stories, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get stories error:", error);
+    return { stories: [], total: 0 };
+  }
+}
+
+export async function getStoryById(storyId: string): Promise<PlaceStory | null> {
+  try {
+    const { data, error } = await supabase
+      .from("place_stories")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `)
+      .eq("id", storyId)
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Get story by ID error:", error);
+      return null;
+    }
+
+    // Get report count
+    const { count } = await supabase
+      .from("story_reports")
+      .select("*", { count: "exact", head: true })
+      .eq("story_id", storyId);
+
+    return {
+      ...data,
+      place_name: data.places?.name,
+      user_email: data.users?.email,
+      report_count: count || 0,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get story by ID error:", error);
+    return null;
+  }
+}
+
+export async function getStoryReports(storyId: string): Promise<StoryReport[]> {
+  try {
+    const { data, error } = await supabase
+      .from("story_reports")
+      .select(`
+        *,
+        users:reporter_user_id(email)
+      `)
+      .eq("story_id", storyId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get story reports error:", error);
+      return [];
+    }
+
+    return (data || []).map((r: any) => ({
+      ...r,
+      reporter_email: r.users?.email,
+    }));
+  } catch (error) {
+    console.error("[Supabase] Get story reports error:", error);
+    return [];
+  }
+}
+
+export async function updateStoryStatus(
+  storyId: string,
+  status: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("place_stories")
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", storyId);
+
+    if (error) {
+      console.error("[Supabase] Update story status error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, `story_${status}`, storyId, "story");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update story status error:", error);
+    return false;
+  }
+}
+
+export async function deleteStory(
+  storyId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    // First get story info for logging
+    const { data: story } = await supabase
+      .from("place_stories")
+      .select("user_id")
+      .eq("id", storyId)
+      .single();
+
+    const { error } = await supabase
+      .from("place_stories")
+      .delete()
+      .eq("id", storyId);
+
+    if (error) {
+      console.error("[Supabase] Delete story error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "story_deleted", storyId, "story", story?.user_id);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Delete story error:", error);
+    return false;
+  }
+}
+
+export async function getReportedStories(
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ stories: PlaceStory[]; total: number }> {
+  try {
+    // Get all story IDs that have reports
+    const { data: reportedIds } = await supabase
+      .from("story_reports")
+      .select("story_id");
+
+    if (!reportedIds || reportedIds.length === 0) {
+      return { stories: [], total: 0 };
+    }
+
+    const uniqueStoryIds = [...new Set(reportedIds.map((r: any) => r.story_id))];
+
+    const { data, error, count } = await supabase
+      .from("place_stories")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `, { count: "exact" })
+      .in("id", uniqueStoryIds)
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get reported stories error:", error);
+      return { stories: [], total: 0 };
+    }
+
+    // Get report counts
+    let reportCounts: Record<string, number> = {};
+    reportedIds.forEach((r: any) => {
+      reportCounts[r.story_id] = (reportCounts[r.story_id] || 0) + 1;
+    });
+
+    const stories: PlaceStory[] = (data || []).map((s: any) => ({
+      ...s,
+      place_name: s.places?.name,
+      user_email: s.users?.email,
+      report_count: reportCounts[s.id] || 0,
+    }));
+
+    return { stories, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get reported stories error:", error);
+    return { stories: [], total: 0 };
+  }
+}
+
+export async function dismissStoryReports(
+  storyId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("story_reports")
+      .delete()
+      .eq("story_id", storyId);
+
+    if (error) {
+      console.error("[Supabase] Dismiss story reports error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "story_reports_dismissed", storyId, "story");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Dismiss story reports error:", error);
+    return false;
+  }
+}
+
+export async function getStoryStats(): Promise<{
+  totalStories: number;
+  activeStories: number;
+  reportedStories: number;
+  removedStories: number;
+}> {
+  try {
+    const [totalResult, activeResult, removedResult] = await Promise.all([
+      supabase.from("place_stories").select("*", { count: "exact", head: true }),
+      supabase.from("place_stories").select("*", { count: "exact", head: true }).or("status.is.null,status.eq.active"),
+      supabase.from("place_stories").select("*", { count: "exact", head: true }).eq("status", "removed"),
+    ]);
+
+    // Get count of stories with reports
+    const { data: reportedIds } = await supabase
+      .from("story_reports")
+      .select("story_id");
+    
+    const uniqueReported = reportedIds ? [...new Set(reportedIds.map((r: any) => r.story_id))].length : 0;
+
+    return {
+      totalStories: totalResult.count || 0,
+      activeStories: activeResult.count || 0,
+      reportedStories: uniqueReported,
+      removedStories: removedResult.count || 0,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get story stats error:", error);
+    return { totalStories: 0, activeStories: 0, reportedStories: 0, removedStories: 0 };
+  }
+}
+
+
+// ============ PHOTO MODERATION ============
+export interface PlacePhoto {
+  id: string;
+  place_id: string;
+  user_id: string | null;
+  url: string;
+  thumbnail_url: string | null;
+  caption: string | null;
+  source: string | null;
+  status: string | null;
+  is_cover: boolean;
+  is_flagged: boolean;
+  flag_reason: string | null;
+  created_at: string;
+  updated_at: string | null;
+  // Joined data
+  place_name?: string;
+  user_email?: string;
+  report_count?: number;
+}
+
+export interface PhotoReport {
+  id: string;
+  photo_id: string;
+  reporter_user_id: string;
+  reason: string;
+  created_at: string;
+  // Joined data
+  reporter_email?: string;
+}
+
+export async function getPhotos(
+  limit: number = 50,
+  offset: number = 0,
+  status?: string,
+  isFlagged?: boolean
+): Promise<{ photos: PlacePhoto[]; total: number }> {
+  try {
+    let query = supabase
+      .from("place_photos")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `, { count: "exact" });
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    if (isFlagged !== undefined) {
+      query = query.eq("is_flagged", isFlagged);
+    }
+
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get photos error:", error);
+      return { photos: [], total: 0 };
+    }
+
+    // Get report counts for each photo
+    const photoIds = (data || []).map((p: any) => p.id);
+    let reportCounts: Record<string, number> = {};
+    
+    if (photoIds.length > 0) {
+      const { data: reports } = await supabase
+        .from("photo_reports")
+        .select("photo_id")
+        .in("photo_id", photoIds);
+      
+      if (reports) {
+        reports.forEach((r: any) => {
+          reportCounts[r.photo_id] = (reportCounts[r.photo_id] || 0) + 1;
+        });
+      }
+    }
+
+    const photos: PlacePhoto[] = (data || []).map((p: any) => ({
+      ...p,
+      place_name: p.places?.name,
+      user_email: p.users?.email,
+      report_count: reportCounts[p.id] || 0,
+    }));
+
+    return { photos, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get photos error:", error);
+    return { photos: [], total: 0 };
+  }
+}
+
+export async function getPhotoById(photoId: string): Promise<PlacePhoto | null> {
+  try {
+    const { data, error } = await supabase
+      .from("place_photos")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `)
+      .eq("id", photoId)
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Get photo by ID error:", error);
+      return null;
+    }
+
+    // Get report count
+    const { count } = await supabase
+      .from("photo_reports")
+      .select("*", { count: "exact", head: true })
+      .eq("photo_id", photoId);
+
+    return {
+      ...data,
+      place_name: data.places?.name,
+      user_email: data.users?.email,
+      report_count: count || 0,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get photo by ID error:", error);
+    return null;
+  }
+}
+
+export async function getPhotoReports(photoId: string): Promise<PhotoReport[]> {
+  try {
+    const { data, error } = await supabase
+      .from("photo_reports")
+      .select(`
+        *,
+        users:reporter_user_id(email)
+      `)
+      .eq("photo_id", photoId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get photo reports error:", error);
+      return [];
+    }
+
+    return (data || []).map((r: any) => ({
+      ...r,
+      reporter_email: r.users?.email,
+    }));
+  } catch (error) {
+    console.error("[Supabase] Get photo reports error:", error);
+    return [];
+  }
+}
+
+export async function updatePhotoStatus(
+  photoId: string,
+  status: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("place_photos")
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", photoId);
+
+    if (error) {
+      console.error("[Supabase] Update photo status error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, `photo_${status}`, photoId, "photo");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update photo status error:", error);
+    return false;
+  }
+}
+
+export async function approvePhoto(
+  photoId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("place_photos")
+      .update({
+        status: "approved",
+        is_flagged: false,
+        flag_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", photoId);
+
+    if (error) {
+      console.error("[Supabase] Approve photo error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "photo_approved", photoId, "photo");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Approve photo error:", error);
+    return false;
+  }
+}
+
+export async function rejectPhoto(
+  photoId: string,
+  reason: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("place_photos")
+      .update({
+        status: "rejected",
+        is_flagged: true,
+        flag_reason: reason,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", photoId);
+
+    if (error) {
+      console.error("[Supabase] Reject photo error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "photo_rejected", photoId, "photo", reason);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Reject photo error:", error);
+    return false;
+  }
+}
+
+export async function deletePhoto(
+  photoId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("place_photos")
+      .delete()
+      .eq("id", photoId);
+
+    if (error) {
+      console.error("[Supabase] Delete photo error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "photo_deleted", photoId, "photo");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Delete photo error:", error);
+    return false;
+  }
+}
+
+export async function setPhotoCover(
+  photoId: string,
+  placeId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    // First, unset any existing cover photo for this place
+    await supabase
+      .from("place_photos")
+      .update({ is_cover: false })
+      .eq("place_id", placeId);
+
+    // Then set this photo as cover
+    const { error } = await supabase
+      .from("place_photos")
+      .update({
+        is_cover: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", photoId);
+
+    if (error) {
+      console.error("[Supabase] Set photo cover error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "photo_set_cover", photoId, "photo");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Set photo cover error:", error);
+    return false;
+  }
+}
+
+export async function getReportedPhotos(
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ photos: PlacePhoto[]; total: number }> {
+  try {
+    // Get all photo IDs that have reports
+    const { data: reportedIds } = await supabase
+      .from("photo_reports")
+      .select("photo_id");
+
+    if (!reportedIds || reportedIds.length === 0) {
+      return { photos: [], total: 0 };
+    }
+
+    const uniquePhotoIds = [...new Set(reportedIds.map((r: any) => r.photo_id))];
+
+    const { data, error, count } = await supabase
+      .from("place_photos")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `, { count: "exact" })
+      .in("id", uniquePhotoIds)
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get reported photos error:", error);
+      return { photos: [], total: 0 };
+    }
+
+    // Get report counts
+    let reportCounts: Record<string, number> = {};
+    reportedIds.forEach((r: any) => {
+      reportCounts[r.photo_id] = (reportCounts[r.photo_id] || 0) + 1;
+    });
+
+    const photos: PlacePhoto[] = (data || []).map((p: any) => ({
+      ...p,
+      place_name: p.places?.name,
+      user_email: p.users?.email,
+      report_count: reportCounts[p.id] || 0,
+    }));
+
+    return { photos, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get reported photos error:", error);
+    return { photos: [], total: 0 };
+  }
+}
+
+export async function getFlaggedPhotos(
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ photos: PlacePhoto[]; total: number }> {
+  try {
+    const { data, error, count } = await supabase
+      .from("place_photos")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `, { count: "exact" })
+      .eq("is_flagged", true)
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get flagged photos error:", error);
+      return { photos: [], total: 0 };
+    }
+
+    const photos: PlacePhoto[] = (data || []).map((p: any) => ({
+      ...p,
+      place_name: p.places?.name,
+      user_email: p.users?.email,
+    }));
+
+    return { photos, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get flagged photos error:", error);
+    return { photos: [], total: 0 };
+  }
+}
+
+export async function dismissPhotoReports(
+  photoId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("photo_reports")
+      .delete()
+      .eq("photo_id", photoId);
+
+    if (error) {
+      console.error("[Supabase] Dismiss photo reports error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "photo_reports_dismissed", photoId, "photo");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Dismiss photo reports error:", error);
+    return false;
+  }
+}
+
+export async function getPhotoStats(): Promise<{
+  totalPhotos: number;
+  approvedPhotos: number;
+  flaggedPhotos: number;
+  reportedPhotos: number;
+}> {
+  try {
+    const [totalResult, approvedResult, flaggedResult] = await Promise.all([
+      supabase.from("place_photos").select("*", { count: "exact", head: true }),
+      supabase.from("place_photos").select("*", { count: "exact", head: true }).eq("status", "approved"),
+      supabase.from("place_photos").select("*", { count: "exact", head: true }).eq("is_flagged", true),
+    ]);
+
+    // Get count of photos with reports
+    const { data: reportedIds } = await supabase
+      .from("photo_reports")
+      .select("photo_id");
+    
+    const uniqueReported = reportedIds ? [...new Set(reportedIds.map((r: any) => r.photo_id))].length : 0;
+
+    return {
+      totalPhotos: totalResult.count || 0,
+      approvedPhotos: approvedResult.count || 0,
+      flaggedPhotos: flaggedResult.count || 0,
+      reportedPhotos: uniqueReported,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get photo stats error:", error);
+    return { totalPhotos: 0, approvedPhotos: 0, flaggedPhotos: 0, reportedPhotos: 0 };
+  }
+}
+
+
+// ============ REVIEW MODERATION ============
+export interface PlaceReview {
+  id: string;
+  place_id: string;
+  user_id: string;
+  rating: number;
+  review_text: string | null;
+  status: string | null;
+  is_flagged: boolean;
+  flag_reason: string | null;
+  created_at: string;
+  updated_at: string | null;
+  // Joined data
+  place_name?: string;
+  user_email?: string;
+  report_count?: number;
+}
+
+export interface ReviewReport {
+  id: string;
+  review_id: string;
+  reporter_user_id: string;
+  reason: string;
+  created_at: string;
+  // Joined data
+  reporter_email?: string;
+}
+
+export async function getReviews(
+  limit: number = 50,
+  offset: number = 0,
+  status?: string,
+  minRating?: number,
+  maxRating?: number
+): Promise<{ reviews: PlaceReview[]; total: number }> {
+  try {
+    let query = supabase
+      .from("place_reviews")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `, { count: "exact" });
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    if (minRating !== undefined) {
+      query = query.gte("rating", minRating);
+    }
+
+    if (maxRating !== undefined) {
+      query = query.lte("rating", maxRating);
+    }
+
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get reviews error:", error);
+      return { reviews: [], total: 0 };
+    }
+
+    // Get report counts for each review
+    const reviewIds = (data || []).map((r: any) => r.id);
+    let reportCounts: Record<string, number> = {};
+    
+    if (reviewIds.length > 0) {
+      const { data: reports } = await supabase
+        .from("review_reports")
+        .select("review_id")
+        .in("review_id", reviewIds);
+      
+      if (reports) {
+        reports.forEach((r: any) => {
+          reportCounts[r.review_id] = (reportCounts[r.review_id] || 0) + 1;
+        });
+      }
+    }
+
+    const reviews: PlaceReview[] = (data || []).map((r: any) => ({
+      ...r,
+      place_name: r.places?.name,
+      user_email: r.users?.email,
+      report_count: reportCounts[r.id] || 0,
+    }));
+
+    return { reviews, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get reviews error:", error);
+    return { reviews: [], total: 0 };
+  }
+}
+
+export async function getReviewById(reviewId: string): Promise<PlaceReview | null> {
+  try {
+    const { data, error } = await supabase
+      .from("place_reviews")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `)
+      .eq("id", reviewId)
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Get review by ID error:", error);
+      return null;
+    }
+
+    // Get report count
+    const { count } = await supabase
+      .from("review_reports")
+      .select("*", { count: "exact", head: true })
+      .eq("review_id", reviewId);
+
+    return {
+      ...data,
+      place_name: data.places?.name,
+      user_email: data.users?.email,
+      report_count: count || 0,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get review by ID error:", error);
+    return null;
+  }
+}
+
+export async function getReviewReports(reviewId: string): Promise<ReviewReport[]> {
+  try {
+    const { data, error } = await supabase
+      .from("review_reports")
+      .select(`
+        *,
+        users:reporter_user_id(email)
+      `)
+      .eq("review_id", reviewId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get review reports error:", error);
+      return [];
+    }
+
+    return (data || []).map((r: any) => ({
+      ...r,
+      reporter_email: r.users?.email,
+    }));
+  } catch (error) {
+    console.error("[Supabase] Get review reports error:", error);
+    return [];
+  }
+}
+
+export async function updateReviewStatus(
+  reviewId: string,
+  status: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("place_reviews")
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", reviewId);
+
+    if (error) {
+      console.error("[Supabase] Update review status error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, `review_${status}`, reviewId, "review");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update review status error:", error);
+    return false;
+  }
+}
+
+export async function approveReview(
+  reviewId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("place_reviews")
+      .update({
+        status: "approved",
+        is_flagged: false,
+        flag_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", reviewId);
+
+    if (error) {
+      console.error("[Supabase] Approve review error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "review_approved", reviewId, "review");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Approve review error:", error);
+    return false;
+  }
+}
+
+export async function rejectReview(
+  reviewId: string,
+  reason: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("place_reviews")
+      .update({
+        status: "rejected",
+        is_flagged: true,
+        flag_reason: reason,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", reviewId);
+
+    if (error) {
+      console.error("[Supabase] Reject review error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "review_rejected", reviewId, "review", reason);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Reject review error:", error);
+    return false;
+  }
+}
+
+export async function deleteReview(
+  reviewId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    // First get review info for logging
+    const { data: review } = await supabase
+      .from("place_reviews")
+      .select("user_id, place_id")
+      .eq("id", reviewId)
+      .single();
+
+    const { error } = await supabase
+      .from("place_reviews")
+      .delete()
+      .eq("id", reviewId);
+
+    if (error) {
+      console.error("[Supabase] Delete review error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "review_deleted", reviewId, "review", review?.user_id);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Delete review error:", error);
+    return false;
+  }
+}
+
+export async function getReportedReviews(
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ reviews: PlaceReview[]; total: number }> {
+  try {
+    // Get all review IDs that have reports
+    const { data: reportedIds } = await supabase
+      .from("review_reports")
+      .select("review_id");
+
+    if (!reportedIds || reportedIds.length === 0) {
+      return { reviews: [], total: 0 };
+    }
+
+    const uniqueReviewIds = [...new Set(reportedIds.map((r: any) => r.review_id))];
+
+    const { data, error, count } = await supabase
+      .from("place_reviews")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `, { count: "exact" })
+      .in("id", uniqueReviewIds)
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get reported reviews error:", error);
+      return { reviews: [], total: 0 };
+    }
+
+    // Get report counts
+    let reportCounts: Record<string, number> = {};
+    reportedIds.forEach((r: any) => {
+      reportCounts[r.review_id] = (reportCounts[r.review_id] || 0) + 1;
+    });
+
+    const reviews: PlaceReview[] = (data || []).map((r: any) => ({
+      ...r,
+      place_name: r.places?.name,
+      user_email: r.users?.email,
+      report_count: reportCounts[r.id] || 0,
+    }));
+
+    return { reviews, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get reported reviews error:", error);
+    return { reviews: [], total: 0 };
+  }
+}
+
+export async function getFlaggedReviews(
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ reviews: PlaceReview[]; total: number }> {
+  try {
+    const { data, error, count } = await supabase
+      .from("place_reviews")
+      .select(`
+        *,
+        places:place_id(name),
+        users:user_id(email)
+      `, { count: "exact" })
+      .eq("is_flagged", true)
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get flagged reviews error:", error);
+      return { reviews: [], total: 0 };
+    }
+
+    const reviews: PlaceReview[] = (data || []).map((r: any) => ({
+      ...r,
+      place_name: r.places?.name,
+      user_email: r.users?.email,
+    }));
+
+    return { reviews, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get flagged reviews error:", error);
+    return { reviews: [], total: 0 };
+  }
+}
+
+export async function dismissReviewReports(
+  reviewId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("review_reports")
+      .delete()
+      .eq("review_id", reviewId);
+
+    if (error) {
+      console.error("[Supabase] Dismiss review reports error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "review_reports_dismissed", reviewId, "review");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Dismiss review reports error:", error);
+    return false;
+  }
+}
+
+export async function getReviewStats(): Promise<{
+  totalReviews: number;
+  approvedReviews: number;
+  flaggedReviews: number;
+  reportedReviews: number;
+  averageRating: number;
+}> {
+  try {
+    const [totalResult, approvedResult, flaggedResult] = await Promise.all([
+      supabase.from("place_reviews").select("*", { count: "exact", head: true }),
+      supabase.from("place_reviews").select("*", { count: "exact", head: true }).eq("status", "approved"),
+      supabase.from("place_reviews").select("*", { count: "exact", head: true }).eq("is_flagged", true),
+    ]);
+
+    // Get count of reviews with reports
+    const { data: reportedIds } = await supabase
+      .from("review_reports")
+      .select("review_id");
+    
+    const uniqueReported = reportedIds ? [...new Set(reportedIds.map((r: any) => r.review_id))].length : 0;
+
+    // Get average rating
+    const { data: ratingData } = await supabase
+      .from("place_reviews")
+      .select("rating");
+    
+    let averageRating = 0;
+    if (ratingData && ratingData.length > 0) {
+      const sum = ratingData.reduce((acc: number, r: any) => acc + (r.rating || 0), 0);
+      averageRating = sum / ratingData.length;
+    }
+
+    return {
+      totalReviews: totalResult.count || 0,
+      approvedReviews: approvedResult.count || 0,
+      flaggedReviews: flaggedResult.count || 0,
+      reportedReviews: uniqueReported,
+      averageRating,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get review stats error:", error);
+    return { totalReviews: 0, approvedReviews: 0, flaggedReviews: 0, reportedReviews: 0, averageRating: 0 };
+  }
+}
+
+
+// ============ PLACE EDITING ============
+export interface PlaceDetails {
+  id: string;
+  name: string;
+  slug: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  phone: string | null;
+  website: string | null;
+  email: string | null;
+  description: string | null;
+  short_description: string | null;
+  category: string | null;
+  subcategory: string | null;
+  price_level: number | null;
+  hours: any | null;
+  amenities: string[] | null;
+  tags: string[] | null;
+  is_verified: boolean;
+  is_claimed: boolean;
+  is_active: boolean;
+  is_featured: boolean;
+  cover_photo_url: string | null;
+  logo_url: string | null;
+  google_place_id: string | null;
+  yelp_id: string | null;
+  created_at: string;
+  updated_at: string | null;
+  owner_user_id: string | null;
+  average_rating: number | null;
+  total_reviews: number | null;
+}
+
+export interface PlaceCreateInput {
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  phone?: string;
+  website?: string;
+  email?: string;
+  description?: string;
+  short_description?: string;
+  category?: string;
+  subcategory?: string;
+  price_level?: number;
+  hours?: any;
+  amenities?: string[];
+  tags?: string[];
+}
+
+export async function createPlace(
+  placeData: PlaceCreateInput,
+  adminId: string
+): Promise<{ success: boolean; placeId?: string; error?: string }> {
+  try {
+    // Generate slug from name
+    const slug = placeData.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+
+    const { data, error } = await supabase
+      .from("places")
+      .insert({
+        ...placeData,
+        slug,
+        is_verified: false,
+        is_claimed: false,
+        is_active: true,
+        is_featured: false,
+        created_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Create place error:", error);
+      return { success: false, error: error.message };
+    }
+
+    await logAdminActivity(adminId, "place_created", data.id, "place", placeData.name);
+    return { success: true, placeId: data.id };
+  } catch (error: any) {
+    console.error("[Supabase] Create place error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updatePlace(
+  placeId: string,
+  updates: Partial<PlaceDetails>,
+  adminId: string
+): Promise<boolean> {
+  try {
+    // Remove fields that shouldn't be updated directly
+    const { id, created_at, ...updateData } = updates as any;
+
+    const { error } = await supabase
+      .from("places")
+      .update({
+        ...updateData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", placeId);
+
+    if (error) {
+      console.error("[Supabase] Update place error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "place_updated", placeId, "place", JSON.stringify(Object.keys(updateData)));
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update place error:", error);
+    return false;
+  }
+}
+
+export async function deletePlace(
+  placeId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    // Get place name for logging
+    const { data: place } = await supabase
+      .from("places")
+      .select("name")
+      .eq("id", placeId)
+      .single();
+
+    const { error } = await supabase
+      .from("places")
+      .delete()
+      .eq("id", placeId);
+
+    if (error) {
+      console.error("[Supabase] Delete place error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "place_deleted", placeId, "place", place?.name);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Delete place error:", error);
+    return false;
+  }
+}
+
+export async function getPlaceForEdit(placeId: string): Promise<PlaceDetails | null> {
+  try {
+    const { data, error } = await supabase
+      .from("places")
+      .select("*")
+      .eq("id", placeId)
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Get place for edit error:", error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("[Supabase] Get place for edit error:", error);
+    return null;
+  }
+}
+
+export async function verifyPlace(
+  placeId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("places")
+      .update({
+        is_verified: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", placeId);
+
+    if (error) {
+      console.error("[Supabase] Verify place error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "place_verified", placeId, "place");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Verify place error:", error);
+    return false;
+  }
+}
+
+export async function unverifyPlace(
+  placeId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("places")
+      .update({
+        is_verified: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", placeId);
+
+    if (error) {
+      console.error("[Supabase] Unverify place error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "place_unverified", placeId, "place");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Unverify place error:", error);
+    return false;
+  }
+}
+
+export async function featurePlace(
+  placeId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("places")
+      .update({
+        is_featured: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", placeId);
+
+    if (error) {
+      console.error("[Supabase] Feature place error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "place_featured", placeId, "place");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Feature place error:", error);
+    return false;
+  }
+}
+
+export async function unfeaturePlace(
+  placeId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("places")
+      .update({
+        is_featured: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", placeId);
+
+    if (error) {
+      console.error("[Supabase] Unfeature place error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "place_unfeatured", placeId, "place");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Unfeature place error:", error);
+    return false;
+  }
+}
+
+export async function activatePlace(
+  placeId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("places")
+      .update({
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", placeId);
+
+    if (error) {
+      console.error("[Supabase] Activate place error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "place_activated", placeId, "place");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Activate place error:", error);
+    return false;
+  }
+}
+
+export async function deactivatePlace(
+  placeId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("places")
+      .update({
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", placeId);
+
+    if (error) {
+      console.error("[Supabase] Deactivate place error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "place_deactivated", placeId, "place");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Deactivate place error:", error);
+    return false;
+  }
+}
+
+export async function getPlacePhotosForEdit(placeId: string): Promise<PlacePhoto[]> {
+  try {
+    const { data, error } = await supabase
+      .from("place_photos")
+      .select("*")
+      .eq("place_id", placeId)
+      .order("is_cover", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Supabase] Get place photos error:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("[Supabase] Get place photos error:", error);
+    return [];
+  }
+}
+
+export async function getDistinctCategories(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("places")
+      .select("category")
+      .not("category", "is", null);
+
+    if (error) {
+      console.error("[Supabase] Get categories error:", error);
+      return [];
+    }
+
+    const categories = [...new Set((data || []).map((d: any) => d.category).filter(Boolean))];
+    return categories.sort();
+  } catch (error) {
+    console.error("[Supabase] Get categories error:", error);
+    return [];
+  }
+}
+
+
+// ============ VERIFICATION SYNC ============
+// These functions ensure verification status is properly synced across all related tables
+
+export async function syncVerificationToProProvider(
+  userId: string,
+  verificationData: {
+    is_licensed_verified?: boolean;
+    is_insured_verified?: boolean;
+    is_bonded_verified?: boolean;
+    is_tavvy_verified?: boolean;
+  },
+  adminId: string
+): Promise<boolean> {
+  try {
+    // Update pro_providers table with verification status
+    const { error } = await supabase
+      .from("pro_providers")
+      .update({
+        is_licensed: verificationData.is_licensed_verified,
+        is_insured: verificationData.is_insured_verified,
+        is_bonded: verificationData.is_bonded_verified,
+        is_tavvy_verified: verificationData.is_tavvy_verified,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("[Supabase] Sync verification to pro_provider error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "verification_synced", userId, "pro_provider");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Sync verification to pro_provider error:", error);
+    return false;
+  }
+}
+
+export async function approveVerificationWithSync(
+  verificationId: string,
+  userId: string,
+  badges: {
+    licensed: boolean;
+    insured: boolean;
+    bonded: boolean;
+    tavvyVerified: boolean;
+  },
+  reviewNotes: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    // Update user_verifications table
+    const { error: verificationError } = await supabase
+      .from("user_verifications")
+      .update({
+        is_licensed_verified: badges.licensed,
+        is_insured_verified: badges.insured,
+        is_bonded_verified: badges.bonded,
+        is_tavvy_verified: badges.tavvyVerified,
+        verification_status: "approved",
+        review_notes: reviewNotes,
+        reviewed_by: adminId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", verificationId);
+
+    if (verificationError) {
+      console.error("[Supabase] Approve verification error:", verificationError);
+      return false;
+    }
+
+    // Sync to pro_providers table
+    await syncVerificationToProProvider(userId, {
+      is_licensed_verified: badges.licensed,
+      is_insured_verified: badges.insured,
+      is_bonded_verified: badges.bonded,
+      is_tavvy_verified: badges.tavvyVerified,
+    }, adminId);
+
+    // Update user profile with verification badges
+    await supabase
+      .from("profiles")
+      .update({
+        is_verified_pro: badges.tavvyVerified,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+
+    await logAdminActivity(adminId, "verification_approved", verificationId, "verification", reviewNotes);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Approve verification with sync error:", error);
+    return false;
+  }
+}
+
+export async function rejectVerificationWithSync(
+  verificationId: string,
+  userId: string,
+  reviewNotes: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    // Update user_verifications table
+    const { error: verificationError } = await supabase
+      .from("user_verifications")
+      .update({
+        verification_status: "rejected",
+        review_notes: reviewNotes,
+        reviewed_by: adminId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", verificationId);
+
+    if (verificationError) {
+      console.error("[Supabase] Reject verification error:", verificationError);
+      return false;
+    }
+
+    // Clear verification badges from pro_providers
+    await supabase
+      .from("pro_providers")
+      .update({
+        is_licensed: false,
+        is_insured: false,
+        is_bonded: false,
+        is_tavvy_verified: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+
+    // Clear verified pro status from profile
+    await supabase
+      .from("profiles")
+      .update({
+        is_verified_pro: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+
+    await logAdminActivity(adminId, "verification_rejected", verificationId, "verification", reviewNotes);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Reject verification with sync error:", error);
+    return false;
+  }
+}
+
+// ============ PLACE OVERRIDE FUNCTIONS ============
+export interface PlaceOverride {
+  id: string;
+  place_id: string;
+  field_name: string;
+  original_value: any;
+  override_value: any;
+  reason: string;
+  created_by: string;
+  created_at: string;
+  is_active: boolean;
+  // Joined
+  place_name?: string;
+  admin_email?: string;
+}
+
+export async function getPlaceOverrides(
+  limit: number = 50,
+  offset: number = 0,
+  placeId?: string
+): Promise<{ overrides: PlaceOverride[]; total: number }> {
+  try {
+    let query = supabase
+      .from("place_overrides")
+      .select(`
+        *,
+        places:place_id(name)
+      `, { count: "exact" });
+
+    if (placeId) {
+      query = query.eq("place_id", placeId);
+    }
+
+    const { data, error, count } = await query
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      console.error("[Supabase] Get place overrides error:", error);
+      return { overrides: [], total: 0 };
+    }
+
+    const overrides: PlaceOverride[] = (data || []).map((o: any) => ({
+      ...o,
+      place_name: o.places?.name,
+    }));
+
+    return { overrides, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get place overrides error:", error);
+    return { overrides: [], total: 0 };
+  }
+}
+
+export async function createPlaceOverride(
+  placeId: string,
+  fieldName: string,
+  originalValue: any,
+  overrideValue: any,
+  reason: string,
+  adminId: string
+): Promise<{ success: boolean; overrideId?: string }> {
+  try {
+    // Create the override record
+    const { data, error } = await supabase
+      .from("place_overrides")
+      .insert({
+        place_id: placeId,
+        field_name: fieldName,
+        original_value: originalValue,
+        override_value: overrideValue,
+        reason,
+        created_by: adminId,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Create place override error:", error);
+      return { success: false };
+    }
+
+    // Apply the override to the place
+    const { error: updateError } = await supabase
+      .from("places")
+      .update({
+        [fieldName]: overrideValue,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", placeId);
+
+    if (updateError) {
+      console.error("[Supabase] Apply place override error:", updateError);
+      // Rollback the override record
+      await supabase.from("place_overrides").delete().eq("id", data.id);
+      return { success: false };
+    }
+
+    await logAdminActivity(adminId, "place_override_created", placeId, "place", `${fieldName}: ${overrideValue}`);
+    return { success: true, overrideId: data.id };
+  } catch (error) {
+    console.error("[Supabase] Create place override error:", error);
+    return { success: false };
+  }
+}
+
+export async function revertPlaceOverride(
+  overrideId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    // Get the override record
+    const { data: override, error: fetchError } = await supabase
+      .from("place_overrides")
+      .select("*")
+      .eq("id", overrideId)
+      .single();
+
+    if (fetchError || !override) {
+      console.error("[Supabase] Fetch override error:", fetchError);
+      return false;
+    }
+
+    // Revert the place field to original value
+    const { error: updateError } = await supabase
+      .from("places")
+      .update({
+        [override.field_name]: override.original_value,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", override.place_id);
+
+    if (updateError) {
+      console.error("[Supabase] Revert place override error:", updateError);
+      return false;
+    }
+
+    // Mark override as inactive
+    const { error: deactivateError } = await supabase
+      .from("place_overrides")
+      .update({
+        is_active: false,
+      })
+      .eq("id", overrideId);
+
+    if (deactivateError) {
+      console.error("[Supabase] Deactivate override error:", deactivateError);
+    }
+
+    await logAdminActivity(adminId, "place_override_reverted", override.place_id, "place", override.field_name);
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Revert place override error:", error);
+    return false;
+  }
+}
+
+export async function deletePlaceOverride(
+  overrideId: string,
+  adminId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("place_overrides")
+      .delete()
+      .eq("id", overrideId);
+
+    if (error) {
+      console.error("[Supabase] Delete place override error:", error);
+      return false;
+    }
+
+    await logAdminActivity(adminId, "place_override_deleted", overrideId, "place_override");
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Delete place override error:", error);
+    return false;
+  }
+}

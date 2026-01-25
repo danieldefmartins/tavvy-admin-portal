@@ -24,6 +24,12 @@ import AuditLog from "@/pages/AuditLog";
 import Verifications from "@/pages/Verifications";
 import Realtors from "@/pages/Realtors";
 import StrategicAudit from "@/pages/StrategicAudit";
+import Users from "@/pages/Users";
+import Pros from "@/pages/Pros";
+import Stories from "@/pages/Stories";
+import Photos from "@/pages/Photos";
+import Reviews from "@/pages/Reviews";
+import PlaceEdit from "@/pages/PlaceEdit";
 
 // Loading component
 function LoadingScreen() {
@@ -124,6 +130,42 @@ function App() {
         </Route>
 
         {/* Admin & Safety Routes */}
+        <Route path="/users">
+          <ProtectedRoute>
+            <Users />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/pros">
+          <ProtectedRoute>
+            <Pros />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/stories">
+          <ProtectedRoute>
+            <Stories />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/photos">
+          <ProtectedRoute>
+            <Photos />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/reviews">
+          <ProtectedRoute>
+            <Reviews />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/places/:id/edit">
+          <ProtectedRoute>
+            <PlaceEdit />
+          </ProtectedRoute>
+        </Route>
+
         <Route path="/realtors">
           <ProtectedRoute>
             <Realtors />

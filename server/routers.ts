@@ -53,6 +53,89 @@ import {
   reviewPlaceOverride,
   // Stats
   getModerationStats,
+  // User Management
+  getUsers,
+  getUserById,
+  getUserRoles,
+  addUserRole,
+  removeUserRole,
+  getUserStrikes,
+  addUserStrike,
+  removeUserStrike,
+  getUserGamification,
+  blockUser,
+  unblockUser,
+  isUserBlocked,
+  getUserStats,
+  // Pro Providers Management
+  getProProviders,
+  getProProviderById,
+  updateProProvider,
+  verifyProProvider,
+  unverifyProProvider,
+  activateProProvider,
+  deactivateProProvider,
+  featureProProvider,
+  unfeatureProProvider,
+  getProReviews,
+  getProStats,
+  getDistinctProviderTypes,
+  // Story Moderation
+  getStories,
+  getStoryById,
+  getStoryReports,
+  updateStoryStatus,
+  deleteStory,
+  getReportedStories,
+  dismissStoryReports,
+  getStoryStats,
+  // Photo Moderation
+  getPhotos,
+  getPhotoById,
+  getPhotoReports,
+  updatePhotoStatus,
+  approvePhoto,
+  rejectPhoto,
+  deletePhoto,
+  setPhotoCover,
+  getReportedPhotos,
+  getFlaggedPhotos,
+  dismissPhotoReports,
+  getPhotoStats,
+  // Review Moderation
+  getReviews,
+  getReviewById,
+  getReviewReports,
+  updateReviewStatus,
+  approveReview,
+  rejectReview,
+  deleteReview,
+  getReportedReviews,
+  getFlaggedReviews,
+  dismissReviewReports,
+  getReviewStats,
+  // Place Editing
+  createPlace,
+  updatePlace,
+  deletePlace,
+  getPlaceForEdit,
+  verifyPlace,
+  unverifyPlace,
+  featurePlace,
+  unfeaturePlace,
+  activatePlace,
+  deactivatePlace,
+  getPlacePhotosForEdit,
+  getDistinctCategories,
+  // Verification Sync
+  syncVerificationToProProvider,
+  approveVerificationWithSync,
+  rejectVerificationWithSync,
+  // Place Overrides
+  getPlaceOverrides,
+  createPlaceOverride,
+  revertPlaceOverride,
+  deletePlaceOverride,
 } from "./supabaseDb";
 import { getDb } from "./db";
 import { repActivityLog, batchImportJobs } from "../drizzle/schema";
@@ -1183,6 +1266,1025 @@ export const appRouter = router({
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: "Failed to review place override",
+          });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ USER MANAGEMENT ============
+  users: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+          search: z.string().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset, search } = input || {};
+        return getUsers(limit, offset, search);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        return getUserById(input.id);
+      }),
+
+    getRoles: protectedProcedure
+      .input(z.object({ userId: z.string() }))
+      .query(async ({ input }) => {
+        return getUserRoles(input.userId);
+      }),
+
+    addRole: protectedProcedure
+      .input(
+        z.object({
+          userId: z.string(),
+          role: z.string(),
+          expiresAt: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await addUserRole(input.userId, input.role, adminId, input.expiresAt);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to add user role",
+          });
+        }
+        return { success: true };
+      }),
+
+    removeRole: protectedProcedure
+      .input(
+        z.object({
+          userId: z.string(),
+          role: z.string(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await removeUserRole(input.userId, input.role, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to remove user role",
+          });
+        }
+        return { success: true };
+      }),
+
+    getStrikes: protectedProcedure
+      .input(z.object({ userId: z.string() }))
+      .query(async ({ input }) => {
+        return getUserStrikes(input.userId);
+      }),
+
+    addStrike: protectedProcedure
+      .input(
+        z.object({
+          userId: z.string(),
+          reason: z.string(),
+          storyId: z.string().optional(),
+          expiresAt: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await addUserStrike(
+          input.userId,
+          input.reason,
+          adminId,
+          input.storyId,
+          input.expiresAt
+        );
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to add user strike",
+          });
+        }
+        return { success: true };
+      }),
+
+    removeStrike: protectedProcedure
+      .input(z.object({ strikeId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await removeUserStrike(input.strikeId, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to remove user strike",
+          });
+        }
+        return { success: true };
+      }),
+
+    getGamification: protectedProcedure
+      .input(z.object({ userId: z.string() }))
+      .query(async ({ input }) => {
+        return getUserGamification(input.userId);
+      }),
+
+    block: protectedProcedure
+      .input(z.object({ userId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await blockUser(input.userId, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to block user",
+          });
+        }
+        return { success: true };
+      }),
+
+    unblock: protectedProcedure
+      .input(z.object({ userId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await unblockUser(input.userId, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to unblock user",
+          });
+        }
+        return { success: true };
+      }),
+
+    isBlocked: protectedProcedure
+      .input(z.object({ userId: z.string() }))
+      .query(async ({ input }) => {
+        return isUserBlocked(input.userId);
+      }),
+
+    getStats: protectedProcedure.query(async () => {
+      return getUserStats();
+    }),
+  }),
+
+  // ============ PRO PROVIDERS MANAGEMENT ============
+  pros: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+          search: z.string().optional(),
+          providerType: z.string().optional(),
+          isVerified: z.boolean().optional(),
+          isActive: z.boolean().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset, search, providerType, isVerified, isActive } = input || {};
+        return getProProviders(limit, offset, search, providerType, isVerified, isActive);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        return getProProviderById(input.id);
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          updates: z.record(z.any()),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await updateProProvider(input.id, input.updates, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update pro provider",
+          });
+        }
+        return { success: true };
+      }),
+
+    verify: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await verifyProProvider(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to verify pro provider",
+          });
+        }
+        return { success: true };
+      }),
+
+    unverify: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await unverifyProProvider(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to unverify pro provider",
+          });
+        }
+        return { success: true };
+      }),
+
+    activate: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await activateProProvider(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to activate pro provider",
+          });
+        }
+        return { success: true };
+      }),
+
+    deactivate: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await deactivateProProvider(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to deactivate pro provider",
+          });
+        }
+        return { success: true };
+      }),
+
+    feature: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await featureProProvider(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to feature pro provider",
+          });
+        }
+        return { success: true };
+      }),
+
+    unfeature: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await unfeatureProProvider(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to unfeature pro provider",
+          });
+        }
+        return { success: true };
+      }),
+
+    getReviews: protectedProcedure
+      .input(z.object({ proId: z.string() }))
+      .query(async ({ input }) => {
+        return getProReviews(input.proId);
+      }),
+
+    getStats: protectedProcedure.query(async () => {
+      return getProStats();
+    }),
+
+    getProviderTypes: protectedProcedure.query(async () => {
+      return getDistinctProviderTypes();
+    }),
+  }),
+
+  // ============ STORY MODERATION ============
+  stories: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+          status: z.string().optional(),
+          hasReports: z.boolean().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset, status, hasReports } = input || {};
+        return getStories(limit, offset, status, hasReports);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        return getStoryById(input.id);
+      }),
+
+    getReports: protectedProcedure
+      .input(z.object({ storyId: z.string() }))
+      .query(async ({ input }) => {
+        return getStoryReports(input.storyId);
+      }),
+
+    getReported: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset } = input || {};
+        return getReportedStories(limit, offset);
+      }),
+
+    updateStatus: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          status: z.string(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await updateStoryStatus(input.id, input.status, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update story status",
+          });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await deleteStory(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete story",
+          });
+        }
+        return { success: true };
+      }),
+
+    dismissReports: protectedProcedure
+      .input(z.object({ storyId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await dismissStoryReports(input.storyId, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to dismiss story reports",
+          });
+        }
+        return { success: true };
+      }),
+
+    getStats: protectedProcedure.query(async () => {
+      return getStoryStats();
+    }),
+  }),
+
+  // ============ PHOTO MODERATION ============
+  photos: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+          status: z.string().optional(),
+          isFlagged: z.boolean().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset, status, isFlagged } = input || {};
+        return getPhotos(limit, offset, status, isFlagged);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        return getPhotoById(input.id);
+      }),
+
+    getReports: protectedProcedure
+      .input(z.object({ photoId: z.string() }))
+      .query(async ({ input }) => {
+        return getPhotoReports(input.photoId);
+      }),
+
+    getReported: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset } = input || {};
+        return getReportedPhotos(limit, offset);
+      }),
+
+    getFlagged: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset } = input || {};
+        return getFlaggedPhotos(limit, offset);
+      }),
+
+    updateStatus: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          status: z.string(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await updatePhotoStatus(input.id, input.status, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update photo status",
+          });
+        }
+        return { success: true };
+      }),
+
+    approve: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await approvePhoto(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to approve photo",
+          });
+        }
+        return { success: true };
+      }),
+
+    reject: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          reason: z.string(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await rejectPhoto(input.id, input.reason, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to reject photo",
+          });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await deletePhoto(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete photo",
+          });
+        }
+        return { success: true };
+      }),
+
+    setCover: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          placeId: z.string(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await setPhotoCover(input.id, input.placeId, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to set photo as cover",
+          });
+        }
+        return { success: true };
+      }),
+
+    dismissReports: protectedProcedure
+      .input(z.object({ photoId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await dismissPhotoReports(input.photoId, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to dismiss photo reports",
+          });
+        }
+        return { success: true };
+      }),
+
+    getStats: protectedProcedure.query(async () => {
+      return getPhotoStats();
+    }),
+  }),
+
+  // ============ REVIEW MODERATION ============
+  reviews: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+          status: z.string().optional(),
+          minRating: z.number().optional(),
+          maxRating: z.number().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset, status, minRating, maxRating } = input || {};
+        return getReviews(limit, offset, status, minRating, maxRating);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        return getReviewById(input.id);
+      }),
+
+    getReports: protectedProcedure
+      .input(z.object({ reviewId: z.string() }))
+      .query(async ({ input }) => {
+        return getReviewReports(input.reviewId);
+      }),
+
+    getReported: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset } = input || {};
+        return getReportedReviews(limit, offset);
+      }),
+
+    getFlagged: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset } = input || {};
+        return getFlaggedReviews(limit, offset);
+      }),
+
+    updateStatus: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          status: z.string(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await updateReviewStatus(input.id, input.status, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update review status",
+          });
+        }
+        return { success: true };
+      }),
+
+    approve: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await approveReview(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to approve review",
+          });
+        }
+        return { success: true };
+      }),
+
+    reject: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          reason: z.string(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await rejectReview(input.id, input.reason, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to reject review",
+          });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await deleteReview(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete review",
+          });
+        }
+        return { success: true };
+      }),
+
+    dismissReports: protectedProcedure
+      .input(z.object({ reviewId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await dismissReviewReports(input.reviewId, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to dismiss review reports",
+          });
+        }
+        return { success: true };
+      }),
+
+    getStats: protectedProcedure.query(async () => {
+      return getReviewStats();
+    }),
+  }),
+
+  // ============ PLACE EDITING ============
+  placeEdit: router({
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().min(1),
+          address: z.string().optional(),
+          city: z.string().optional(),
+          state: z.string().optional(),
+          zip_code: z.string().optional(),
+          country: z.string().optional(),
+          latitude: z.number().optional(),
+          longitude: z.number().optional(),
+          phone: z.string().optional(),
+          website: z.string().optional(),
+          email: z.string().optional(),
+          description: z.string().optional(),
+          short_description: z.string().optional(),
+          category: z.string().optional(),
+          subcategory: z.string().optional(),
+          price_level: z.number().optional(),
+          hours: z.any().optional(),
+          amenities: z.array(z.string()).optional(),
+          tags: z.array(z.string()).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const result = await createPlace(input, adminId);
+        if (!result.success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: result.error || "Failed to create place",
+          });
+        }
+        return { success: true, placeId: result.placeId };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          updates: z.record(z.any()),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await updatePlace(input.id, input.updates, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update place",
+          });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await deletePlace(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete place",
+          });
+        }
+        return { success: true };
+      }),
+
+    getForEdit: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        return getPlaceForEdit(input.id);
+      }),
+
+    verify: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await verifyPlace(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to verify place",
+          });
+        }
+        return { success: true };
+      }),
+
+    unverify: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await unverifyPlace(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to unverify place",
+          });
+        }
+        return { success: true };
+      }),
+
+    feature: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await featurePlace(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to feature place",
+          });
+        }
+        return { success: true };
+      }),
+
+    unfeature: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await unfeaturePlace(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to unfeature place",
+          });
+        }
+        return { success: true };
+      }),
+
+    activate: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await activatePlace(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to activate place",
+          });
+        }
+        return { success: true };
+      }),
+
+    deactivate: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await deactivatePlace(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to deactivate place",
+          });
+        }
+        return { success: true };
+      }),
+
+    getPhotos: protectedProcedure
+      .input(z.object({ placeId: z.string() }))
+      .query(async ({ input }) => {
+        return getPlacePhotosForEdit(input.placeId);
+      }),
+
+    getCategories: protectedProcedure.query(async () => {
+      return getDistinctCategories();
+    }),
+  }),
+
+  // ============ VERIFICATION SYNC ============
+  verificationSync: router({
+    approve: protectedProcedure
+      .input(
+        z.object({
+          verificationId: z.string(),
+          userId: z.string(),
+          badges: z.object({
+            licensed: z.boolean(),
+            insured: z.boolean(),
+            bonded: z.boolean(),
+            tavvyVerified: z.boolean(),
+          }),
+          reviewNotes: z.string(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await approveVerificationWithSync(
+          input.verificationId,
+          input.userId,
+          input.badges,
+          input.reviewNotes,
+          adminId
+        );
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to approve verification",
+          });
+        }
+        return { success: true };
+      }),
+
+    reject: protectedProcedure
+      .input(
+        z.object({
+          verificationId: z.string(),
+          userId: z.string(),
+          reviewNotes: z.string(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await rejectVerificationWithSync(
+          input.verificationId,
+          input.userId,
+          input.reviewNotes,
+          adminId
+        );
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to reject verification",
+          });
+        }
+        return { success: true };
+      }),
+
+    syncToProvider: protectedProcedure
+      .input(
+        z.object({
+          userId: z.string(),
+          verificationData: z.object({
+            is_licensed_verified: z.boolean().optional(),
+            is_insured_verified: z.boolean().optional(),
+            is_bonded_verified: z.boolean().optional(),
+            is_tavvy_verified: z.boolean().optional(),
+          }),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await syncVerificationToProProvider(
+          input.userId,
+          input.verificationData,
+          adminId
+        );
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to sync verification",
+          });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ PLACE OVERRIDES ============
+  placeOverrides: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().optional().default(50),
+          offset: z.number().optional().default(0),
+          placeId: z.string().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const { limit, offset, placeId } = input || {};
+        return getPlaceOverrides(limit, offset, placeId);
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          placeId: z.string(),
+          fieldName: z.string(),
+          originalValue: z.any(),
+          overrideValue: z.any(),
+          reason: z.string(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const result = await createPlaceOverride(
+          input.placeId,
+          input.fieldName,
+          input.originalValue,
+          input.overrideValue,
+          input.reason,
+          adminId
+        );
+        if (!result.success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create override",
+          });
+        }
+        return { success: true, overrideId: result.overrideId };
+      }),
+
+    revert: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await revertPlaceOverride(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to revert override",
+          });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await deletePlaceOverride(input.id, adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete override",
           });
         }
         return { success: true };

@@ -48,7 +48,12 @@ import {
   FileUp,
   FileCode,
   BadgeCheck,
-  Home
+  Home,
+  Users,
+  Briefcase,
+  Film,
+  ImageIcon,
+  MessageSquare
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -78,6 +83,11 @@ const otherItems = [
 
 // Admin & Safety items
 const adminItems = [
+  { icon: Users, label: "Users", path: "/users" },
+  { icon: Briefcase, label: "Pros", path: "/pros" },
+  { icon: Film, label: "Stories", path: "/stories" },
+  { icon: ImageIcon, label: "Photos", path: "/photos" },
+  { icon: MessageSquare, label: "Reviews", path: "/reviews" },
   { icon: Home, label: "Realtors", path: "/realtors" },
   { icon: BadgeCheck, label: "Verifications", path: "/verifications" },
   { icon: Shield, label: "Business Claims", path: "/business-claims" },

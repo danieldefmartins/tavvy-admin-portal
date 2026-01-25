@@ -14,7 +14,9 @@ import {
   X, 
   ChevronDown,
   ChevronUp,
-  RotateCcw
+  RotateCcw,
+  Plus,
+  Edit
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -210,9 +212,17 @@ export default function Places() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Places</h1>
-        <p className="text-muted-foreground">Search and browse places in the database</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Places</h1>
+          <p className="text-muted-foreground">Search and browse places in the database</p>
+        </div>
+        <Link href="/places/new/edit">
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Place
+          </Button>
+        </Link>
       </div>
 
       {/* Search Card */}
@@ -543,7 +553,14 @@ export default function Places() {
                       )}
                     </div>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex items-center gap-2">
+                    <Link href={`/places/${place.id}/edit`} onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
                 </CardContent>
               </Card>
             </Link>
