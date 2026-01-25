@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -449,14 +449,15 @@ export default function Places() {
   const getCountryName = (code: string) => countryNames[code] || code;
 
   // Sort countries with US first, then alphabetically by name
-  const sortedCountries = React.useMemo(() => {
+  const sortedCountries = useMemo(() => {
     if (!countries) return [];
+    const getName = (code: string) => countryNames[code] || code;
     return [...countries].sort((a, b) => {
       // US always first
       if (a === "US" || a === "United States") return -1;
       if (b === "US" || b === "United States") return 1;
       // Then alphabetically by display name
-      return getCountryName(a).localeCompare(getCountryName(b));
+      return getName(a).localeCompare(getName(b));
     });
   }, [countries]);
 
