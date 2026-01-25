@@ -26,6 +26,7 @@ import Realtors from "@/pages/Realtors";
 import StrategicAudit from "@/pages/StrategicAudit";
 import Users from "@/pages/Users";
 import Pros from "@/pages/Pros";
+import Providers from "@/pages/Providers";
 import Stories from "@/pages/Stories";
 import Photos from "@/pages/Photos";
 import Reviews from "@/pages/Reviews";
@@ -136,10 +137,15 @@ function App() {
           </ProtectedRoute>
         </Route>
 
-        <Route path="/pros">
+        <Route path="/providers">
           <ProtectedRoute>
-            <Pros />
+            <Providers />
           </ProtectedRoute>
+        </Route>
+
+        {/* Legacy routes - redirect to providers */}
+        <Route path="/pros">
+          <Redirect to="/providers" />
         </Route>
 
         <Route path="/stories">
@@ -167,9 +173,7 @@ function App() {
         </Route>
 
         <Route path="/realtors">
-          <ProtectedRoute>
-            <Realtors />
-          </ProtectedRoute>
+          <Redirect to="/providers" />
         </Route>
 
         <Route path="/business-claims">

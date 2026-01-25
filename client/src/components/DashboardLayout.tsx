@@ -81,19 +81,30 @@ const otherItems = [
   { icon: Globe, label: "Universes", path: "/universes" },
 ];
 
-// Admin & Safety items
-const adminItems = [
-  { icon: Users, label: "Users", path: "/users" },
-  { icon: Briefcase, label: "Pros", path: "/pros" },
+// Content Moderation items
+const moderationItems = [
   { icon: Film, label: "Stories", path: "/stories" },
   { icon: ImageIcon, label: "Photos", path: "/photos" },
   { icon: MessageSquare, label: "Reviews", path: "/reviews" },
-  { icon: Home, label: "Realtors", path: "/realtors" },
+  { icon: Flag, label: "Flags Queue", path: "/moderation" },
+];
+
+// Providers items
+const providerItems = [
+  { icon: Briefcase, label: "All Providers", path: "/providers" },
   { icon: BadgeCheck, label: "Verifications", path: "/verifications" },
   { icon: Shield, label: "Business Claims", path: "/business-claims" },
-  { icon: Flag, label: "Moderation", path: "/moderation" },
-  { icon: Edit3, label: "Overrides", path: "/overrides" },
+];
+
+// Users & Access items
+const usersItems = [
+  { icon: Users, label: "Users", path: "/users" },
   { icon: History, label: "Audit Log", path: "/audit-log" },
+];
+
+// System items
+const systemItems = [
+  { icon: Edit3, label: "Overrides", path: "/overrides" },
   { icon: BarChart3, label: "Strategic Audit", path: "/strategic-audit" },
 ];
 
@@ -320,11 +331,25 @@ function DashboardLayoutContent({
               {/* Other items */}
               {otherItems.map(renderMenuItem)}
               
-              {/* Divider */}
+              {/* Divider - Content Moderation */}
               <div className="my-3 mx-2 border-t border-white/10" />
+              <div className="px-3 py-1 text-xs uppercase tracking-wider text-white/40 font-medium">Moderation</div>
+              {moderationItems.map(renderMenuItem)}
               
-              {/* Admin items */}
-              {adminItems.map(renderMenuItem)}
+              {/* Divider - Providers */}
+              <div className="my-3 mx-2 border-t border-white/10" />
+              <div className="px-3 py-1 text-xs uppercase tracking-wider text-white/40 font-medium">Providers</div>
+              {providerItems.map(renderMenuItem)}
+              
+              {/* Divider - Users & Access */}
+              <div className="my-3 mx-2 border-t border-white/10" />
+              <div className="px-3 py-1 text-xs uppercase tracking-wider text-white/40 font-medium">Users & Access</div>
+              {usersItems.map(renderMenuItem)}
+              
+              {/* Divider - System */}
+              <div className="my-3 mx-2 border-t border-white/10" />
+              <div className="px-3 py-1 text-xs uppercase tracking-wider text-white/40 font-medium">System</div>
+              {systemItems.map(renderMenuItem)}
             </SidebarMenu>
           </SidebarContent>
 
