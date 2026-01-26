@@ -1902,41 +1902,6 @@ export async function getUserById(userId: string): Promise<User | null> {
     return null;
   }
 }
-}
-
-export async function getUserById(userId: string): Promise<User | null> {
-  try {
-    const { data, error } = await supabase
-      .from("users")
-      .select(`
-        *,
-        profiles:profiles(display_name, avatar_url, bio)
-      `)
-      .eq("id", userId)
-      .single();
-
-    if (error) {
-      console.error("[Supabase] Get user by ID error:", error);
-      return null;
-    }
-
-    return {
-      id: data.id,
-      email: data.email,
-      phone_e164: data.phone_e164,
-      is_phone_verified: data.is_phone_verified,
-      is_email_verified: data.is_email_verified,
-      created_at: data.created_at,
-      last_login_at: data.last_login_at,
-      display_name: data.profiles?.display_name,
-      avatar_url: data.profiles?.avatar_url,
-      bio: data.profiles?.bio,
-    };
-  } catch (error) {
-    console.error("[Supabase] Get user by ID error:", error);
-    return null;
-  }
-}
 
 export async function getUserRoles(userId: string): Promise<UserRole[]> {
   try {
@@ -2187,37 +2152,6 @@ export async function isUserBlocked(userId: string): Promise<boolean> {
     return false;
   }
 }
-
-export async function getUserStats(): Promise<{
-  totalUsers: number;
-  verifiedUsers: number;
-  activeToday: number;
-  newThisWeek: number;
-}> {
-  try {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    const [totalResult, verifiedResult, activeTodayResult, newThisWeekResult] = await Promise.all([
-      supabase.from("users").select("*", { count: "exact", head: true }),
-      supabase.from("users").select("*", { count: "exact", head: true }).eq("is_email_verified", true),
-      supabase.from("users").select("*", { count: "exact", head: true }).gte("last_login_at", todayStart),
-      supabase.from("users").select("*", { count: "exact", head: true }).gte("created_at", weekAgo),
-    ]);
-
-    return {
-      totalUsers: totalResult.count || 0,
-      verifiedUsers: verifiedResult.count || 0,
-      activeToday: activeTodayResult.count || 0,
-      newThisWeek: newThisWeekResult.count || 0,
-    };
-  } catch (error) {
-    console.error("[Supabase] Get user stats error:", error);
-    return { totalUsers: 0, verifiedUsers: 0, activeToday: 0, newThisWeek: 0 };
-  }
-}
-
 
 // ============ PRO PROVIDERS MANAGEMENT ============
 export interface ProProvider {
