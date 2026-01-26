@@ -4,6 +4,9 @@ import { z } from "zod";
 import {
   searchPlaces,
   searchPlacesAdvanced,
+  searchFsqPlaces,
+  getFsqRegions,
+  getFsqCities,
   getDistinctCountries,
   getDistinctRegions,
   getDistinctCities,
@@ -552,6 +555,45 @@ export const appRouter = router({
     getCategories: protectedProcedure.query(async () => {
       return getDistinctCategories();
     }),
+
+    // Search fsq_places_raw with required country filter (for large dataset)
+    searchFsq: protectedProcedure
+      .input(
+        z.object({
+          country: z.string().min(1),
+          region: z.string().optional(),
+          city: z.string().optional(),
+          name: z.string().optional(),
+          limit: z.number().min(1).max(200).default(50),
+          offset: z.number().min(0).default(0),
+        })
+      )
+      .query(async ({ input }) => {
+        return searchFsqPlaces(
+          {
+            country: input.country,
+            region: input.region,
+            city: input.city,
+            name: input.name,
+          },
+          input.limit,
+          input.offset
+        );
+      }),
+
+    // Get regions from fsq_places_raw for a specific country
+    getFsqRegions: protectedProcedure
+      .input(z.object({ country: z.string().min(1) }))
+      .query(async ({ input }) => {
+        return getFsqRegions(input.country);
+      }),
+
+    // Get cities from fsq_places_raw for a specific country/region
+    getFsqCities: protectedProcedure
+      .input(z.object({ country: z.string().min(1), region: z.string().optional() }))
+      .query(async ({ input }) => {
+        return getFsqCities(input.country, input.region);
+      }),
   }),
 
   // Signals router - get signal definitions

@@ -216,11 +216,22 @@ export async function searchPlacesAdvanced(
   }
 }
 
-// Get distinct countries for dropdown
+// Get distinct countries for dropdown - uses fsq_countries lookup table
 export async function getDistinctCountries(): Promise<string[]> {
   try {
-    // Query places table and get unique countries
-    // Use pagination to ensure we get all records
+    // First try to get from fsq_countries lookup table (fast)
+    const { data: lookupData, error: lookupError } = await supabase
+      .from("fsq_countries")
+      .select("code")
+      .order("code", { ascending: true });
+
+    if (!lookupError && lookupData && lookupData.length > 0) {
+      console.log(`[Supabase] Got ${lookupData.length} countries from lookup table`);
+      return lookupData.map((d: any) => d.code);
+    }
+
+    // Fallback to places table if lookup table is empty
+    console.log("[Supabase] Falling back to places table for countries");
     const allCountries: string[] = [];
     let offset = 0;
     const batchSize = 1000;
@@ -395,6 +406,136 @@ export async function getDistinctCategories(): Promise<string[]> {
     return categories;
   } catch (error) {
     console.error("[Supabase] Get distinct categories error:", error);
+    return [];
+  }
+}
+
+// Search fsq_places_raw with required country filter for efficient querying
+export interface FsqPlaceSearchFilters {
+  country: string; // Required - dramatically reduces search space
+  region?: string;
+  city?: string;
+  name?: string;
+}
+
+export async function searchFsqPlaces(
+  filters: FsqPlaceSearchFilters,
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ places: Place[]; total: number }> {
+  try {
+    // Country is required for efficient searching
+    if (!filters.country) {
+      console.log("[Supabase] searchFsqPlaces requires country filter");
+      return { places: [], total: 0 };
+    }
+
+    let query = supabase
+      .from("fsq_places_raw")
+      .select("*", { count: "exact" })
+      .eq("country", filters.country);
+
+    // Apply optional filters
+    if (filters.region) {
+      query = query.eq("region", filters.region);
+    }
+    if (filters.city) {
+      query = query.ilike("locality", `%${filters.city}%`);
+    }
+    if (filters.name) {
+      query = query.ilike("name", `%${filters.name}%`);
+    }
+
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1)
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.error("[Supabase] searchFsqPlaces error:", error);
+      return { places: [], total: 0 };
+    }
+
+    // Map fsq_places_raw to Place interface
+    const places: Place[] = (data || []).map((p: any) => ({
+      id: p.fsq_place_id || p.id,
+      name: p.name,
+      address: p.address,
+      city: p.locality,
+      state: p.region,
+      country: p.country,
+      postal_code: p.postcode,
+      lat: p.latitude,
+      lng: p.longitude,
+      phone: p.tel,
+      website: p.website,
+      category: p.fsq_category_labels,
+      source: 'fsq',
+    }));
+
+    console.log(`[Supabase] searchFsqPlaces found ${places.length} places (total: ${count}) for country: ${filters.country}`);
+    return { places, total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] searchFsqPlaces error:", error);
+    return { places: [], total: 0 };
+  }
+}
+
+// Get distinct regions from fsq_places_raw for a specific country
+export async function getFsqRegions(country: string): Promise<string[]> {
+  try {
+    if (!country) return [];
+    
+    // Use a sample-based approach for large tables
+    const { data, error } = await supabase
+      .from("fsq_places_raw")
+      .select("region")
+      .eq("country", country)
+      .not("region", "is", null)
+      .limit(10000); // Get a sample
+
+    if (error) {
+      console.error("[Supabase] getFsqRegions error:", error);
+      return [];
+    }
+
+    // Extract unique regions
+    const regions = Array.from(new Set((data || []).map((d: any) => d.region).filter(Boolean))).sort();
+    console.log(`[Supabase] Found ${regions.length} regions for ${country}`);
+    return regions as string[];
+  } catch (error) {
+    console.error("[Supabase] getFsqRegions error:", error);
+    return [];
+  }
+}
+
+// Get distinct cities from fsq_places_raw for a specific country/region
+export async function getFsqCities(country: string, region?: string): Promise<string[]> {
+  try {
+    if (!country) return [];
+    
+    let query = supabase
+      .from("fsq_places_raw")
+      .select("locality")
+      .eq("country", country)
+      .not("locality", "is", null);
+
+    if (region) {
+      query = query.eq("region", region);
+    }
+
+    const { data, error } = await query.limit(10000); // Get a sample
+
+    if (error) {
+      console.error("[Supabase] getFsqCities error:", error);
+      return [];
+    }
+
+    // Extract unique cities
+    const cities = Array.from(new Set((data || []).map((d: any) => d.locality).filter(Boolean))).sort();
+    console.log(`[Supabase] Found ${cities.length} cities for ${country}${region ? '/' + region : ''}`);
+    return cities as string[];
+  } catch (error) {
+    console.error("[Supabase] getFsqCities error:", error);
     return [];
   }
 }
