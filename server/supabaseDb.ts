@@ -4134,6 +4134,99 @@ export async function getPlaceForEdit(placeId: string): Promise<PlaceDetails | n
     return data;
   } catch (error) {
     console.error("[Supabase] Get place for edit error:", error);
+// ============ TAVVY PLACES (User-Generated) ============
+export interface TavvyPlaceInput {
+  name: string;
+  description?: string | null;
+  tavvy_category: string;
+  tavvy_subcategory?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  address?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  region?: string | null;
+  postcode?: string | null;
+  country?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  instagram?: string | null;
+  facebook?: string | null;
+  twitter?: string | null;
+  tiktok?: string | null;
+  hours_display?: string | null;
+  hours_json?: any;
+  price_level?: number | null;
+  photos?: string[] | null;
+  cover_image_url?: string | null;
+  universe_id?: string | null;
+}
+
+export interface TavvyPlace extends TavvyPlaceInput {
+  id: string;
+  is_verified: boolean;
+  is_claimed: boolean;
+  source: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
+  deleted_at: string | null;
+}
+
+export async function createTavvyPlace(
+  input: TavvyPlaceInput,
+  createdBy: string
+): Promise<TavvyPlace | null> {
+  try {
+    const { data, error } = await supabase
+      .from("tavvy_places")
+      .insert({
+        name: input.name,
+        description: input.description || null,
+        tavvy_category: input.tavvy_category,
+        tavvy_subcategory: input.tavvy_subcategory || null,
+        latitude: input.latitude || null,
+        longitude: input.longitude || null,
+        address: input.address || null,
+        address_line2: input.address_line2 || null,
+        city: input.city || null,
+        region: input.region || null,
+        postcode: input.postcode || null,
+        country: input.country || null,
+        phone: input.phone || null,
+        email: input.email || null,
+        website: input.website || null,
+        instagram: input.instagram || null,
+        facebook: input.facebook || null,
+        twitter: input.twitter || null,
+        tiktok: input.tiktok || null,
+        hours_display: input.hours_display || null,
+        hours_json: input.hours_json || null,
+        price_level: input.price_level || null,
+        photos: input.photos || null,
+        cover_image_url: input.cover_image_url || null,
+        universe_id: input.universe_id || null,
+        source: 'admin',
+        created_by: createdBy,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Create tavvy place error:", error);
+      return null;
+    }
+
+    console.log(`[Supabase] Created new tavvy place: ${data.name} (${data.id})`);
+    
+    // Log admin action
+    await logAdminActivity(createdBy, 'place_created', data.id, 'tavvy_place', `Name: ${data.name}`);
+
+    return data as TavvyPlace;
+  } catch (error) {
+    console.error("[Supabase] Create tavvy place error:", error);
     return null;
   }
 }
@@ -4502,6 +4595,15 @@ export async function getPlaceOverridesAdmin(
     }
 
     const { data, error, count } = await query
+export async function getTavvyPlaces(
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ places: TavvyPlace[]; total: number }> {
+  try {
+    const { data, error, count } = await supabase
+      .from("tavvy_places")
+      .select("*", { count: "exact" })
+      .eq("is_deleted", false)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -4648,4 +4750,124 @@ export async function deletePlaceOverrideAdmin(
     console.error("[Supabase] Delete place override error:", error);
     return false;
   }
+}
+      console.error("[Supabase] Get tavvy places error:", error);
+      return { places: [], total: 0 };
+    }
+
+    return { places: data as TavvyPlace[], total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get tavvy places error:", error);
+    return { places: [], total: 0 };
+  }
+}
+
+export async function getTavvyPlaceById(id: string): Promise<TavvyPlace | null> {
+  try {
+    const { data, error } = await supabase
+      .from("tavvy_places")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      console.error("[Supabase] Get tavvy place by id error:", error);
+      return null;
+    }
+
+    return data as TavvyPlace;
+  } catch (error) {
+    console.error("[Supabase] Get tavvy place by id error:", error);
+    return null;
+  }
+}
+
+export async function updateTavvyPlace(
+  id: string,
+  updates: Partial<TavvyPlaceInput>,
+  updatedBy: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("tavvy_places")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) {
+      console.error("[Supabase] Update tavvy place error:", error);
+      return false;
+    }
+
+    // Log admin action
+    await logAdminActivity(updatedBy, 'place_updated', id, 'tavvy_place');
+
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update tavvy place error:", error);
+    return false;
+  }
+}
+
+export async function deleteTavvyPlace(id: string, deletedBy: string): Promise<boolean> {
+  try {
+    // Soft delete
+    const { error } = await supabase
+      .from("tavvy_places")
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) {
+      console.error("[Supabase] Delete tavvy place error:", error);
+      return false;
+    }
+
+    // Log admin action
+    await logAdminActivity(deletedBy, 'place_deleted', id, 'tavvy_place');
+
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Delete tavvy place error:", error);
+    return false;
+  }
+}
+
+// Get all tavvy categories for dropdown
+export async function getTavvyCategories(): Promise<{ slug: string; name: string }[]> {
+  // Return the predefined categories
+  // These match the PRIMARY_CATEGORIES in the mobile app
+  return [
+    { slug: 'arts', name: 'Arts & Culture' },
+    { slug: 'automotive', name: 'Automotive' },
+    { slug: 'nightlife', name: 'Bars & Nightlife' },
+    { slug: 'beauty', name: 'Beauty & Personal Care' },
+    { slug: 'business', name: 'Business Services' },
+    { slug: 'coffee_tea', name: 'Coffee & Tea' },
+    { slug: 'education', name: 'Education' },
+    { slug: 'entertainment', name: 'Entertainment' },
+    { slug: 'events', name: 'Events & Venues' },
+    { slug: 'financial', name: 'Financial Services' },
+    { slug: 'fitness', name: 'Fitness & Sports' },
+    { slug: 'food', name: 'Food & Dining' },
+    { slug: 'government', name: 'Government' },
+    { slug: 'health', name: 'Health & Medical' },
+    { slug: 'home', name: 'Home Services' },
+    { slug: 'hotels', name: 'Hotels & Lodging' },
+    { slug: 'legal', name: 'Legal Services' },
+    { slug: 'outdoors', name: 'Outdoors & Recreation' },
+    { slug: 'pets', name: 'Pets & Animals' },
+    { slug: 'professional', name: 'Professional Services' },
+    { slug: 'real_estate', name: 'Real Estate' },
+    { slug: 'religious', name: 'Religious Organizations' },
+    { slug: 'rv_camping', name: 'RV & Camping' },
+    { slug: 'shopping', name: 'Shopping & Retail' },
+    { slug: 'transportation', name: 'Transportation' },
+    { slug: 'other', name: 'Other' },
+  ];
 }

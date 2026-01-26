@@ -48,12 +48,13 @@ import {
   FileUp,
   FileCode,
   BadgeCheck,
-  Home,
+Home,
   Users,
   Briefcase,
   Film,
   ImageIcon,
-  MessageSquare
+  MessageSquare,
+  PlusCircle
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -63,6 +64,8 @@ import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: MapPin, label: "Places", path: "/places" },
+  { icon: PlusCircle, label: "Add Place", path: "/places/new" },
+  { icon: FileText, label: "Drafts", path: "/drafts" },
   { icon: Zap, label: "Quick Entry", path: "/quick-entry" },
   { icon: Upload, label: "Batch Upload", path: "/batch-upload" },
   { icon: BarChart3, label: "Signals", path: "/signals" },

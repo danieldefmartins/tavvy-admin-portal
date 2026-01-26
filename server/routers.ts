@@ -1,4 +1,16 @@
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import {
+  createDraft,
+  getDraftById,
+  getActiveDraft,
+  getUserDrafts,
+  updateDraft,
+  deleteDraft,
+  snoozeDraft,
+  submitDraft,
+  getPendingOfflineDrafts,
+  markDraftSynced,
+} from "./draftDb";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -56,7 +68,7 @@ import {
   reviewPlaceOverride,
   // Stats
   getModerationStats,
-  // User Management
+// User Management
   getUsers,
   getUserById,
   getUserRoles,
@@ -142,6 +154,14 @@ import {
   createPlaceOverrideAdmin,
   revertPlaceOverrideAdmin,
   deletePlaceOverrideAdmin,
+  // Tavvy Places (User-Generated)
+  createTavvyPlace,
+  getTavvyPlaces,
+  getTavvyPlaceById,
+  updateTavvyPlace,
+  deleteTavvyPlace,
+  getTavvyCategories,
+  type TavvyPlaceInput,
 } from "./supabaseDb";
 import { getDb } from "./db";
 import { repActivityLog, batchImportJobs } from "../drizzle/schema";
@@ -593,6 +613,173 @@ export const appRouter = router({
       .input(z.object({ country: z.string().min(1), region: z.string().optional() }))
       .query(async ({ input }) => {
         return getFsqCities(input.country, input.region);
+    // ============ TAVVY PLACES (User-Generated) ============
+    
+    // Get tavvy categories for dropdown
+    getTavvyCategories: protectedProcedure.query(async () => {
+      return getTavvyCategories();
+    }),
+
+    // Create a new tavvy place
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().min(1, "Name is required").max(200),
+          description: z.string().max(2000).optional(),
+          tavvy_category: z.string().min(1, "Category is required"),
+          tavvy_subcategory: z.string().optional(),
+          latitude: z.number().min(-90).max(90).optional(),
+          longitude: z.number().min(-180).max(180).optional(),
+          address: z.string().max(500).optional(),
+          address_line2: z.string().max(200).optional(),
+          city: z.string().max(100).optional(),
+          region: z.string().max(100).optional(),
+          postcode: z.string().max(20).optional(),
+          country: z.string().max(100).optional(),
+          phone: z.string().max(50).optional(),
+          email: z.string().email().optional().or(z.literal("")),
+          website: z.string().url().optional().or(z.literal("")),
+          instagram: z.string().max(100).optional(),
+          facebook: z.string().max(200).optional(),
+          twitter: z.string().max(100).optional(),
+          tiktok: z.string().max(100).optional(),
+          hours_display: z.string().max(500).optional(),
+          hours_json: z.any().optional(),
+          price_level: z.number().min(1).max(4).optional(),
+          photos: z.array(z.string()).optional(),
+          cover_image_url: z.string().url().optional().or(z.literal("")),
+          universe_id: z.string().uuid().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "You must be logged in to create a place",
+          });
+        }
+
+        // Clean up empty strings
+        const cleanInput: TavvyPlaceInput = {
+          ...input,
+          email: input.email || null,
+          website: input.website || null,
+          cover_image_url: input.cover_image_url || null,
+        };
+
+        const place = await createTavvyPlace(cleanInput, userId);
+        if (!place) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create place",
+          });
+        }
+
+        return place;
+      }),
+
+    // Get all tavvy places (paginated)
+    getTavvyPlaces: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().min(1).max(200).default(50),
+          offset: z.number().min(0).default(0),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const limit = input?.limit || 50;
+        const offset = input?.offset || 0;
+        return getTavvyPlaces(limit, offset);
+      }),
+
+    // Get a single tavvy place by ID
+    getTavvyPlace: protectedProcedure
+      .input(z.object({ id: z.string().uuid() }))
+      .query(async ({ input }) => {
+        const place = await getTavvyPlaceById(input.id);
+        if (!place) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Place not found",
+          });
+        }
+        return place;
+      }),
+
+    // Update a tavvy place
+    updateTavvyPlace: protectedProcedure
+      .input(
+        z.object({
+          id: z.string().uuid(),
+          name: z.string().min(1).max(200).optional(),
+          description: z.string().max(2000).optional(),
+          tavvy_category: z.string().optional(),
+          tavvy_subcategory: z.string().optional(),
+          latitude: z.number().min(-90).max(90).optional(),
+          longitude: z.number().min(-180).max(180).optional(),
+          address: z.string().max(500).optional(),
+          address_line2: z.string().max(200).optional(),
+          city: z.string().max(100).optional(),
+          region: z.string().max(100).optional(),
+          postcode: z.string().max(20).optional(),
+          country: z.string().max(100).optional(),
+          phone: z.string().max(50).optional(),
+          email: z.string().email().optional().or(z.literal("")),
+          website: z.string().url().optional().or(z.literal("")),
+          instagram: z.string().max(100).optional(),
+          facebook: z.string().max(200).optional(),
+          twitter: z.string().max(100).optional(),
+          tiktok: z.string().max(100).optional(),
+          hours_display: z.string().max(500).optional(),
+          hours_json: z.any().optional(),
+          price_level: z.number().min(1).max(4).optional(),
+          photos: z.array(z.string()).optional(),
+          cover_image_url: z.string().url().optional().or(z.literal("")),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "You must be logged in to update a place",
+          });
+        }
+
+        const { id, ...updates } = input;
+        const success = await updateTavvyPlace(id, updates, userId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update place",
+          });
+        }
+
+        return { success: true };
+      }),
+
+    // Delete a tavvy place (soft delete)
+    deleteTavvyPlace: protectedProcedure
+      .input(z.object({ id: z.string().uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "You must be logged in to delete a place",
+          });
+        }
+
+        const success = await deleteTavvyPlace(input.id, userId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete place",
+          });
+        }
+
+        return { success: true };
       }),
   }),
 
@@ -2364,6 +2551,181 @@ export const appRouter = router({
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: "Failed to delete override",
+  // Drafts router - manage content drafts for Universal Add
+  drafts: router({
+    create: protectedProcedure
+      .input(
+        z.object({
+          latitude: z.number(),
+          longitude: z.number(),
+          address_line1: z.string().optional(),
+          address_line2: z.string().optional(),
+          city: z.string().optional(),
+          region: z.string().optional(),
+          postal_code: z.string().optional(),
+          country: z.string().optional(),
+          formatted_address: z.string().optional(),
+          is_offline: z.boolean().optional(),
+          offline_created_at: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+        const draft = await createDraft(userId, input);
+        if (!draft) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create draft",
+          });
+        }
+        return draft;
+      }),
+    get: protectedProcedure
+      .input(z.object({ id: z.string().uuid() }))
+      .query(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+        const draft = await getDraftById(input.id, userId);
+        if (!draft) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Draft not found" });
+        }
+        return draft;
+      }),
+    getActive: protectedProcedure.query(async ({ ctx }) => {
+      const userId = ctx.user?.id;
+      if (!userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      return await getActiveDraft(userId);
+    }),
+    list: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().min(1).max(100).default(50),
+          offset: z.number().min(0).default(0),
+        }).optional()
+      )
+      .query(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+        return await getUserDrafts(userId, input?.limit || 50, input?.offset || 0);
+      }),
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string().uuid(),
+          status: z.enum(["draft_location","draft_type_selected","draft_subtype_selected","draft_details","draft_review"]).optional(),
+          current_step: z.number().min(1).max(6).optional(),
+          latitude: z.number().optional(),
+          longitude: z.number().optional(),
+          address_line1: z.string().optional(),
+          address_line2: z.string().optional(),
+          city: z.string().optional(),
+          region: z.string().optional(),
+          postal_code: z.string().optional(),
+          country: z.string().optional(),
+          formatted_address: z.string().optional(),
+          content_type: z.enum(["business","universe","city","rv_campground","event","quick_add"]).optional(),
+          content_subtype: z.enum(['physical','service','on_the_go','new_universe','spot_in_universe','rv_park','campground','boondocking','overnight_parking','restroom','parking','atm','water_fountain','pet_relief','photo_spot']).optional(),
+          data: z.record(z.string(), z.any()).optional(),
+          photos: z.array(z.string()).optional(),
+          cover_photo: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+        const { id, ...updates } = input;
+        const draft = await updateDraft(id, userId, updates);
+        if (!draft) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update draft",
+          });
+        }
+        return draft;
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.string().uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+        const success = await deleteDraft(input.id, userId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete draft",
+          });
+        }
+        return { success: true };
+      }),
+    snooze: protectedProcedure
+      .input(
+        z.object({
+          id: z.string().uuid(),
+          hours: z.number().min(1).max(168).default(24),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+        const draft = await snoozeDraft(input.id, userId, input.hours);
+        if (!draft) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to snooze draft",
+          });
+        }
+        return draft;
+      }),
+    submit: protectedProcedure
+      .input(z.object({ id: z.string().uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+        const result = await submitDraft(input.id, userId);
+        if (!result.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: result.error || "Failed to submit draft",
+          });
+        }
+        return result;
+      }),
+    getPendingOffline: protectedProcedure.query(async ({ ctx }) => {
+      const userId = ctx.user?.id;
+      if (!userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      return await getPendingOfflineDrafts(userId);
+    }),
+    markSynced: protectedProcedure
+      .input(z.object({ id: z.string().uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+        const success = await markDraftSynced(input.id, userId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to mark draft as synced",
           });
         }
         return { success: true };

@@ -31,6 +31,8 @@ import Stories from "@/pages/Stories";
 import Photos from "@/pages/Photos";
 import Reviews from "@/pages/Reviews";
 import PlaceEdit from "@/pages/PlaceEdit";
+import CreatePlace from "@/pages/CreatePlace";
+import Drafts from "@/pages/Drafts";
 
 // Loading component
 function LoadingScreen() {
@@ -79,6 +81,12 @@ function App() {
         <Route path="/places">
           <ProtectedRoute>
             <Places />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/places/new">
+          <ProtectedRoute>
+            <CreatePlace />
           </ProtectedRoute>
         </Route>
 
@@ -206,9 +214,15 @@ function App() {
           </ProtectedRoute>
         </Route>
 
-        <Route path="/strategic-audit">
+<Route path="/strategic-audit">
           <ProtectedRoute>
             <StrategicAudit />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/drafts">
+          <ProtectedRoute>
+            <Drafts />
           </ProtectedRoute>
         </Route>
 

@@ -15,7 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
-  Plus,
+Plus,
   Edit
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -548,10 +548,10 @@ export default function Places() {
           <h1 className="text-3xl font-bold tracking-tight">Places</h1>
           <p className="text-muted-foreground">Search and browse places in the database</p>
         </div>
-        <Link href="/places/new/edit">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Place
+<Link href="/places/new">
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Place
           </Button>
         </Link>
       </div>
