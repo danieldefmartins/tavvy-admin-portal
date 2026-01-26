@@ -1,11 +1,37 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Search, Zap, ThumbsUp, Sparkles, AlertTriangle, Loader2, MapPin, CheckCircle2 } from "lucide-react";
+import { Search, Zap, ThumbsUp, Sparkles, AlertTriangle, Loader2, MapPin, CheckCircle2, Filter, ChevronDown, ChevronUp, Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export default function QuickEntry() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -13,12 +39,44 @@ export default function QuickEntry() {
   const [selectedPlace, setSelectedPlace] = useState<{
     id: string;
     name: string;
+    city?: string;
+    state?: string;
   } | null>(null);
   const [selectedSignals, setSelectedSignals] = useState<Map<string, number>>(new Map());
+  
+  // Location filter state
+  const [showFilters, setShowFilters] = useState(false);
+  const [countryOpen, setCountryOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    country: "",
+    state: "",
+    city: "",
+  });
 
-  const { data: places, isLoading: placesLoading, isFetching } = trpc.places.search.useQuery(
-    { query: debouncedQuery, limit: 10 },
-    { enabled: debouncedQuery.length >= 2 }
+  // Fetch dropdown data
+  const { data: countries } = trpc.places.getCountries.useQuery();
+  const { data: regions } = trpc.places.getRegions.useQuery(
+    { country: filters.country || undefined },
+    { enabled: !!filters.country }
+  );
+  const { data: cities } = trpc.places.getCities.useQuery(
+    { country: filters.country || undefined, region: filters.state || undefined },
+    { enabled: !!filters.country || !!filters.state }
+  );
+
+  // Use advanced search when filters are applied
+  const hasFilters = filters.country || filters.state || filters.city;
+  
+  const { data: places, isLoading: placesLoading, isFetching } = trpc.places.searchAdvanced.useQuery(
+    { 
+      name: debouncedQuery || undefined,
+      country: filters.country || undefined,
+      state: filters.state || undefined,
+      city: filters.city || undefined,
+      limit: 20,
+      offset: 0,
+    },
+    { enabled: debouncedQuery.length >= 2 || hasFilters }
   );
 
   const { data: allSignalDefs } = trpc.signals.getAll.useQuery();
@@ -37,7 +95,7 @@ export default function QuickEntry() {
   });
 
   const handleSearch = () => {
-    if (searchQuery.length >= 2) {
+    if (searchQuery.length >= 2 || hasFilters) {
       setDebouncedQuery(searchQuery);
     }
   };
@@ -48,7 +106,7 @@ export default function QuickEntry() {
     }
   };
 
-  const handleSelectPlace = (place: { id: string; name: string }) => {
+  const handleSelectPlace = (place: { id: string; name: string; city?: string; state?: string }) => {
     setSelectedPlace(place);
     setDebouncedQuery("");
     setSearchQuery("");
@@ -88,17 +146,95 @@ export default function QuickEntry() {
     });
   };
 
+  const resetFilters = () => {
+    setFilters({ country: "", state: "", city: "" });
+  };
+
+  // Country name mapping
+  const countryNames: Record<string, string> = {
+    US: "United States", CA: "Canada", MX: "Mexico", GB: "United Kingdom",
+    FR: "France", DE: "Germany", IT: "Italy", ES: "Spain", PT: "Portugal",
+    BR: "Brazil", AR: "Argentina", CO: "Colombia", CL: "Chile",
+    AU: "Australia", NZ: "New Zealand", JP: "Japan", KR: "South Korea",
+    CN: "China", IN: "India", AE: "United Arab Emirates", SA: "Saudi Arabia",
+    "United States": "United States",
+  };
+  const getCountryName = (code: string) => countryNames[code] || code;
+
+  // US State name mapping
+  const usStateNames: Record<string, string> = {
+    AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+    CO: "Colorado", CT: "Connecticut", DE: "Delaware", DC: "District of Columbia",
+    FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois",
+    IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana",
+    ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota",
+    MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada",
+    NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York",
+    NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon",
+    PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota",
+    TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia",
+    WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+    "Calif": "California", "Florida": "Florida", "New York": "New York",
+  };
+  const getStateName = (code: string) => usStateNames[code] || code;
+
+  // Map state variations to canonical code
+  const stateToCanonical: Record<string, string> = {
+    "Calif": "CA", "California": "CA", "Florida": "FL", "New York": "NY", "Texas": "TX",
+  };
+
+  // Sort and consolidate countries
+  const sortedCountries = useMemo(() => {
+    if (!countries) return [];
+    const hasUS = countries.includes("US");
+    const hasUnitedStates = countries.includes("United States");
+    let filtered = [...countries];
+    if (hasUS && hasUnitedStates) {
+      filtered = filtered.filter(c => c !== "United States");
+    }
+    return filtered.sort((a, b) => {
+      if (a === "US" || a === "United States") return -1;
+      if (b === "US" || b === "United States") return 1;
+      return getCountryName(a).localeCompare(getCountryName(b));
+    });
+  }, [countries]);
+
+  // Sort and consolidate regions
+  const sortedRegions = useMemo(() => {
+    if (!regions) return [];
+    const canonicalSet = new Set<string>();
+    const result: string[] = [];
+    regions.forEach(region => {
+      const canonical = stateToCanonical[region] || region;
+      if (!canonicalSet.has(canonical)) {
+        canonicalSet.add(canonical);
+        if (stateToCanonical[region] && regions.includes(canonical)) {
+          return;
+        }
+        result.push(region);
+      }
+    });
+    const finalResult = result.filter(r => {
+      const canonical = stateToCanonical[r];
+      if (canonical && result.includes(canonical)) return false;
+      return true;
+    });
+    return finalResult.sort((a, b) => getStateName(a).localeCompare(getStateName(b)));
+  }, [regions]);
+
   // Group signals by type
   const bestForSignals = allSignalDefs?.filter((s) => s.signal_type === "best_for") || [];
   const vibeSignals = allSignalDefs?.filter((s) => s.signal_type === "vibe") || [];
   const headsUpSignals = allSignalDefs?.filter((s) => s.signal_type === "heads_up") || [];
+
+  const placesData = places?.places || [];
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Quick Signal Entry</h1>
         <p className="text-muted-foreground">
-          Rapidly submit signals for places. Search, select, tap, submit.
+          Rapidly submit signals for places. Filter by location, search, select, tap, submit.
         </p>
       </div>
 
@@ -126,7 +262,9 @@ export default function QuickEntry() {
                 <MapPin className="h-5 w-5 text-emerald-500" />
                 <div>
                   <p className="font-semibold">{selectedPlace.name}</p>
-                  <p className="text-xs text-muted-foreground">{selectedPlace.id}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {[selectedPlace.city, selectedPlace.state].filter(Boolean).join(", ")} • {selectedPlace.id}
+                  </p>
                 </div>
               </div>
               <Button variant="outline" size="sm" onClick={() => setSelectedPlace(null)}>
@@ -135,6 +273,126 @@ export default function QuickEntry() {
             </div>
           ) : (
             <>
+              {/* Location Filters */}
+              <Collapsible open={showFilters} onOpenChange={setShowFilters} className="mb-4">
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2 mb-2">
+                    <Filter className="h-4 w-4" />
+                    Location Filters
+                    {showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {hasFilters && (
+                      <Badge variant="secondary" className="ml-2">
+                        {[filters.country, filters.state, filters.city].filter(Boolean).length} active
+                      </Badge>
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-lg bg-muted/50">
+                    {/* Country */}
+                    <div className="space-y-2">
+                      <Label>Country</Label>
+                      <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={countryOpen}
+                            className="w-full justify-between"
+                          >
+                            {filters.country ? getCountryName(filters.country) : "Select country..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search country..." />
+                            <CommandList>
+                              <CommandEmpty>No country found.</CommandEmpty>
+                              <CommandGroup>
+                                <CommandItem
+                                  value="all-countries"
+                                  onSelect={() => {
+                                    setFilters({ ...filters, country: "", state: "", city: "" });
+                                    setCountryOpen(false);
+                                  }}
+                                >
+                                  <Check className={`mr-2 h-4 w-4 ${!filters.country ? "opacity-100" : "opacity-0"}`} />
+                                  All Countries
+                                </CommandItem>
+                                {sortedCountries.map((country) => (
+                                  <CommandItem
+                                    key={country}
+                                    value={`${country} ${getCountryName(country)}`}
+                                    onSelect={() => {
+                                      setFilters({ ...filters, country, state: "", city: "" });
+                                      setCountryOpen(false);
+                                    }}
+                                  >
+                                    <Check className={`mr-2 h-4 w-4 ${filters.country === country ? "opacity-100" : "opacity-0"}`} />
+                                    {getCountryName(country)}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {/* State/Region */}
+                    <div className="space-y-2">
+                      <Label>State / Region</Label>
+                      <Select
+                        value={filters.state}
+                        onValueChange={(v) => setFilters({ ...filters, state: v === "all" ? "" : v, city: "" })}
+                        disabled={!filters.country}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={filters.country ? "Select state" : "Select country first"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All States</SelectItem>
+                          {sortedRegions.map((region) => (
+                            <SelectItem key={region} value={region}>
+                              {getStateName(region)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* City */}
+                    <div className="space-y-2">
+                      <Label>City</Label>
+                      <Select
+                        value={filters.city}
+                        onValueChange={(v) => setFilters({ ...filters, city: v === "all" ? "" : v })}
+                        disabled={!filters.country && !filters.state}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={filters.country || filters.state ? "Select city" : "Select country/state first"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Cities</SelectItem>
+                          {cities?.map((city) => (
+                            <SelectItem key={city} value={city}>
+                              {city}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {hasFilters && (
+                    <Button variant="ghost" size="sm" onClick={resetFilters} className="mt-2">
+                      Clear Filters
+                    </Button>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Search Input */}
               <div className="flex gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -146,28 +404,50 @@ export default function QuickEntry() {
                     className="pl-10"
                   />
                 </div>
-                <Button onClick={handleSearch} disabled={searchQuery.length < 2}>
+                <Button onClick={handleSearch} disabled={searchQuery.length < 2 && !hasFilters}>
                   {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
                 </Button>
               </div>
+              
+              {hasFilters && !debouncedQuery && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Filters applied. Enter a name to search or click Search to browse.
+                </p>
+              )}
 
               {/* Search Results */}
-              {places && places.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {places.map((place) => (
+              {placesData.length > 0 && (
+                <div className="mt-4 space-y-2 max-h-[300px] overflow-y-auto">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Found {places?.total || placesData.length} places
+                  </p>
+                  {placesData.map((place) => (
                     <div
                       key={place.id}
-                      onClick={() => handleSelectPlace({ id: place.id, name: place.name })}
+                      onClick={() => handleSelectPlace({ 
+                        id: place.id, 
+                        name: place.name,
+                        city: place.city,
+                        state: place.state,
+                      })}
                       className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
                     >
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{place.name}</p>
-                        <p className="text-xs text-muted-foreground">{place.city}</p>
+                      <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{place.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {[place.city, place.state, place.country].filter(Boolean).join(", ")}
+                        </p>
                       </div>
                     </div>
                   ))}
                 </div>
+              )}
+              
+              {(debouncedQuery || hasFilters) && placesData.length === 0 && !isFetching && (
+                <p className="text-sm text-muted-foreground mt-4 text-center py-4">
+                  No places found. Try adjusting your filters or search term.
+                </p>
               )}
             </>
           )}

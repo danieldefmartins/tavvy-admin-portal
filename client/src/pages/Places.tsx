@@ -448,6 +448,74 @@ export default function Places() {
 
   const getCountryName = (code: string) => countryNames[code] || code;
 
+  // US State name mapping (code -> full name)
+  const usStateNames: Record<string, string> = {
+    AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+    CO: "Colorado", CT: "Connecticut", DE: "Delaware", DC: "District of Columbia",
+    FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois",
+    IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana",
+    ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota",
+    MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada",
+    NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York",
+    NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon",
+    PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota",
+    TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia",
+    WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+    // Common variations/typos in data
+    "Calif": "California", "Florida": "Florida", "New York": "New York",
+    "Texas": "Texas", "California": "California",
+  };
+
+  // Map state variations to their canonical code
+  const stateToCanonical: Record<string, string> = {
+    "Calif": "CA", "California": "CA",
+    "Florida": "FL",
+    "New York": "NY",
+    "Texas": "TX",
+  };
+
+  const getStateName = (code: string) => usStateNames[code] || code;
+
+  // Consolidate duplicate states (e.g., "FL" and "Florida" -> just "FL")
+  const sortedRegions = useMemo(() => {
+    if (!regions) return [];
+    
+    // Build a set of canonical codes
+    const canonicalSet = new Set<string>();
+    const result: string[] = [];
+    
+    regions.forEach(region => {
+      const canonical = stateToCanonical[region] || region;
+      if (!canonicalSet.has(canonical)) {
+        canonicalSet.add(canonical);
+        // Prefer the code version if it exists
+        if (stateToCanonical[region]) {
+          // This is a full name, check if the code exists in regions
+          if (regions.includes(canonical)) {
+            // Code exists, skip this full name
+            return;
+          }
+        }
+        result.push(region);
+      }
+    });
+    
+    // Filter out full names if their code equivalent exists
+    const finalResult = result.filter(r => {
+      const canonical = stateToCanonical[r];
+      if (canonical && result.includes(canonical)) {
+        return false; // Skip full name if code exists
+      }
+      return true;
+    });
+    
+    return finalResult.sort((a, b) => {
+      const nameA = getStateName(a);
+      const nameB = getStateName(b);
+      return nameA.localeCompare(nameB);
+    });
+  }, [regions]);
+
   // Sort countries with US first, then alphabetically by name
   // Also consolidate duplicate entries (e.g., "US" and "United States")
   const sortedCountries = useMemo(() => {
@@ -611,9 +679,9 @@ export default function Places() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All States</SelectItem>
-                      {regions?.map((region) => (
+                      {sortedRegions.map((region) => (
                         <SelectItem key={region} value={region}>
-                          {region}
+                          {getStateName(region)}
                         </SelectItem>
                       ))}
                     </SelectContent>

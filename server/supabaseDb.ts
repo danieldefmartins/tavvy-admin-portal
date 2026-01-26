@@ -148,7 +148,24 @@ export async function searchPlacesAdvanced(
       query = query.ilike("city", `%${filters.city}%`);
     }
     if (filters.state) {
-      query = query.eq("region", filters.state);
+      // Handle state variations (e.g., FL/Florida, CA/Calif, NY/New York)
+      const stateVariations: Record<string, string[]> = {
+        "FL": ["FL", "Florida"],
+        "Florida": ["FL", "Florida"],
+        "CA": ["CA", "Calif", "California"],
+        "Calif": ["CA", "Calif", "California"],
+        "California": ["CA", "Calif", "California"],
+        "NY": ["NY", "New York"],
+        "New York": ["NY", "New York"],
+        "TX": ["TX", "Texas"],
+        "Texas": ["TX", "Texas"],
+      };
+      const variations = stateVariations[filters.state];
+      if (variations) {
+        query = query.or(variations.map(v => `region.eq.${v}`).join(','));
+      } else {
+        query = query.eq("region", filters.state);
+      }
     }
     if (filters.country) {
       // Handle US/United States consolidation - search for both values
