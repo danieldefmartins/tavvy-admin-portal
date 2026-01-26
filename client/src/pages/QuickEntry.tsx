@@ -16,12 +16,12 @@ export default function QuickEntry() {
   } | null>(null);
   const [selectedSignals, setSelectedSignals] = useState<Map<string, number>>(new Map());
 
-  const { data: places, isLoading: placesLoading, isFetching } = trpc.places.search.useQuery(
+  const { data: places, isLoading: placesLoading, isFetching, error: placesError } = trpc.places.search.useQuery(
     { query: debouncedQuery, limit: 10 },
-    { enabled: debouncedQuery.length >= 2 }
+    { enabled: debouncedQuery.length >= 2, retry: false }
   );
 
-  const { data: allSignalDefs } = trpc.signals.getAll.useQuery();
+  const { data: allSignalDefs, error: signalsError } = trpc.signals.getAll.useQuery({ retry: false });
 
   const submitMutation = trpc.reviews.submitQuick.useMutation({
     onSuccess: (result) => {
@@ -92,6 +92,18 @@ export default function QuickEntry() {
   const bestForSignals = allSignalDefs?.filter((s) => s.signal_type === "best_for") || [];
   const vibeSignals = allSignalDefs?.filter((s) => s.signal_type === "vibe") || [];
   const headsUpSignals = allSignalDefs?.filter((s) => s.signal_type === "heads_up") || [];
+
+  // Show error if signals fail to load
+  if (signalsError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Quick Signal Entry</h1>
+          <p className="text-muted-foreground">Error loading signals: {signalsError.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
