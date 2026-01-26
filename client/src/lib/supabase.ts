@@ -51,6 +51,7 @@ export async function signUpWithEmail(
     password,
     options: {
       data: metadata,
+      emailRedirectTo: `${window.location.origin}/dashboard`,
     },
   });
   return { data, error };
