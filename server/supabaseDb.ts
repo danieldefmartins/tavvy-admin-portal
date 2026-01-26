@@ -430,9 +430,10 @@ export async function searchFsqPlaces(
       return { places: [], total: 0 };
     }
 
+    // Don't use { count: "exact" } as it's very slow on 104M+ rows
     let query = supabase
       .from("fsq_places_raw")
-      .select("*", { count: "exact" })
+      .select("*")
       .eq("country", filters.country);
 
     // Apply optional filters
@@ -448,7 +449,7 @@ export async function searchFsqPlaces(
       query = query.ilike("name", `${filters.name}%`);
     }
 
-    const { data, error, count } = await query
+    const { data, error } = await query
       .range(offset, offset + limit - 1)
       .order("name", { ascending: true });
 
@@ -474,8 +475,9 @@ export async function searchFsqPlaces(
       source: 'fsq',
     }));
 
-    console.log(`[Supabase] searchFsqPlaces found ${places.length} places (total: ${count}) for country: ${filters.country}`);
-    return { places, total: count || 0 };
+    console.log(`[Supabase] searchFsqPlaces found ${places.length} places for country: ${filters.country}`);
+    // Return -1 for total to indicate we don't know the exact count (too slow to compute on 104M+ rows)
+    return { places, total: places.length > 0 ? -1 : 0 };
   } catch (error) {
     console.error("[Supabase] searchFsqPlaces error:", error);
     return { places: [], total: 0 };
