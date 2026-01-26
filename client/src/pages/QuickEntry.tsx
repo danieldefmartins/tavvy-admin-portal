@@ -116,22 +116,23 @@ export default function QuickEntry() {
     { enabled: !!selectedCountry }
   );
 
-  // Search places using fsq_places_raw with filters
+  // Search places using fsq_places_raw - name is required, location filters are optional
+  // This uses the same approach as the mobile app for fast searching
   const { data: fsqPlacesResult, isLoading: fsqLoading, isFetching: fsqFetching } = trpc.places.searchFsq.useQuery(
     { 
-      country: selectedCountry, 
+      name: debouncedQuery,
+      country: selectedCountry || undefined, 
       region: selectedRegion || undefined,
       city: citySearch || undefined,
-      name: debouncedQuery || undefined,
       limit: 50 
     },
-    { enabled: !!selectedCountry && (debouncedQuery.length >= 2 || !!citySearch) }
+    { enabled: debouncedQuery.length >= 2 }
   );
 
-  // Fallback to places table search if no country selected
+  // Keep simple search as additional fallback (searches places table)
   const { data: simplePlaces, isLoading: simpleLoading, isFetching: simpleFetching } = trpc.places.search.useQuery(
     { query: debouncedQuery, limit: 50 },
-    { enabled: !selectedCountry && debouncedQuery.length >= 2 }
+    { enabled: debouncedQuery.length >= 2 }
   );
 
   const { data: allSignalDefs, error: signalsError } = trpc.signals.getAll.useQuery();
@@ -230,11 +231,21 @@ export default function QuickEntry() {
     setCitySearch("");
   };
 
-  // Determine which places to show
-  const places = selectedCountry ? fsqPlacesResult?.places : simplePlaces;
-  const totalCount = selectedCountry ? (fsqPlacesResult?.total || 0) : (simplePlaces?.length || 0);
-  const isLoading = selectedCountry ? fsqLoading : simpleLoading;
-  const isFetching = selectedCountry ? fsqFetching : simpleFetching;
+  // Combine results from both fsq and simple search, deduplicated
+  const fsqPlaces = fsqPlacesResult?.places || [];
+  const simplePlacesData = simplePlaces || [];
+  
+  // Merge and deduplicate by id
+  const seenIds = new Set<string>();
+  const places = [...fsqPlaces, ...simplePlacesData].filter(p => {
+    if (seenIds.has(p.id)) return false;
+    seenIds.add(p.id);
+    return true;
+  });
+  
+  const totalCount = places.length;
+  const isLoading = fsqLoading || simpleLoading;
+  const isFetching = fsqFetching || simpleFetching;
 
   // Group signals by type
   const bestForSignals = allSignalDefs?.filter((s) => s.signal_type === "best_for") || [];

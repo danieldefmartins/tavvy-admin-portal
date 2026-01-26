@@ -412,7 +412,7 @@ export async function getDistinctCategories(): Promise<string[]> {
 
 // Search fsq_places_raw with required country filter for efficient querying
 export interface FsqPlaceSearchFilters {
-  country: string; // Required - dramatically reduces search space
+  country?: string; // Optional - can search globally without country
   region?: string;
   city?: string;
   name?: string;
@@ -424,33 +424,33 @@ export async function searchFsqPlaces(
   offset: number = 0
 ): Promise<{ places: Place[]; total: number }> {
   try {
-    // Country is required for efficient searching
-    if (!filters.country) {
-      console.log("[Supabase] searchFsqPlaces requires country filter");
+    // Name is required for searching
+    if (!filters.name || filters.name.trim().length < 2) {
+      console.log("[Supabase] searchFsqPlaces requires at least 2 characters in name");
       return { places: [], total: 0 };
     }
 
-    // Don't use { count: "exact" } as it's very slow on 104M+ rows
+    // Use the same approach as mobile app - simple ILIKE search with limit
+    // This works because PostgreSQL can efficiently scan and return first N matches
     let query = supabase
       .from("fsq_places_raw")
-      .select("*")
-      .eq("country", filters.country);
+      .select("fsq_place_id, name, latitude, longitude, address, locality, region, country, postcode, tel, website, fsq_category_labels")
+      .ilike("name", `%${filters.name}%`)
+      .is("date_closed", null);
 
-    // Apply optional filters
+    // Apply optional location filters to narrow down results
+    if (filters.country) {
+      query = query.eq("country", filters.country);
+    }
     if (filters.region) {
       query = query.eq("region", filters.region);
     }
     if (filters.city) {
       query = query.ilike("locality", `%${filters.city}%`);
     }
-    if (filters.name) {
-      // Use prefix match for efficient indexed search (name ILIKE 'search%')
-      // This is much faster than contains match on 104M+ rows
-      query = query.ilike("name", `${filters.name}%`);
-    }
 
     const { data, error } = await query
-      .range(offset, offset + limit - 1)
+      .limit(limit)
       .order("name", { ascending: true });
 
     if (error) {
@@ -475,7 +475,7 @@ export async function searchFsqPlaces(
       source: 'fsq',
     }));
 
-    console.log(`[Supabase] searchFsqPlaces found ${places.length} places for country: ${filters.country}`);
+    console.log(`[Supabase] searchFsqPlaces found ${places.length} places for name: ${filters.name}${filters.country ? ` in ${filters.country}` : ''}`);
     // Return -1 for total to indicate we don't know the exact count (too slow to compute on 104M+ rows)
     return { places, total: places.length > 0 ? -1 : 0 };
   } catch (error) {

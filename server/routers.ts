@@ -556,14 +556,14 @@ export const appRouter = router({
       return getDistinctCategories();
     }),
 
-    // Search fsq_places_raw with required country filter (for large dataset)
+    // Search fsq_places_raw - name required, location filters optional
     searchFsq: protectedProcedure
       .input(
         z.object({
-          country: z.string().min(1),
+          name: z.string().min(2), // Required - at least 2 characters
+          country: z.string().optional(),
           region: z.string().optional(),
           city: z.string().optional(),
-          name: z.string().optional(),
           limit: z.number().min(1).max(200).default(50),
           offset: z.number().min(0).default(0),
         })
@@ -571,10 +571,10 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return searchFsqPlaces(
           {
+            name: input.name,
             country: input.country,
             region: input.region,
             city: input.city,
-            name: input.name,
           },
           input.limit,
           input.offset
