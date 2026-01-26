@@ -443,7 +443,9 @@ export async function searchFsqPlaces(
       query = query.ilike("locality", `%${filters.city}%`);
     }
     if (filters.name) {
-      query = query.ilike("name", `%${filters.name}%`);
+      // Use prefix match for efficient indexed search (name ILIKE 'search%')
+      // This is much faster than contains match on 104M+ rows
+      query = query.ilike("name", `${filters.name}%`);
     }
 
     const { data, error, count } = await query
