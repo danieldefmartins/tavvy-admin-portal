@@ -17,7 +17,7 @@ export default function QuickEntry() {
   const [selectedSignals, setSelectedSignals] = useState<Map<string, number>>(new Map());
 
   const { data: places, isLoading: placesLoading, isFetching, error: placesError } = trpc.places.search.useQuery(
-    { query: debouncedQuery, limit: 10 },
+    { query: debouncedQuery, limit: 50 },
     { enabled: debouncedQuery.length >= 2, retry: false }
   );
 
@@ -165,17 +165,20 @@ export default function QuickEntry() {
 
               {/* Search Results */}
               {places && places.length > 0 && (
-                <div className="mt-4 space-y-2">
+                <div className="mt-4 space-y-2 max-h-80 overflow-y-auto">
+                  <p className="text-xs text-muted-foreground mb-2">Found {places.length} results</p>
                   {places.map((place) => (
                     <div
                       key={place.id}
                       onClick={() => handleSelectPlace({ id: place.id, name: place.name })}
                       className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
                     >
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{place.name}</p>
-                        <p className="text-xs text-muted-foreground">{place.city}</p>
+                      <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{place.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {[place.city, place.state, place.country].filter(Boolean).join(", ")}
+                        </p>
                       </div>
                     </div>
                   ))}
