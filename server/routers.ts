@@ -67,6 +67,9 @@ import {
   unblockUser,
   isUserBlocked,
   getUserStats,
+  updateUser,
+  updateUserEmail,
+  deleteUser,
   // Pro Providers Management
   getProProviders,
   getProProviderById,
@@ -1428,6 +1431,40 @@ export const appRouter = router({
     getStats: protectedProcedure.query(async () => {
       return getUserStats();
     }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          userId: z.string(),
+          data: z.object({
+            display_name: z.string().optional(),
+            username: z.string().optional(),
+            bio: z.string().optional(),
+            is_pro: z.boolean().optional(),
+            trusted_contributor: z.boolean().optional(),
+          }),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return updateUser(input.userId, input.data);
+      }),
+
+    updateEmail: protectedProcedure
+      .input(
+        z.object({
+          userId: z.string(),
+          email: z.string().email(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return updateUserEmail(input.userId, input.email);
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ userId: z.string() }))
+      .mutation(async ({ input }) => {
+        return deleteUser(input.userId);
+      }),
   }),
 
   // ============ PRO PROVIDERS MANAGEMENT ============

@@ -1717,8 +1717,21 @@ export interface User {
   last_login_at: string | null;
   // From profiles
   display_name?: string | null;
+  username?: string | null;
   avatar_url?: string | null;
   bio?: string | null;
+  is_pro?: boolean;
+  trusted_contributor?: boolean;
+  subscription_status?: string | null;
+  subscription_plan?: string | null;
+}
+
+export interface UpdateUserData {
+  display_name?: string;
+  username?: string;
+  bio?: string;
+  is_pro?: boolean;
+  trusted_contributor?: boolean;
 }
 
 export interface UserRole {
@@ -1900,6 +1913,81 @@ export async function getUserById(userId: string): Promise<User | null> {
   } catch (error) {
     console.error("[Supabase] Get user by ID error:", error);
     return null;
+  }
+}
+
+// Update user profile data
+export async function updateUser(
+  userId: string,
+  data: UpdateUserData
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        display_name: data.display_name,
+        username: data.username,
+        bio: data.bio,
+        is_pro: data.is_pro,
+        trusted_contributor: data.trusted_contributor,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("[Supabase] Update user error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[Supabase] Update user error:", error);
+    return { success: false, error: "Failed to update user" };
+  }
+}
+
+// Update user email (requires admin auth)
+export async function updateUserEmail(
+  userId: string,
+  newEmail: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Use Supabase Admin API to update auth.users email
+    const { error } = await supabase.auth.admin.updateUserById(userId, {
+      email: newEmail,
+      email_confirm: true, // Auto-confirm the new email
+    });
+
+    if (error) {
+      console.error("[Supabase] Update user email error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[Supabase] Update user email error:", error);
+    return { success: false, error: "Failed to update email" };
+  }
+}
+
+// Delete user (soft delete by deactivating)
+export async function deleteUser(
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Soft delete by setting a flag or you can use hard delete
+    // For now, we'll use Supabase Admin to delete the user
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+
+    if (error) {
+      console.error("[Supabase] Delete user error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[Supabase] Delete user error:", error);
+    return { success: false, error: "Failed to delete user" };
   }
 }
 

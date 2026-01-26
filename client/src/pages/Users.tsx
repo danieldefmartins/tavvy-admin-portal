@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -73,6 +74,8 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Edit,
+  Save,
 } from "lucide-react";
 
 const AVAILABLE_ROLES = [
@@ -99,12 +102,25 @@ export default function Users() {
   const [page, setPage] = useState(0);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [showUserDialog, setShowUserDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [showStrikeDialog, setShowStrikeDialog] = useState(false);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [newRole, setNewRole] = useState("");
   const [strikeReason, setStrikeReason] = useState("");
   const [customStrikeReason, setCustomStrikeReason] = useState("");
+  
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    display_name: "",
+    username: "",
+    email: "",
+    bio: "",
+    is_pro: false,
+    trusted_contributor: false,
+  });
+  
   const limit = 50;
 
   // Queries
@@ -114,7 +130,7 @@ export default function Users() {
     offset: page * limit,
     search: debouncedSearch || undefined,
   });
-  const { data: selectedUser, isLoading: userLoading } = trpc.users.getById.useQuery(
+  const { data: selectedUser, isLoading: userLoading, refetch: refetchSelectedUser } = trpc.users.getById.useQuery(
     { id: selectedUserId! },
     { enabled: !!selectedUserId }
   );
@@ -202,6 +218,42 @@ export default function Users() {
     },
   });
 
+  const updateUserMutation = trpc.users.update.useMutation({
+    onSuccess: () => {
+      toast.success("User updated successfully");
+      refetchSelectedUser();
+      refetchUsers();
+      setShowEditDialog(false);
+    },
+    onError: (error) => {
+      toast.error(`Failed to update user: ${error.message}`);
+    },
+  });
+
+  const updateEmailMutation = trpc.users.updateEmail.useMutation({
+    onSuccess: () => {
+      toast.success("Email updated successfully");
+      refetchSelectedUser();
+      refetchUsers();
+    },
+    onError: (error) => {
+      toast.error(`Failed to update email: ${error.message}`);
+    },
+  });
+
+  const deleteUserMutation = trpc.users.delete.useMutation({
+    onSuccess: () => {
+      toast.success("User deleted successfully");
+      refetchUsers();
+      setShowDeleteDialog(false);
+      setShowUserDialog(false);
+      setSelectedUserId(null);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete user: ${error.message}`);
+    },
+  });
+
   const handleSearch = () => {
     setDebouncedSearch(searchQuery);
     setPage(0);
@@ -216,6 +268,47 @@ export default function Users() {
   const handleViewUser = (userId: string) => {
     setSelectedUserId(userId);
     setShowUserDialog(true);
+  };
+
+  const handleEditUser = (user: any) => {
+    setEditForm({
+      display_name: user.display_name || "",
+      username: user.username || "",
+      email: user.email || "",
+      bio: user.bio || "",
+      is_pro: user.is_pro || false,
+      trusted_contributor: user.trusted_contributor || false,
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleSaveUser = () => {
+    if (!selectedUserId) return;
+    
+    // Update profile data
+    updateUserMutation.mutate({
+      userId: selectedUserId,
+      data: {
+        display_name: editForm.display_name || undefined,
+        username: editForm.username || undefined,
+        bio: editForm.bio || undefined,
+        is_pro: editForm.is_pro,
+        trusted_contributor: editForm.trusted_contributor,
+      },
+    });
+
+    // Update email if changed
+    if (editForm.email && selectedUser?.email !== editForm.email) {
+      updateEmailMutation.mutate({
+        userId: selectedUserId,
+        email: editForm.email,
+      });
+    }
+  };
+
+  const handleDeleteUser = () => {
+    if (!selectedUserId) return;
+    deleteUserMutation.mutate({ userId: selectedUserId });
   };
 
   const handleAddRole = () => {
@@ -278,12 +371,12 @@ export default function Users() {
           </p>
         </div>
         <Button onClick={() => refetchUsers()} variant="outline">
-          <RefreshCw className="mr-2 h-4 w-4" />
+          <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -301,14 +394,14 @@ export default function Users() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Verified Users</CardTitle>
+            <CardTitle className="text-sm font-medium">Pro Users</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold text-green-600">{stats?.verifiedUsers?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold">{stats?.verifiedUsers?.toLocaleString() || 0}</div>
             )}
           </CardContent>
         </Card>
@@ -316,13 +409,13 @@ export default function Users() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Today</CardTitle>
-            <Flame className="h-4 w-4 text-orange-500" />
+            <Calendar className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold text-orange-600">{stats?.activeToday?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold">{stats?.activeToday?.toLocaleString() || 0}</div>
             )}
           </CardContent>
         </Card>
@@ -330,26 +423,31 @@ export default function Users() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">New This Week</CardTitle>
-            <UserPlus className="h-4 w-4 text-blue-500" />
+            <UserPlus className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold text-blue-600">{stats?.newThisWeek?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold">{stats?.newThisWeek?.toLocaleString() || 0}</div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Search and Users List */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-3">
+        <CardHeader>
+          <CardTitle>Users</CardTitle>
+          <CardDescription>Search and manage user accounts</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Search */}
+          <div className="flex gap-2 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by email or phone..."
+                placeholder="Search by name or username..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -358,28 +456,16 @@ export default function Users() {
             </div>
             <Button onClick={handleSearch}>Search</Button>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Users Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Users</CardTitle>
-          <CardDescription>
-            {totalUsers > 0 ? `Showing ${page * limit + 1}-${Math.min((page + 1) * limit, totalUsers)} of ${totalUsers} users` : "No users found"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
           {usersLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
           ) : users.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <UsersIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No users found</p>
+              No users found
             </div>
           ) : (
             <>
@@ -387,10 +473,10 @@ export default function Users() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>User</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Verified</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
-                    <TableHead>Last Login</TableHead>
+                    <TableHead>Last Active</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -401,51 +487,31 @@ export default function Users() {
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
                             {user.avatar_url ? (
-                              <img src={user.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover" />
+                              <img
+                                src={user.avatar_url}
+                                alt={user.display_name || "User"}
+                                className="h-10 w-10 rounded-full object-cover"
+                              />
                             ) : (
                               <UsersIcon className="h-5 w-5 text-muted-foreground" />
                             )}
                           </div>
                           <div>
-                            <p className="font-medium">{user.display_name || "Unnamed User"}</p>
-                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">{user.id}</p>
+                            <p className="font-medium">{user.display_name || "No name"}</p>
+                            <p className="text-sm text-muted-foreground">{user.email || "No email"}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="space-y-1">
-                          {user.email && (
-                            <div className="flex items-center gap-1 text-sm">
-                              <Mail className="h-3 w-3" />
-                              <span className="truncate max-w-[200px]">{user.email}</span>
-                            </div>
-                          )}
-                          {user.phone_e164 && (
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <Phone className="h-3 w-3" />
-                              <span>{user.phone_e164}</span>
-                            </div>
-                          )}
-                        </div>
+                        <span className="text-sm">@{user.username || "—"}</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          {user.is_email_verified && (
-                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
-                              <Mail className="h-3 w-3 mr-1" />
-                              Email
-                            </Badge>
+                          {user.is_pro && (
+                            <Badge variant="default" className="bg-purple-500">Pro</Badge>
                           )}
-                          {user.is_phone_verified && (
-                            <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30">
-                              <Phone className="h-3 w-3 mr-1" />
-                              Phone
-                            </Badge>
-                          )}
-                          {!user.is_email_verified && !user.is_phone_verified && (
-                            <Badge variant="outline" className="text-muted-foreground">
-                              Unverified
-                            </Badge>
+                          {user.trusted_contributor && (
+                            <Badge variant="secondary">Trusted</Badge>
                           )}
                         </div>
                       </TableCell>
@@ -466,6 +532,13 @@ export default function Users() {
                             <DropdownMenuItem onClick={() => handleViewUser(user.id)}>
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedUserId(user.id);
+                              handleEditUser(user);
+                            }}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit User
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -496,6 +569,16 @@ export default function Users() {
                             >
                               <Ban className="h-4 w-4 mr-2" />
                               Block User
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedUserId(user.id);
+                                setShowDeleteDialog(true);
+                              }}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete User
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -542,7 +625,19 @@ export default function Users() {
       <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>User Details</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              <span>User Details</span>
+              {selectedUser && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEditUser(selectedUser)}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+            </DialogTitle>
             <DialogDescription>
               View and manage user information
             </DialogDescription>
@@ -569,6 +664,10 @@ export default function Users() {
                     <p className="font-medium">{selectedUser.display_name || "Not set"}</p>
                   </div>
                   <div>
+                    <Label className="text-muted-foreground">Username</Label>
+                    <p className="font-medium">@{selectedUser.username || "Not set"}</p>
+                  </div>
+                  <div>
                     <Label className="text-muted-foreground">Email</Label>
                     <p className="font-medium">{selectedUser.email || "Not set"}</p>
                   </div>
@@ -581,20 +680,24 @@ export default function Users() {
                     <p className="font-mono text-sm">{selectedUser.id}</p>
                   </div>
                   <div>
+                    <Label className="text-muted-foreground">Bio</Label>
+                    <p className="font-medium">{selectedUser.bio || "Not set"}</p>
+                  </div>
+                  <div>
                     <Label className="text-muted-foreground">Joined</Label>
                     <p className="font-medium">{formatDate(selectedUser.created_at)}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Last Login</Label>
+                    <Label className="text-muted-foreground">Last Active</Label>
                     <p className="font-medium">{formatDate(selectedUser.last_login_at)}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Email Verified</Label>
-                    <p>{selectedUser.is_email_verified ? "Yes" : "No"}</p>
+                    <Label className="text-muted-foreground">Pro Status</Label>
+                    <p>{selectedUser.is_pro ? <Badge className="bg-purple-500">Pro</Badge> : "No"}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Phone Verified</Label>
-                    <p>{selectedUser.is_phone_verified ? "Yes" : "No"}</p>
+                    <Label className="text-muted-foreground">Trusted Contributor</Label>
+                    <p>{selectedUser.trusted_contributor ? <Badge variant="secondary">Yes</Badge> : "No"}</p>
                   </div>
                 </div>
 
@@ -773,6 +876,102 @@ export default function Users() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit User Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user profile information
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="display_name">Display Name</Label>
+              <Input
+                id="display_name"
+                value={editForm.display_name}
+                onChange={(e) => setEditForm({ ...editForm, display_name: e.target.value })}
+                placeholder="Enter display name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                value={editForm.username}
+                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                placeholder="Enter username"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                placeholder="Enter email address"
+              />
+              <p className="text-xs text-muted-foreground">
+                Changing email will update the user's login credentials
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                value={editForm.bio}
+                onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                placeholder="Enter user bio"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="is_pro">Pro Status</Label>
+                <p className="text-xs text-muted-foreground">Grant Pro privileges to this user</p>
+              </div>
+              <Switch
+                id="is_pro"
+                checked={editForm.is_pro}
+                onCheckedChange={(checked) => setEditForm({ ...editForm, is_pro: checked })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="trusted_contributor">Trusted Contributor</Label>
+                <p className="text-xs text-muted-foreground">Mark as trusted contributor</p>
+              </div>
+              <Switch
+                id="trusted_contributor"
+                checked={editForm.trusted_contributor}
+                onCheckedChange={(checked) => setEditForm({ ...editForm, trusted_contributor: checked })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveUser} 
+              disabled={updateUserMutation.isPending || updateEmailMutation.isPending}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {updateUserMutation.isPending || updateEmailMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Role Dialog */}
       <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
         <DialogContent>
@@ -885,6 +1084,27 @@ export default function Users() {
               className="bg-red-600 hover:bg-red-700"
             >
               {blockMutation.isPending ? "Blocking..." : "Block User"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete User Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete this user? This action cannot be undone and will remove all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteUserMutation.isPending ? "Deleting..." : "Delete User"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
