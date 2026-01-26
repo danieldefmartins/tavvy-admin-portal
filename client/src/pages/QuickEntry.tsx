@@ -67,12 +67,14 @@ export default function QuickEntry() {
   // Use advanced search when filters are applied
   const hasFilters = filters.country || filters.state || filters.city;
   
-  const { data: places, isLoading: placesLoading, isFetching } = trpc.places.searchAdvanced.useQuery(
+  const { data: places, isLoading: placesLoading, isFetching } = trpc.places.advancedSearch.useQuery(
     { 
-      name: debouncedQuery || undefined,
-      country: filters.country || undefined,
-      state: filters.state || undefined,
-      city: filters.city || undefined,
+      filters: {
+        name: debouncedQuery || undefined,
+        country: filters.country || undefined,
+        state: filters.state || undefined,
+        city: filters.city || undefined,
+      },
       limit: 20,
       offset: 0,
     },
