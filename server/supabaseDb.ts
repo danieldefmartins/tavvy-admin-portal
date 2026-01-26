@@ -444,7 +444,7 @@ export async function getPlaceById(id: string) {
 export async function getPlacesCount(): Promise<number> {
   try {
     const { count, error } = await supabase
-      .from("fsq_places_raw")
+      .from("places")
       .select("*", { count: "exact", head: true });
 
     if (error) {
