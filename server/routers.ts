@@ -621,7 +621,11 @@ export const appRouter = router({
       .input(z.object({ country: z.string().min(1), region: z.string().optional() }))
       .query(async ({ input }) => {
         return getFsqCities(input.country, input.region);
-    // ============ TAVVY PLACES (User-Generated) ============
+      }),
+  }),
+
+  // ============ TAVVY PLACES (User-Generated) ============
+  tavvyPlaces: router({
     
     // Get tavvy categories for dropdown
     getTavvyCategories: protectedProcedure.query(async () => {
