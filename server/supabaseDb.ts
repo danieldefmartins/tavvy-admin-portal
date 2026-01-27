@@ -172,7 +172,7 @@ export async function searchPlaces(
         const { data: fsqData, error: fsqError } = await supabase
           .from("fsq_places_raw")
           .select("fsq_place_id, name, latitude, longitude, address, locality, region, country, postcode, tel, website, fsq_category_labels")
-          .ilike("name", `%${sanitizedQuery}%`)
+          .or(`name.ilike.%${sanitizedQuery}%,fsq_category_labels.ilike.%${sanitizedQuery}%`)
           .is("date_closed", null)
           .limit(limit - placesFromPlacesTable.length);
         const duration = Date.now() - startTime;
@@ -182,6 +182,14 @@ export async function searchPlaces(
           console.error("[Supabase] fsq_places_raw search error:", fsqError);
         } else if (fsqData) {
           // Filter out duplicates and map to Place interface
+          // Helper to extract main category only
+          const getMainCategory = (categoryLabels: string | null): string => {
+            if (!categoryLabels) return '';
+            const firstCategory = categoryLabels.split(',')[0].trim();
+            const mainCategory = firstCategory.split('>')[0].trim();
+            return mainCategory;
+          };
+
           placesFromFsqRaw = (fsqData || [])
             .filter((p: any) => !existingIds.has(p.fsq_place_id))
             .map((p: any) => ({
@@ -196,7 +204,7 @@ export async function searchPlaces(
               lng: p.longitude,
               phone: p.tel,
               website: p.website,
-              category: p.fsq_category_labels,
+              category: getMainCategory(p.fsq_category_labels),
               source: 'fsq',
             }));
           console.log(`[Supabase] Found ${fsqData.length} from fsq_raw, ${placesFromFsqRaw.length} after dedup`);
@@ -731,7 +739,7 @@ export async function searchFsqPlaces(
     let query = supabase
       .from("fsq_places_raw")
       .select("fsq_place_id, name, latitude, longitude, address, locality, region, country, postcode, tel, website, fsq_category_labels")
-      .ilike("name", `%${filters.name}%`)
+      .or(`name.ilike.%${filters.name}%,fsq_category_labels.ilike.%${filters.name}%`)
       .is("date_closed", null);
 
     // Apply optional location filters to narrow down results
@@ -754,6 +762,15 @@ export async function searchFsqPlaces(
       return { places: [], total: 0 };
     }
 
+    // Helper function to extract main category only
+    const getMainCategory = (categoryLabels: string | null): string => {
+      if (!categoryLabels) return '';
+      // Split by comma to get first category, then split by > to get main category
+      const firstCategory = categoryLabels.split(',')[0].trim();
+      const mainCategory = firstCategory.split('>')[0].trim();
+      return mainCategory;
+    };
+
     // Map fsq_places_raw to Place interface
     const places: Place[] = (data || []).map((p: any) => ({
       id: p.fsq_place_id || p.id,
@@ -767,7 +784,7 @@ export async function searchFsqPlaces(
       lng: p.longitude,
       phone: p.tel,
       website: p.website,
-      category: p.fsq_category_labels,
+      category: getMainCategory(p.fsq_category_labels),
       source: 'fsq',
     }));
 
