@@ -63,17 +63,23 @@ export async function searchPlaces(
   limit: number = 50,
   offset: number = 0
 ): Promise<Place[]> {
+  const FALLBACK_THRESHOLD = 10; // If places table returns less than this, search fsq_places_raw
+  let placesFromPlacesTable: Place[] = [];
+  let placesFromFsqRaw: Place[] = [];
+
   try {
     // Sanitize query: escape special characters that could break filter parsing
     const sanitizedQuery = query
       .replace(/[%_\\]/g, '\\$&')  // Escape SQL LIKE wildcards
       .trim();
     
-    if (!sanitizedQuery) {
+    if (!sanitizedQuery || sanitizedQuery.length < 2) {
       return [];
     }
 
-    // Search in places table with sanitized query
+    // ============================================
+    // STEP 1: Search places table first (canonical data)
+    // ============================================
     const { data: placesData, error: placesError } = await supabase
       .from("places")
       .select("*")
@@ -83,33 +89,79 @@ export async function searchPlaces(
 
     if (placesError) {
       console.error("[Supabase] Search places error:", placesError);
-      return [];
+    } else {
+      placesFromPlacesTable = (placesData || []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        address: p.street,
+        city: p.city,
+        state: p.region,
+        country: p.country,
+        postal_code: p.postcode,
+        lat: p.latitude,
+        lng: p.longitude,
+        phone: p.phone,
+        website: p.website,
+        category: p.tavvy_category,
+        subcategory: p.tavvy_subcategory,
+        source: p.source_type || 'tavvy',
+        cover_image_url: p.cover_image_url,
+        photos: p.photos,
+        status: p.status,
+        is_active: p.is_active,
+      }));
+      console.log(`[Supabase] Found ${placesFromPlacesTable.length} places from places table`);
     }
 
-    // Map to Place interface
-    const places: Place[] = (placesData || []).map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      address: p.street,
-      city: p.city,
-      state: p.region,
-      country: p.country,
-      postal_code: p.postcode,
-      lat: p.latitude,
-      lng: p.longitude,
-      phone: p.phone,
-      website: p.website,
-      category: p.tavvy_category,
-      subcategory: p.tavvy_subcategory,
-      source: p.source_type || 'tavvy',
-      cover_image_url: p.cover_image_url,
-      photos: p.photos,
-      status: p.status,
-      is_active: p.is_active,
-    }));
+    // ============================================
+    // STEP 2: If not enough results, search fsq_places_raw as fallback
+    // ============================================
+    if (placesFromPlacesTable.length < FALLBACK_THRESHOLD) {
+      console.log(`[Supabase] Fallback triggered: ${placesFromPlacesTable.length} < ${FALLBACK_THRESHOLD} threshold`);
+      
+      // Get existing IDs to avoid duplicates
+      const existingIds = new Set(placesFromPlacesTable.map(p => p.id));
+      
+      // Search fsq_places_raw using the same simple approach as mobile app
+      const { data: fsqData, error: fsqError } = await supabase
+        .from("fsq_places_raw")
+        .select("fsq_place_id, name, latitude, longitude, address, locality, region, country, postcode, tel, website, fsq_category_labels")
+        .ilike("name", `%${query}%`)
+        .is("date_closed", null)
+        .limit(limit - placesFromPlacesTable.length)
+        .order("name", { ascending: true });
 
-    console.log(`[Supabase] Found ${places.length} places for query: ${query}`);
-    return places;
+      if (fsqError) {
+        console.error("[Supabase] fsq_places_raw search error:", fsqError);
+      } else if (fsqData) {
+        // Filter out duplicates and map to Place interface
+        placesFromFsqRaw = (fsqData || [])
+          .filter((p: any) => !existingIds.has(p.fsq_place_id))
+          .map((p: any) => ({
+            id: p.fsq_place_id,
+            name: p.name,
+            address: p.address,
+            city: p.locality,
+            state: p.region,
+            country: p.country,
+            postal_code: p.postcode,
+            lat: p.latitude,
+            lng: p.longitude,
+            phone: p.tel,
+            website: p.website,
+            category: p.fsq_category_labels,
+            source: 'fsq',
+          }));
+        console.log(`[Supabase] Found ${fsqData.length} from fsq_raw, ${placesFromFsqRaw.length} after dedup`);
+      }
+    }
+
+    // ============================================
+    // STEP 3: Merge results
+    // ============================================
+    const allPlaces = [...placesFromPlacesTable, ...placesFromFsqRaw];
+    console.log(`[Supabase] Total: ${allPlaces.length} places (${placesFromPlacesTable.length} from places, ${placesFromFsqRaw.length} from fsq_raw)`);
+    return allPlaces;
   } catch (error) {
     console.error("[Supabase] Search places error:", error);
     return [];
