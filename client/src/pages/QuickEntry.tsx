@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRegionsForCountry, hasRegionMapping } from "@/lib/regionMappings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -81,9 +82,6 @@ const countryNames: Record<string, string> = {
 };
 
 const getCountryName = (code: string) => countryNames[code] || code;
-
-// Import region mappings
-import { getRegionsForCountry, hasRegionMapping } from "@/lib/regionMappings";
 
 export default function QuickEntry() {
   // Location filter state
