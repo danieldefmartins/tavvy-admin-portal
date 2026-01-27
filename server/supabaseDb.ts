@@ -503,7 +503,8 @@ export async function searchPlacesAdvanced(
         };
         const stateCode = stateNameToCode[filters.state] || filters.state;
         console.log(`[Supabase] State filter: "${filters.state}" → "${stateCode}"`);
-        fsqQuery = fsqQuery.eq("region", stateCode);
+        // Use ilike for more forgiving matching (handles case sensitivity and partial matches)
+        fsqQuery = fsqQuery.ilike("region", `%${stateCode}%`);
       }
       if (filters.city) {
         console.log(`[Supabase] City filter: "${filters.city}"`);
