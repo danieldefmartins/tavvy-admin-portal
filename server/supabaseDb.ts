@@ -63,8 +63,9 @@ export async function searchPlaces(
   limit: number = 50,
   offset: number = 0
 ): Promise<Place[]> {
-  const FALLBACK_THRESHOLD = 10; // If places table returns less than this, search fsq_places_raw
+  // Admin portal searches ALL 3 tables for complete coverage
   let placesFromPlacesTable: Place[] = [];
+  let placesFromTavvyPlaces: Place[] = [];
   let placesFromFsqRaw: Place[] = [];
 
   try {
@@ -114,14 +115,55 @@ export async function searchPlaces(
     }
 
     // ============================================
-    // STEP 2: If not enough results, search fsq_places_raw as fallback
+    // STEP 2: Search tavvy_places table (Tavvy-created places)
     // ============================================
-    if (placesFromPlacesTable.length < FALLBACK_THRESHOLD) {
-      console.log(`[Supabase] Fallback triggered: ${placesFromPlacesTable.length} < ${FALLBACK_THRESHOLD} threshold, searching fsq_places_raw for: ${sanitizedQuery}`);
+    try {
+      const { data: tavvyData, error: tavvyError } = await supabase
+        .from("tavvy_places")
+        .select("*")
+        .or(`name.ilike.%${sanitizedQuery}%,city.ilike.%${sanitizedQuery}%,address.ilike.%${sanitizedQuery}%`)
+        .is("is_deleted", false)
+        .limit(limit)
+        .order("name", { ascending: true });
+
+      if (tavvyError) {
+        console.error("[Supabase] Search tavvy_places error:", tavvyError);
+      } else {
+        placesFromTavvyPlaces = (tavvyData || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          address: p.address || p.address_line1,
+          city: p.city,
+          state: p.region,
+          country: p.country,
+          postal_code: p.postcode,
+          lat: p.latitude,
+          lng: p.longitude,
+          phone: p.phone,
+          website: p.website,
+          category: p.tavvy_category,
+          subcategory: p.tavvy_subcategory,
+          source: 'tavvy',
+          cover_image_url: p.cover_image_url,
+          photos: p.photos,
+        }));
+        console.log(`[Supabase] Found ${placesFromTavvyPlaces.length} places from tavvy_places table`);
+      }
+    } catch (tavvyError: any) {
+      console.error("[Supabase] tavvy_places search caught error:", tavvyError?.message || tavvyError);
+    }
+
+    // ============================================
+    // STEP 3: Search fsq_places_raw (full Foursquare dataset)
+    // ============================================
+    console.log(`[Supabase] Searching fsq_places_raw for: ${sanitizedQuery}`);
       
-      try {
-        // Get existing IDs to avoid duplicates
-        const existingIds = new Set(placesFromPlacesTable.map(p => p.id));
+    try {
+        // Get existing IDs to avoid duplicates from all sources
+        const existingIds = new Set([
+          ...placesFromPlacesTable.map(p => p.id),
+          ...placesFromTavvyPlaces.map(p => p.id)
+        ]);
         
         // Search fsq_places_raw using the same simple approach as mobile app
         // NOTE: No .order() to avoid slow sorting on 104M+ rows
@@ -164,10 +206,10 @@ export async function searchPlaces(
     }
 
     // ============================================
-    // STEP 3: Merge results
+    // STEP 4: Merge results from all 3 tables
     // ============================================
-    const allPlaces = [...placesFromPlacesTable, ...placesFromFsqRaw];
-    console.log(`[Supabase] Total: ${allPlaces.length} places (${placesFromPlacesTable.length} from places, ${placesFromFsqRaw.length} from fsq_raw)`);
+    const allPlaces = [...placesFromPlacesTable, ...placesFromTavvyPlaces, ...placesFromFsqRaw];
+    console.log(`[Supabase] Total: ${allPlaces.length} places (${placesFromPlacesTable.length} from places, ${placesFromTavvyPlaces.length} from tavvy_places, ${placesFromFsqRaw.length} from fsq_raw)`);
     return allPlaces;
   } catch (error) {
     console.error("[Supabase] Search places error:", error);
@@ -190,8 +232,9 @@ export async function searchPlacesAdvanced(
   limit: number = 50,
   offset: number = 0
 ): Promise<{ places: Place[]; total: number }> {
-  const FALLBACK_THRESHOLD = 10; // If places table returns less than this, search fsq_places_raw
+  // Admin portal searches ALL 3 tables for complete coverage
   let placesFromPlacesTable: Place[] = [];
+  let placesFromTavvyPlaces: Place[] = [];
   let placesFromFsqRaw: Place[] = [];
   let totalFromPlaces = 0;
 
@@ -277,13 +320,76 @@ export async function searchPlacesAdvanced(
     }
 
     // ============================================
-    // STEP 2: If not enough results, search fsq_places_raw as fallback
+    // STEP 2: Search tavvy_places table (Tavvy-created places)
     // ============================================
-    if (placesFromPlacesTable.length < FALLBACK_THRESHOLD && filters.name && filters.name.length >= 2) {
-      console.log(`[Supabase] Fallback triggered: ${placesFromPlacesTable.length} < ${FALLBACK_THRESHOLD} threshold`);
+    try {
+      let tavvyQuery = supabase
+        .from("tavvy_places")
+        .select("*")
+        .is("is_deleted", false);
+
+      // Apply filters
+      if (filters.name) {
+        tavvyQuery = tavvyQuery.ilike("name", `%${filters.name}%`);
+      }
+      if (filters.address) {
+        tavvyQuery = tavvyQuery.or(`address.ilike.%${filters.address}%,address_line1.ilike.%${filters.address}%`);
+      }
+      if (filters.city) {
+        tavvyQuery = tavvyQuery.ilike("city", `%${filters.city}%`);
+      }
+      if (filters.state) {
+        tavvyQuery = tavvyQuery.eq("region", filters.state);
+      }
+      if (filters.country) {
+        tavvyQuery = tavvyQuery.eq("country", filters.country);
+      }
+      if (filters.category) {
+        tavvyQuery = tavvyQuery.ilike("tavvy_category", `%${filters.category}%`);
+      }
+
+      const { data: tavvyData, error: tavvyError } = await tavvyQuery
+        .limit(limit)
+        .order("name", { ascending: true });
+
+      if (tavvyError) {
+        console.error("[Supabase] Search tavvy_places error:", tavvyError);
+      } else {
+        placesFromTavvyPlaces = (tavvyData || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          address: p.address || p.address_line1,
+          city: p.city,
+          state: p.region,
+          country: p.country,
+          postal_code: p.postcode,
+          lat: p.latitude,
+          lng: p.longitude,
+          phone: p.phone,
+          website: p.website,
+          category: p.tavvy_category,
+          subcategory: p.tavvy_subcategory,
+          source: 'tavvy',
+          cover_image_url: p.cover_image_url,
+          photos: p.photos,
+        }));
+        console.log(`[Supabase] Found ${placesFromTavvyPlaces.length} places from tavvy_places table`);
+      }
+    } catch (tavvyError: any) {
+      console.error("[Supabase] tavvy_places search caught error:", tavvyError?.message || tavvyError);
+    }
+
+    // ============================================
+    // STEP 3: Search fsq_places_raw (full Foursquare dataset)
+    // ============================================
+    if (filters.name && filters.name.length >= 2) {
+      console.log(`[Supabase] Searching fsq_places_raw for advanced filters`);
       
-      // Get existing IDs to avoid duplicates
-      const existingIds = new Set(placesFromPlacesTable.map(p => p.id));
+      // Get existing IDs to avoid duplicates from all sources
+      const existingIds = new Set([
+        ...placesFromPlacesTable.map(p => p.id),
+        ...placesFromTavvyPlaces.map(p => p.id)
+      ]);
       
       // Search fsq_places_raw using the same simple approach as mobile app
       let fsqQuery = supabase
@@ -337,14 +443,14 @@ export async function searchPlacesAdvanced(
     }
 
     // ============================================
-    // STEP 3: Merge results
+    // STEP 4: Merge results from all 3 tables
     // ============================================
-    const allPlaces = [...placesFromPlacesTable, ...placesFromFsqRaw];
+    const allPlaces = [...placesFromPlacesTable, ...placesFromTavvyPlaces, ...placesFromFsqRaw];
     
-    // Total is -1 if we used fsq_raw fallback (can't count efficiently)
+    // Total is -1 if we used fsq_raw (can't count efficiently)
     const total = placesFromFsqRaw.length > 0 ? -1 : totalFromPlaces;
     
-    console.log(`[Supabase] Advanced search total: ${allPlaces.length} places (${placesFromPlacesTable.length} from places, ${placesFromFsqRaw.length} from fsq_raw)`);
+    console.log(`[Supabase] Advanced search total: ${allPlaces.length} places (${placesFromPlacesTable.length} from places, ${placesFromTavvyPlaces.length} from tavvy_places, ${placesFromFsqRaw.length} from fsq_raw)`);
     return { places: allPlaces, total };
   } catch (error) {
     console.error("[Supabase] Advanced search places error:", error);
