@@ -203,7 +203,6 @@ export async function searchPlaces(
       } catch (fsqCatchError: any) {
         console.error("[Supabase] fsq_places_raw search caught error:", fsqCatchError?.message || fsqCatchError);
       }
-    }
 
     // ============================================
     // STEP 4: Merge results from all 3 tables
@@ -830,16 +829,43 @@ export async function getPlaceById(id: string) {
 
 export async function getPlacesCount(): Promise<number> {
   try {
-    const { count, error } = await supabase
+    // Count from all 3 tables for admin portal
+    let totalCount = 0;
+    
+    // Count places table
+    const { count: placesCount, error: placesError } = await supabase
       .from("places")
       .select("*", { count: "exact", head: true });
-
-    if (error) {
-      console.error("[Supabase] Get places count error:", error);
-      return 0;
+    if (placesError) {
+      console.error("[Supabase] Get places count error:", placesError);
+    } else {
+      totalCount += placesCount || 0;
     }
-
-    return count || 0;
+    
+    // Count tavvy_places table
+    const { count: tavvyCount, error: tavvyError } = await supabase
+      .from("tavvy_places")
+      .select("*", { count: "exact", head: true })
+      .is("is_deleted", false);
+    if (tavvyError) {
+      console.error("[Supabase] Get tavvy_places count error:", tavvyError);
+    } else {
+      totalCount += tavvyCount || 0;
+    }
+    
+    // Count fsq_places_raw table (this might be slow, but it's for dashboard display)
+    const { count: fsqCount, error: fsqError } = await supabase
+      .from("fsq_places_raw")
+      .select("*", { count: "exact", head: true })
+      .is("date_closed", null);
+    if (fsqError) {
+      console.error("[Supabase] Get fsq_places_raw count error:", fsqError);
+    } else {
+      totalCount += fsqCount || 0;
+    }
+    
+    console.log(`[Supabase] Total places count: ${totalCount} (places: ${placesCount}, tavvy: ${tavvyCount}, fsq: ${fsqCount})`);
+    return totalCount;
   } catch (error) {
     console.error("[Supabase] Get places count error:", error);
     return 0;
