@@ -444,7 +444,12 @@ export async function searchPlacesAdvanced(
     // ============================================
     // STEP 3: Search fsq_places_raw (full Foursquare dataset)
     // ============================================
-    if (filters.name && filters.name.length >= 2) {
+    // Allow search with name OR category OR location filters
+    const hasNameFilter = filters.name && filters.name.length >= 2;
+    const hasCategoryFilter = filters.category && filters.category.length > 0;
+    const hasLocationFilter = filters.country || filters.state || filters.city;
+    
+    if (hasNameFilter || hasCategoryFilter || hasLocationFilter) {
       console.log(`[Supabase] Searching fsq_places_raw for advanced filters`);
       
       // Get existing IDs to avoid duplicates from all sources
@@ -457,8 +462,17 @@ export async function searchPlacesAdvanced(
       let fsqQuery = supabase
         .from("fsq_places_raw")
         .select("fsq_place_id, name, latitude, longitude, address, locality, region, country, postcode, tel, website, fsq_category_labels")
-        .ilike("name", `%${filters.name}%`)
         .is("date_closed", null);
+      
+      // Apply name filter if provided
+      if (filters.name && filters.name.length >= 2) {
+        fsqQuery = fsqQuery.or(`name.ilike.%${filters.name}%,fsq_category_labels.ilike.%${filters.name}%`);
+      }
+      
+      // Apply category filter if provided
+      if (filters.category && filters.category.length > 0) {
+        fsqQuery = fsqQuery.ilike("fsq_category_labels", `%${filters.category}%`);
+      }
 
       // Apply location filters if provided
       if (filters.country) {
