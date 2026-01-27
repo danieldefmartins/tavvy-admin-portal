@@ -5,10 +5,22 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY!;
 
 // Admin client with service role key (for server-side operations)
+// Increased timeout for large table queries (fsq_places_raw has 104M+ rows)
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
+  },
+  global: {
+    fetch: (url, options = {}) => {
+      return fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(60000), // 60 second timeout
+      });
+    },
+  },
+  db: {
+    schema: 'public',
   },
 });
 
