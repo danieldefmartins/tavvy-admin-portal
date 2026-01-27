@@ -63,10 +63,11 @@ export async function searchPlaces(
   limit: number = 50,
   offset: number = 0
 ): Promise<Place[]> {
-  // Admin portal searches ALL 3 tables for complete coverage
+  // Admin portal searches ALL 4 tables for complete coverage
   let placesFromPlacesTable: Place[] = [];
   let placesFromTavvyPlaces: Place[] = [];
   let placesFromFsqRaw: Place[] = [];
+  let placesFromNrel: Place[] = [];
 
   try {
     // Sanitize query: escape special characters that could break filter parsing
@@ -205,10 +206,63 @@ export async function searchPlaces(
       }
 
     // ============================================
-    // STEP 4: Merge results from all 3 tables
+    // STEP 4: Search nrel_ev_stations (EV charging stations)
     // ============================================
-    const allPlaces = [...placesFromPlacesTable, ...placesFromTavvyPlaces, ...placesFromFsqRaw];
-    console.log(`[Supabase] Total: ${allPlaces.length} places (${placesFromPlacesTable.length} from places, ${placesFromTavvyPlaces.length} from tavvy_places, ${placesFromFsqRaw.length} from fsq_raw)`);
+    console.log(`[Supabase] Searching nrel_ev_stations for: ${sanitizedQuery}`);
+    
+    try {
+      // Get existing IDs to avoid duplicates
+      const existingIds = new Set([
+        ...placesFromPlacesTable.map(p => p.id),
+        ...placesFromTavvyPlaces.map(p => p.id),
+        ...placesFromFsqRaw.map(p => p.id)
+      ]);
+      
+      const startTime = Date.now();
+      const { data: nrelData, error: nrelError } = await supabase
+        .from("nrel_ev_stations")
+        .select("id, station_name, street_address, city, state, country, zip, latitude, longitude, station_phone, ev_network, ev_network_web, ev_connector_types, ev_dc_fast_num, ev_level2_evse_num, ev_pricing, facility_type, status_code, tavvy_rating, tavvy_review_count")
+        .or(`station_name.ilike.%${sanitizedQuery}%,city.ilike.%${sanitizedQuery}%,ev_network.ilike.%${sanitizedQuery}%`)
+        .eq("is_active", true)
+        .eq("status_code", "E") // E = Available
+        .limit(limit)
+        .order("station_name", { ascending: true });
+      
+      const duration = Date.now() - startTime;
+      console.log(`[Supabase] nrel_ev_stations query took ${duration}ms`);
+      
+      if (nrelError) {
+        console.error("[Supabase] nrel_ev_stations search error:", nrelError);
+      } else if (nrelData) {
+        placesFromNrel = (nrelData || [])
+          .filter((p: any) => !existingIds.has(p.id))
+          .map((p: any) => ({
+            id: p.id,
+            name: p.station_name,
+            address: p.street_address,
+            city: p.city,
+            state: p.state,
+            country: p.country || 'US',
+            postal_code: p.zip,
+            lat: p.latitude,
+            lng: p.longitude,
+            phone: p.station_phone,
+            website: p.ev_network_web,
+            category: 'EV Charging',
+            subcategory: p.ev_network || 'EV Charging Station',
+            source: 'nrel',
+          }));
+        console.log(`[Supabase] Found ${nrelData.length} from nrel_ev_stations, ${placesFromNrel.length} after dedup`);
+      }
+    } catch (nrelCatchError: any) {
+      console.error("[Supabase] nrel_ev_stations search caught error:", nrelCatchError?.message || nrelCatchError);
+    }
+
+    // ============================================
+    // STEP 5: Merge results from all 4 tables
+    // ============================================
+    const allPlaces = [...placesFromPlacesTable, ...placesFromTavvyPlaces, ...placesFromFsqRaw, ...placesFromNrel];
+    console.log(`[Supabase] Total: ${allPlaces.length} places (${placesFromPlacesTable.length} from places, ${placesFromTavvyPlaces.length} from tavvy_places, ${placesFromFsqRaw.length} from fsq_raw, ${placesFromNrel.length} from nrel)`);
     return allPlaces;
   } catch (error) {
     console.error("[Supabase] Search places error:", error);
@@ -231,10 +285,11 @@ export async function searchPlacesAdvanced(
   limit: number = 50,
   offset: number = 0
 ): Promise<{ places: Place[]; total: number }> {
-  // Admin portal searches ALL 3 tables for complete coverage
+  // Admin portal searches ALL 4 tables for complete coverage
   let placesFromPlacesTable: Place[] = [];
   let placesFromTavvyPlaces: Place[] = [];
   let placesFromFsqRaw: Place[] = [];
+  let placesFromNrel: Place[] = [];
   let totalFromPlaces = 0;
 
   try {
@@ -829,7 +884,7 @@ export async function getPlaceById(id: string) {
 
 export async function getPlacesCount(): Promise<number> {
   try {
-    // Count from all 3 tables for admin portal
+    // Count from all 4 tables for admin portal
     let totalCount = 0;
     
     // Count places table
@@ -864,7 +919,19 @@ export async function getPlacesCount(): Promise<number> {
       totalCount += fsqCount || 0;
     }
     
-    console.log(`[Supabase] Total places count: ${totalCount} (places: ${placesCount}, tavvy: ${tavvyCount}, fsq: ${fsqCount})`);
+    // Count nrel_ev_stations table
+    const { count: nrelCount, error: nrelError } = await supabase
+      .from("nrel_ev_stations")
+      .select("*", { count: "exact", head: true })
+      .eq("is_active", true)
+      .eq("status_code", "E"); // E = Available
+    if (nrelError) {
+      console.error("[Supabase] Get nrel_ev_stations count error:", nrelError);
+    } else {
+      totalCount += nrelCount || 0;
+    }
+    
+    console.log(`[Supabase] Total places count: ${totalCount} (places: ${placesCount}, tavvy: ${tavvyCount}, fsq: ${fsqCount}, nrel: ${nrelCount})`);
     return totalCount;
   } catch (error) {
     console.error("[Supabase] Get places count error:", error);
