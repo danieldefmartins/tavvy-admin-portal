@@ -503,12 +503,13 @@ export async function searchPlacesAdvanced(
         };
         const stateCode = stateNameToCode[filters.state] || filters.state;
         console.log(`[Supabase] State filter: "${filters.state}" → "${stateCode}"`);
-        // Use ilike for more forgiving matching (handles case sensitivity and partial matches)
-        fsqQuery = fsqQuery.ilike("region", `%${stateCode}%`);
+        // Use exact match for state code
+        fsqQuery = fsqQuery.eq("region", stateCode);
       }
       if (filters.city) {
         console.log(`[Supabase] City filter: "${filters.city}"`);
-        fsqQuery = fsqQuery.ilike("locality", `%${filters.city}%`);
+        // Use exact match for city (case-insensitive)
+        fsqQuery = fsqQuery.ilike("locality", filters.city);
       }
 
       // NOTE: No .order() to avoid slow sorting on 104M+ rows
