@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,20 +82,8 @@ const countryNames: Record<string, string> = {
 
 const getCountryName = (code: string) => countryNames[code] || code;
 
-// US States mapping
-const US_STATES = [
-  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
-  "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
-  "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
-  "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
-  "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
-  "New Hampshire", "New Jersey", "New Mexico", "New York",
-  "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
-  "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
-  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
-  "West Virginia", "Wisconsin", "Wyoming", "District of Columbia",
-  "Puerto Rico", "Guam", "US Virgin Islands"
-];
+// Import region mappings
+import { getRegionsForCountry, hasRegionMapping } from "@/lib/regionMappings";
 
 export default function QuickEntry() {
   // Location filter state
@@ -119,17 +107,23 @@ export default function QuickEntry() {
   // Fetch countries from lookup table
   const { data: countries } = trpc.places.getCountries.useQuery();
 
-  // Fetch regions when country is selected
+  // Fetch regions when country is selected (only if no mapping exists)
   const { data: fsqRegions, isLoading: regionsLoading } = trpc.places.getFsqRegions.useQuery(
     { country: selectedCountry },
-    { enabled: !!selectedCountry && selectedCountry !== "US" }
+    { enabled: !!selectedCountry && !hasRegionMapping(selectedCountry) }
   );
 
-  // Use US states for US, otherwise use fsq regions
+  // Use region mappings for countries with clean data, otherwise use fsq regions
   const regions = useMemo(() => {
-    if (selectedCountry === "US") {
-      return US_STATES;
+    if (!selectedCountry) return [];
+    
+    // Check if we have a clean mapping for this country
+    const mappedRegions = getRegionsForCountry(selectedCountry);
+    if (mappedRegions) {
+      return mappedRegions;
     }
+    
+    // Fall back to database regions for countries without mappings
     return fsqRegions || [];
   }, [selectedCountry, fsqRegions]);
 
@@ -139,24 +133,59 @@ export default function QuickEntry() {
     { enabled: !!selectedCountry }
   );
 
-  // Search places using fsq_places_raw - name is required, location filters are optional
+  // Search places using fsq_places_raw with infinite scroll
   // This uses the same approach as the mobile app for fast searching
-  const { data: fsqPlacesResult, isLoading: fsqLoading, isFetching: fsqFetching } = trpc.places.searchFsq.useQuery(
+  const { 
+    data: fsqPlacesResult, 
+    isLoading: fsqLoading, 
+    isFetching: fsqFetching,
+    fetchNextPage: fetchNextFsqPage,
+    hasNextPage: hasNextFsqPage,
+    isFetchingNextPage: isFetchingNextFsqPage
+  } = trpc.places.searchFsq.useInfiniteQuery(
     { 
       name: debouncedQuery,
       country: selectedCountry || undefined, 
       region: selectedRegion || undefined,
       city: citySearch || undefined,
-      limit: 50 
+      limit: 100 
     },
-    { enabled: debouncedQuery.length >= 2 }
+    { 
+      enabled: debouncedQuery.length >= 2,
+      getNextPageParam: (lastPage, allPages) => {
+        // If the last page has fewer results than the limit, we've reached the end
+        if (lastPage.places.length < 100) return undefined;
+        // Otherwise, return the next offset
+        return allPages.length * 100;
+      },
+    }
   );
 
   // Keep simple search as additional fallback (searches places table)
   const { data: simplePlaces, isLoading: simpleLoading, isFetching: simpleFetching } = trpc.places.search.useQuery(
-    { query: debouncedQuery, limit: 50 },
+    { query: debouncedQuery, limit: 100 },
     { enabled: debouncedQuery.length >= 2 }
   );
+
+  // Ref for infinite scroll observer
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Set up intersection observer for infinite scroll
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasNextFsqPage || isFetchingNextFsqPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextFsqPage && !isFetchingNextFsqPage) {
+          fetchNextFsqPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextFsqPage, isFetchingNextFsqPage, fetchNextFsqPage]);
 
   const { data: allSignalDefs, error: signalsError } = trpc.signals.getAll.useQuery();
 
@@ -255,7 +284,8 @@ export default function QuickEntry() {
   };
 
   // Combine results from both fsq and simple search, deduplicated
-  const fsqPlaces = fsqPlacesResult?.places || [];
+  // Flatten all pages from infinite query
+  const fsqPlaces = fsqPlacesResult?.pages.flatMap(page => page.places) || [];
   const simplePlacesData = simplePlaces || [];
   
   // Merge and deduplicate by id
@@ -550,7 +580,7 @@ export default function QuickEntry() {
               {places && places.length > 0 && (
                 <div className="mt-4 space-y-2 max-h-80 overflow-y-auto">
                   <p className="text-xs text-muted-foreground mb-2">
-                    Found {places.length} results{totalCount > places.length ? ` (showing ${places.length} of ${totalCount})` : ''}
+                    Found {places.length} results{hasNextFsqPage ? ' (scroll to load more)' : ''}
                   </p>
                   {places.map((place) => (
                     <div
@@ -567,6 +597,15 @@ export default function QuickEntry() {
                       </div>
                     </div>
                   ))}
+                  
+                  {/* Infinite scroll trigger */}
+                  {hasNextFsqPage && (
+                    <div ref={loadMoreRef} className="flex items-center justify-center py-4">
+                      {isFetchingNextFsqPage && (
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
