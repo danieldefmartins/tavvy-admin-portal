@@ -228,7 +228,15 @@ async function isUserSuperAdmin(userId: string): Promise<boolean> {
   }
 }
 
+// Version for deployment verification
+const BUILD_VERSION = '2026-01-26-fsq-search-fix';
+
 export const appRouter = router({
+  // Version endpoint for deployment verification
+  version: publicProcedure.query(() => {
+    return { version: BUILD_VERSION, timestamp: new Date().toISOString() };
+  }),
+
   // Auth router - Login only, super admin restricted
   auth: router({
     me: publicProcedure.query(async ({ ctx }) => {
