@@ -908,16 +908,25 @@ export async function getPlacesCount(): Promise<number> {
       totalCount += tavvyCount || 0;
     }
     
-    // Count fsq_places_raw table (this might be slow, but it's for dashboard display)
-    const { count: fsqCount, error: fsqError } = await supabase
-      .from("fsq_places_raw")
-      .select("*", { count: "exact", head: true })
-      .is("date_closed", null);
-    if (fsqError) {
-      console.error("[Supabase] Get fsq_places_raw count error:", fsqError);
-    } else {
-      totalCount += fsqCount || 0;
+    // Count fsq_places_raw table using estimated count (104M records - exact count would timeout)
+    // Use PostgreSQL's reltuples for instant estimate
+    let fsqCount = 0;
+    try {
+      const { data: fsqEstimate, error: fsqError } = await supabase.rpc('get_table_estimate', {
+        table_name: 'fsq_places_raw'
+      });
+      if (fsqError) {
+        console.error("[Supabase] Get fsq_places_raw estimate error:", fsqError);
+        // Fallback to hardcoded estimate if function doesn't exist
+        fsqCount = 104000000; // 104M estimate
+      } else {
+        fsqCount = fsqEstimate || 104000000;
+      }
+    } catch (fsqCatchError) {
+      console.error("[Supabase] fsq_places_raw count caught error:", fsqCatchError);
+      fsqCount = 104000000; // 104M fallback estimate
     }
+    totalCount += fsqCount;
     
     // Count nrel_ev_stations table
     const { count: nrelCount, error: nrelError } = await supabase
