@@ -746,8 +746,8 @@ export async function searchFsqPlaces(
     }
 
     const { data, error } = await query
-      .limit(limit)
-      .order("name", { ascending: true });
+      .order("name", { ascending: true })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       console.error("[Supabase] searchFsqPlaces error:", error);
