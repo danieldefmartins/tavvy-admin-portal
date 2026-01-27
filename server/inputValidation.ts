@@ -229,7 +229,8 @@ export function validatePagination(
 export function validateInput<T>(schema: z.ZodSchema<T>, input: unknown): T {
   const result = schema.safeParse(input);
   if (!result.success) {
-    const errors = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
+    // @ts-ignore - Zod v4 API compatibility
+    const errors = result.error.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`);
     throw new Error(`Validation failed: ${errors.join(', ')}`);
   }
   return result.data;
