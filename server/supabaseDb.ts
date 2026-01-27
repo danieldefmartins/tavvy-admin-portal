@@ -123,13 +123,13 @@ export async function searchPlaces(
       const existingIds = new Set(placesFromPlacesTable.map(p => p.id));
       
       // Search fsq_places_raw using the same simple approach as mobile app
+      // NOTE: No .order() to avoid slow sorting on 104M+ rows
       const { data: fsqData, error: fsqError } = await supabase
         .from("fsq_places_raw")
         .select("fsq_place_id, name, latitude, longitude, address, locality, region, country, postcode, tel, website, fsq_category_labels")
         .ilike("name", `%${query}%`)
         .is("date_closed", null)
-        .limit(limit - placesFromPlacesTable.length)
-        .order("name", { ascending: true });
+        .limit(limit - placesFromPlacesTable.length);
 
       if (fsqError) {
         console.error("[Supabase] fsq_places_raw search error:", fsqError);
@@ -300,9 +300,9 @@ export async function searchPlacesAdvanced(
         fsqQuery = fsqQuery.ilike("locality", `%${filters.city}%`);
       }
 
+      // NOTE: No .order() to avoid slow sorting on 104M+ rows
       const { data: fsqData, error: fsqError } = await fsqQuery
-        .limit(limit - placesFromPlacesTable.length)
-        .order("name", { ascending: true });
+        .limit(limit - placesFromPlacesTable.length);
 
       if (fsqError) {
         console.error("[Supabase] fsq_places_raw search error:", fsqError);
