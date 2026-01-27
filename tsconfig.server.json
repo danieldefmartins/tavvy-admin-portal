@@ -2,13 +2,15 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "ESNext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "target": "ES2022",
-    "outDir": "./dist",
+    "outDir": "./dist/server",
     "declaration": false,
     "sourceMap": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
   },
   "include": ["server/**/*"],
-  "exclude": ["node_modules", "dist", "client", "server/**/*_fix.ts", "server/**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "client", "server/**/*_fix.ts", "server/**/*.test.ts", "vite.config.ts", "*.config.ts"]
 }
