@@ -82,6 +82,21 @@ const countryNames: Record<string, string> = {
 
 const getCountryName = (code: string) => countryNames[code] || code;
 
+// US States mapping
+const US_STATES = [
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
+  "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
+  "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
+  "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
+  "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
+  "New Hampshire", "New Jersey", "New Mexico", "New York",
+  "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
+  "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
+  "West Virginia", "Wisconsin", "Wyoming", "District of Columbia",
+  "Puerto Rico", "Guam", "US Virgin Islands"
+];
+
 export default function QuickEntry() {
   // Location filter state
   const [selectedCountry, setSelectedCountry] = useState("");
@@ -105,10 +120,18 @@ export default function QuickEntry() {
   const { data: countries } = trpc.places.getCountries.useQuery();
 
   // Fetch regions when country is selected
-  const { data: regions, isLoading: regionsLoading } = trpc.places.getFsqRegions.useQuery(
+  const { data: fsqRegions, isLoading: regionsLoading } = trpc.places.getFsqRegions.useQuery(
     { country: selectedCountry },
-    { enabled: !!selectedCountry }
+    { enabled: !!selectedCountry && selectedCountry !== "US" }
   );
+
+  // Use US states for US, otherwise use fsq regions
+  const regions = useMemo(() => {
+    if (selectedCountry === "US") {
+      return US_STATES;
+    }
+    return fsqRegions || [];
+  }, [selectedCountry, fsqRegions]);
 
   // Fetch cities when country (and optionally region) is selected
   const { data: cities, isLoading: citiesLoading } = trpc.places.getFsqCities.useQuery(
