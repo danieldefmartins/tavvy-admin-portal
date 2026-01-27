@@ -450,7 +450,9 @@ export async function searchPlacesAdvanced(
     const hasLocationFilter = filters.country || filters.state || filters.city;
     
     if (hasNameFilter || hasCategoryFilter || hasLocationFilter) {
-      console.log(`[Supabase] Searching fsq_places_raw for advanced filters`);
+      console.log(`[Supabase] ===== FSQ_PLACES_RAW SEARCH DEBUG =====`);
+      console.log(`[Supabase] Filters received:`, JSON.stringify(filters, null, 2));
+      console.log(`[Supabase] hasNameFilter: ${hasNameFilter}, hasCategoryFilter: ${hasCategoryFilter}, hasLocationFilter: ${hasLocationFilter}`);
       
       // Get existing IDs to avoid duplicates from all sources
       const existingIds = new Set([
@@ -500,19 +502,27 @@ export async function searchPlacesAdvanced(
           "Wisconsin": "WI", "Wyoming": "WY", "District of Columbia": "DC"
         };
         const stateCode = stateNameToCode[filters.state] || filters.state;
+        console.log(`[Supabase] State filter: "${filters.state}" → "${stateCode}"`);
         fsqQuery = fsqQuery.eq("region", stateCode);
       }
       if (filters.city) {
+        console.log(`[Supabase] City filter: "${filters.city}"`);
         fsqQuery = fsqQuery.ilike("locality", `%${filters.city}%`);
       }
 
       // NOTE: No .order() to avoid slow sorting on 104M+ rows
+      const queryLimit = limit - placesFromPlacesTable.length;
+      console.log(`[Supabase] Query limit: ${queryLimit}`);
       const { data: fsqData, error: fsqError } = await fsqQuery
-        .limit(limit - placesFromPlacesTable.length);
+        .limit(queryLimit);
 
       if (fsqError) {
         console.error("[Supabase] fsq_places_raw search error:", fsqError);
       } else if (fsqData) {
+        console.log(`[Supabase] fsq_places_raw returned ${fsqData.length} results`);
+        if (fsqData.length > 0) {
+          console.log(`[Supabase] First result:`, JSON.stringify(fsqData[0], null, 2));
+        }
         // Filter out duplicates and map to Place interface
         placesFromFsqRaw = (fsqData || [])
           .filter((p: any) => !existingIds.has(p.fsq_place_id))
