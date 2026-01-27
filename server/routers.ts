@@ -515,7 +515,7 @@ export const appRouter = router({
       .input(
         z.object({
           query: z.string().min(1),
-          limit: z.number().min(1).max(100).default(50),
+          limit: z.number().min(1).max(5000).default(100),
           offset: z.number().min(0).default(0),
         })
       )
@@ -551,7 +551,7 @@ export const appRouter = router({
             country: z.string().optional(),
             category: z.string().optional(),
           }),
-          limit: z.number().min(1).max(200).default(50),
+          limit: z.number().min(1).max(5000).default(100),
           offset: z.number().min(0).default(0),
         })
       )
@@ -591,7 +591,7 @@ export const appRouter = router({
           country: z.string().optional(),
           region: z.string().optional(),
           city: z.string().optional(),
-          limit: z.number().min(1).max(200).default(50),
+          limit: z.number().min(1).max(5000).default(100),
           offset: z.number().min(0).default(0),
         })
       )
@@ -694,7 +694,7 @@ export const appRouter = router({
     getTavvyPlaces: protectedProcedure
       .input(
         z.object({
-          limit: z.number().min(1).max(200).default(50),
+          limit: z.number().min(1).max(5000).default(100),
           offset: z.number().min(0).default(0),
         }).optional()
       )
@@ -972,7 +972,7 @@ export const appRouter = router({
       .input(
         z
           .object({
-            limit: z.number().min(1).max(100).default(50),
+            limit: z.number().min(1).max(5000).default(100),
           })
           .optional()
       )
@@ -2625,7 +2625,7 @@ export const appRouter = router({
     list: protectedProcedure
       .input(
         z.object({
-          limit: z.number().min(1).max(100).default(50),
+          limit: z.number().min(1).max(5000).default(100),
           offset: z.number().min(0).default(0),
         }).optional()
       )
