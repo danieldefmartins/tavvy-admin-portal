@@ -290,7 +290,7 @@ export interface PlaceSearchFilters {
 
 export async function searchPlacesAdvanced(
   filters: PlaceSearchFilters,
-  limit: number = 50,
+  limit: number = 1000,
   offset: number = 0
 ): Promise<{ places: Place[]; total: number }> {
   // Admin portal searches ALL 4 tables for complete coverage
