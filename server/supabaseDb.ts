@@ -507,9 +507,10 @@ export async function searchPlacesAdvanced(
         fsqQuery = fsqQuery.eq("region", stateCode);
       }
       if (filters.city) {
-        console.log(`[Supabase] City filter: "${filters.city}"`);
-        // Use exact match for city (case-insensitive)
-        fsqQuery = fsqQuery.ilike("locality", filters.city);
+        const cityTrimmed = filters.city.trim();
+        console.log(`[Supabase] City filter: "${filters.city}" → "${cityTrimmed}"`);
+        // Use flexible match for city (case-insensitive, allows partial matches)
+        fsqQuery = fsqQuery.ilike("locality", `%${cityTrimmed}%`);
       }
 
       // NOTE: No .order() to avoid slow sorting on 104M+ rows
