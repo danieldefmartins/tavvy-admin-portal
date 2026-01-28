@@ -791,7 +791,28 @@ export async function searchFsqPlaces(
       query = query.eq("country", filters.country);
     }
     if (filters.region) {
-      query = query.eq("region", filters.region);
+      // Map full state names to state codes for US
+      if (filters.country === 'US') {
+        const stateNameToCode: Record<string, string> = {
+          "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR",
+          "California": "CA", "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE",
+          "Florida": "FL", "Georgia": "GA", "Hawaii": "HI", "Idaho": "ID",
+          "Illinois": "IL", "Indiana": "IN", "Iowa": "IA", "Kansas": "KS",
+          "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
+          "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS",
+          "Missouri": "MO", "Montana": "MT", "Nebraska": "NE", "Nevada": "NV",
+          "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY",
+          "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK",
+          "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI", "South Carolina": "SC",
+          "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX", "Utah": "UT",
+          "Vermont": "VT", "Virginia": "VA", "Washington": "WA", "West Virginia": "WV",
+          "Wisconsin": "WI", "Wyoming": "WY", "District of Columbia": "DC"
+        };
+        const stateCode = stateNameToCode[filters.region] || filters.region;
+        query = query.eq("region", stateCode);
+      } else {
+        query = query.eq("region", filters.region);
+      }
     }
     if (filters.city) {
       query = query.ilike("locality", `%${filters.city}%`);
