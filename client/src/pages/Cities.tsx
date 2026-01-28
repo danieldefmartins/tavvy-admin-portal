@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Pencil, Trash2, Search, MapPin, Users, Building2, Plane } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { trpc } from "@/lib/trpc";
 
 interface City {
   id: string;
@@ -91,7 +91,6 @@ export default function Cities() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRegion, setFilterRegion] = useState<string>("all");
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -125,28 +124,12 @@ export default function Cities() {
   });
 
   // Fetch cities
-  const { data: cities = [], isLoading } = useQuery({
-    queryKey: ["/api/cities"],
-    queryFn: async () => {
-      const response = await fetch("/api/cities");
-      if (!response.ok) throw new Error("Failed to fetch cities");
-      return response.json();
-    },
-  });
+  const { data: cities = [], isLoading, refetch } = trpc.cities.getAll.useQuery();
 
   // Create city mutation
-  const createMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      const response = await fetch("/api/cities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Failed to create city");
-      return response.json();
-    },
+  const createMutation = trpc.cities.create.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cities"] });
+      refetch();
       toast({ title: "City created successfully" });
       setIsDialogOpen(false);
       resetForm();
@@ -157,18 +140,9 @@ export default function Cities() {
   });
 
   // Update city mutation
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
-      const response = await fetch(`/api/cities/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Failed to update city");
-      return response.json();
-    },
+  const updateMutation = trpc.cities.update.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cities"] });
+      refetch();
       toast({ title: "City updated successfully" });
       setIsDialogOpen(false);
       setEditingCity(null);
@@ -180,16 +154,9 @@ export default function Cities() {
   });
 
   // Delete city mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/cities/${id}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Failed to delete city");
-      return response.json();
-    },
+  const deleteMutation = trpc.cities.delete.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cities"] });
+      refetch();
       toast({ title: "City deleted successfully" });
     },
     onError: (error: Error) => {
@@ -275,7 +242,7 @@ export default function Cities() {
     };
 
     if (editingCity) {
-      updateMutation.mutate({ id: editingCity.id, data: dataToSubmit });
+      updateMutation.mutate({ id: editingCity.id, ...dataToSubmit });
     } else {
       createMutation.mutate(dataToSubmit);
     }
