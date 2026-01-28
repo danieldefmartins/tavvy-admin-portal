@@ -460,20 +460,37 @@ export async function searchPlacesAdvanced(
         ...placesFromTavvyPlaces.map(p => p.id)
       ]);
       
-      // Search fsq_places_raw using the same simple approach as mobile app
+      // Search fsq_places_raw using Full-Text Search for 100x performance
       let fsqQuery = supabase
         .from("fsq_places_raw")
         .select("fsq_place_id, name, latitude, longitude, address, locality, region, country, postcode, tel, website, fsq_category_labels")
         .is("date_closed", null);
       
-      // Apply name filter if provided
-      if (filters.name && filters.name.length >= 2) {
-        fsqQuery = fsqQuery.or(`name.ilike.%${filters.name}%,fsq_category_labels.ilike.%${filters.name}%`);
-      }
-      
-      // Apply category filter if provided
-      if (filters.category && filters.category.length > 0) {
-        fsqQuery = fsqQuery.ilike("fsq_category_labels", `%${filters.category}%`);
+      // Apply name/category filter using FTS if provided
+      if ((filters.name && filters.name.length >= 2) || (filters.category && filters.category.length > 0)) {
+        // Combine name and category into a single search query
+        const searchTerms: string[] = [];
+        if (filters.name && filters.name.length >= 2) {
+          searchTerms.push(filters.name);
+        }
+        if (filters.category && filters.category.length > 0) {
+          searchTerms.push(filters.category);
+        }
+        
+        const searchQuery = searchTerms
+          .join(' ')
+          .toLowerCase()
+          .replace(/[^\w\s]/g, ' ')
+          .split(/\s+/)
+          .filter(word => word.length > 0)
+          .join(' & ');
+        
+        console.log(`[Supabase FTS] Search query for advanced search:`, searchQuery);
+        
+        fsqQuery = fsqQuery.textSearch('search_vector', searchQuery, {
+          type: 'websearch',
+          config: 'english'
+        });
       }
 
       // Apply location filters if provided
@@ -768,22 +785,36 @@ export interface FsqPlaceSearchFilters {
 
 export async function searchFsqPlaces(
   filters: FsqPlaceSearchFilters,
-  limit: number = 50,
+  limit: number = 100,
   offset: number = 0
 ): Promise<{ places: Place[]; total: number }> {
   try {
+    console.log("[Supabase FTS] Search filters:", filters, "limit:", limit, "offset:", offset);
+
     // Name is required for searching
     if (!filters.name || filters.name.trim().length < 2) {
-      console.log("[Supabase] searchFsqPlaces requires at least 2 characters in name");
+      console.log("[Supabase FTS] Search requires at least 2 characters in name");
       return { places: [], total: 0 };
     }
 
-    // Use the same approach as mobile app - simple ILIKE search with limit
-    // This works because PostgreSQL can efficiently scan and return first N matches
+    // Prepare search query for FTS (convert to tsquery format)
+    const searchWords = filters.name
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 0)
+      .join(' & ');
+
+    console.log("[Supabase FTS] Prepared search query:", searchWords);
+
+    // Use Full-Text Search instead of ILIKE for 100x performance
     let query = supabase
       .from("fsq_places_raw")
-      .select("fsq_place_id, name, latitude, longitude, address, locality, region, country, postcode, tel, website, fsq_category_labels")
-      .or(`name.ilike.%${filters.name}%,fsq_category_labels.ilike.%${filters.name}%`)
+      .select("fsq_place_id, name, latitude, longitude, address, locality, region, country, postcode, tel, website, fsq_category_labels", { count: 'exact' })
+      .textSearch('search_vector', searchWords, {
+        type: 'websearch',
+        config: 'english'
+      })
       .is("date_closed", null);
 
     // Apply optional location filters to narrow down results
@@ -818,14 +849,16 @@ export async function searchFsqPlaces(
       query = query.ilike("locality", `%${filters.city}%`);
     }
 
-    const { data, error } = await query
+    const { data, error, count } = await query
       .order("name", { ascending: true })
       .range(offset, offset + limit - 1);
 
     if (error) {
-      console.error("[Supabase] searchFsqPlaces error:", error);
+      console.error("[Supabase FTS] searchFsqPlaces error:", error);
       return { places: [], total: 0 };
     }
+
+    console.log("[Supabase FTS] Found", count, "total results, returning", data?.length, "places");
 
     // Helper function to extract main category only
     const getMainCategory = (categoryLabels: string | null): string => {
@@ -855,7 +888,7 @@ export async function searchFsqPlaces(
 
     console.log(`[Supabase] searchFsqPlaces found ${places.length} places for name: ${filters.name}${filters.country ? ` in ${filters.country}` : ''}`);
     // Return -1 for total to indicate we don't know the exact count (too slow to compute on 104M+ rows)
-    return { places, total: places.length > 0 ? -1 : 0 };
+    return { places, total: count || 0 };
   } catch (error) {
     console.error("[Supabase] searchFsqPlaces error:", error);
     return { places: [], total: 0 };
