@@ -66,7 +66,7 @@ export default function Places() {
   const [appliedFilters, setAppliedFilters] = useState(filters);
   const [page, setPage] = useState(0);
   const [countryOpen, setCountryOpen] = useState(false);
-  const limit = 50;
+  const limit = 1000;
 
   // Fetch dropdown data
   const { data: countries } = trpc.places.getCountries.useQuery();
@@ -82,7 +82,7 @@ export default function Places() {
 
   // Simple search query
   const { data: simplePlaces, isLoading: simpleLoading, isFetching: simpleFetching } = trpc.places.search.useQuery(
-    { query: debouncedQuery, limit: 50 },
+    { query: debouncedQuery, limit: 1000 },
     { enabled: !useAdvancedSearch && debouncedQuery.length >= 2 }
   );
 
