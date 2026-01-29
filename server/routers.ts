@@ -1,5 +1,15 @@
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import {
+  searchPlacesTypesense,
+  getAutocompleteSuggestions,
+  getDistinctCountriesTypesense,
+  getDistinctRegionsTypesense,
+  getDistinctCitiesTypesense,
+  getDistinctCategoriesTypesense,
+  getTypesenseStats,
+  typesenseHealthCheck,
+} from "./typesenseService";
+import {
   createDraft,
   getDraftById,
   getActiveDraft,
@@ -517,9 +527,36 @@ export const appRouter = router({
           query: z.string().min(1),
           limit: z.number().min(1).max(5000).default(100),
           offset: z.number().min(0).default(0),
+          country: z.string().optional(),
+          region: z.string().optional(),
+          locality: z.string().optional(),
+          categories: z.array(z.string()).optional(),
         })
       )
       .query(async ({ input }) => {
+        // Try Typesense first (fast!)
+        try {
+          const result = await searchPlacesTypesense({
+            query: input.query,
+            limit: input.limit,
+            offset: input.offset,
+            country: input.country,
+            region: input.region,
+            locality: input.locality,
+            categories: input.categories,
+          });
+          
+          // If Typesense returns results, use them
+          if (result.places.length > 0 || result.totalFound > 0) {
+            console.log(`[Search] Typesense: ${result.totalFound} results in ${result.searchTimeMs}ms`);
+            return result.places;
+          }
+        } catch (error) {
+          console.error('[Search] Typesense error, falling back to Supabase:', error);
+        }
+        
+        // Fallback to Supabase if Typesense fails or returns no results
+        console.log('[Search] Using Supabase fallback');
         return searchPlaces(input.query, input.limit, input.offset);
       }),
 
@@ -621,6 +658,26 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return getFsqCities(input.country, input.region);
       }),
+
+    // Typesense-specific endpoints
+    autocomplete: protectedProcedure
+      .input(
+        z.object({
+          query: z.string().min(2),
+          limit: z.number().min(1).max(20).default(10),
+        })
+      )
+      .query(async ({ input }) => {
+        return getAutocompleteSuggestions(input.query, input.limit);
+      }),
+
+    typesenseStats: protectedProcedure.query(async () => {
+      return getTypesenseStats();
+    }),
+
+    typesenseHealth: protectedProcedure.query(async () => {
+      return typesenseHealthCheck();
+    }),
   }),
 
   // ============ TAVVY PLACES (User-Generated) ============
