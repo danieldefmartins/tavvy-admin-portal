@@ -66,7 +66,10 @@ export default function Places() {
   const [appliedFilters, setAppliedFilters] = useState(filters);
   const [page, setPage] = useState(0);
   const [countryOpen, setCountryOpen] = useState(false);
-  const limit = 1000;
+  const [loadedPlaces, setLoadedPlaces] = useState<any[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const limit = 50; // Reduced from 1000 for better infinite scroll UX
 
   // Fetch dropdown data
   const { data: countries } = trpc.places.getCountries.useQuery();
@@ -162,6 +165,41 @@ export default function Places() {
   const totalCount = useAdvancedSearch ? (advancedResult?.total || 0) : (simplePlaces?.length || 0);
   const hasResults = places && places.length > 0;
   const hasSearched = useAdvancedSearch ? hasActiveFilters(appliedFilters) : debouncedQuery.length >= 2;
+
+  // Accumulate places for infinite scroll
+  useEffect(() => {
+    if (places) {
+      if (page === 0) {
+        setLoadedPlaces(places);
+      } else {
+        setLoadedPlaces(prev => [...prev, ...places]);
+      }
+      setHasMore(places.length === limit);
+    }
+  }, [places, page, limit]);
+
+  // Infinite scroll handler
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !useAdvancedSearch) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      // Load more when 200px from bottom
+      if (scrollHeight - scrollTop - clientHeight < 200 && hasMore && !isFetching) {
+        setPage(p => p + 1);
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [hasMore, isFetching, useAdvancedSearch]);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setPage(0);
+    setLoadedPlaces([]);
+  }, [debouncedQuery, appliedFilters]);
 
   // Comprehensive country code to name mapping (ISO 3166-1 alpha-2)
   const countryNames: Record<string, string> = {
@@ -873,85 +911,65 @@ export default function Places() {
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
               {useAdvancedSearch 
-                ? `Showing ${places.length} of ${totalCount} places`
+                ? `Showing ${loadedPlaces.length} of ${totalCount} places`
                 : `Found ${places.length} places`}
             </p>
-            {useAdvancedSearch && totalCount > limit && (
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {page + 1} of {Math.ceil(totalCount / limit)}
-                </span>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={(page + 1) * limit >= totalCount}
-                >
-                  Next
-                </Button>
+          </div>
+          <div ref={scrollContainerRef} className="space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto pr-2">
+            {(useAdvancedSearch ? loadedPlaces : places).map((place) => (
+            <Card 
+              key={place.id} 
+              className="cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => window.location.href = `/places/${place.id}`}
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <MapPin className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{place.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {[place.address, place.city, place.state, place.country].filter(Boolean).join(", ") || "No address"}
+                    </p>
+                    {place.category && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {place.category}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `/places/${place.id}/edit`;
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          ))
+            
+            {/* Infinite scroll loading indicator */}
+            {useAdvancedSearch && isFetching && page > 0 && (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            
+            {/* End of results indicator */}
+            {useAdvancedSearch && !hasMore && loadedPlaces.length > 0 && (
+              <div className="text-center py-4 text-sm text-muted-foreground">
+                End of results
               </div>
             )}
           </div>
-          {places.map((place) => (
-            <Link key={place.id} href={`/places/${place.id}`}>
-              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <MapPin className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">{place.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {[place.address, place.city, place.state, place.country].filter(Boolean).join(", ") || "No address"}
-                      </p>
-                      {place.category && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {place.category}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link href={`/places/${place.id}/edit`} onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-          
-          {/* Bottom pagination for advanced search */}
-          {useAdvancedSearch && totalCount > limit && (
-            <div className="flex justify-center gap-2 pt-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setPage(p => Math.max(0, p - 1))}
-                disabled={page === 0}
-              >
-                Previous
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setPage(p => p + 1)}
-                disabled={(page + 1) * limit >= totalCount}
-              >
-                Next
-              </Button>
-            </div>
-          )}
         </div>
       ) : hasSearched ? (
         <Card>

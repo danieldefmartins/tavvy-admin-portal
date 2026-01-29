@@ -81,9 +81,16 @@ export default function PlaceEdit() {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Queries
-  const { data: placeData, isLoading: placeLoading, refetch } = trpc.placeEdit.getForEdit.useQuery(
+  const { data: placeData, isLoading: placeLoading, error: placeError, refetch } = trpc.placeEdit.getForEdit.useQuery(
     { id: placeId! },
-    { enabled: !!placeId && !isNewPlace }
+    { 
+      enabled: !!placeId && !isNewPlace,
+      retry: 2,
+      onError: (err) => {
+        console.error('[PlaceEdit] Failed to load place:', err);
+        toast.error(`Failed to load place: ${err.message}`);
+      }
+    }
   );
   const { data: categories } = trpc.placeEdit.getCategories.useQuery();
   const { data: photos } = trpc.placeEdit.getPhotos.useQuery(
@@ -250,11 +257,56 @@ export default function PlaceEdit() {
     deleteMutation.mutate({ id: placeId });
   };
 
+  // Show error state
+  if (placeError && !isNewPlace) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/places")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Error Loading Place</h1>
+            <p className="text-muted-foreground">Place ID: {placeId}</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <XCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
+            <h3 className="font-semibold text-lg mb-2">Failed to load place</h3>
+            <p className="text-muted-foreground mb-4">
+              {placeError.message || "Unknown error occurred"}
+            </p>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={() => refetch()} variant="outline">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+              <Button onClick={() => setLocation("/places")} variant="default">
+                Back to Places
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (placeLoading && !isNewPlace) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+        </div>
         <Skeleton className="h-[600px] w-full" />
+        <div className="text-center text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+          Loading place data...
+        </div>
       </div>
     );
   }

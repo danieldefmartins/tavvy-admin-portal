@@ -4579,20 +4579,42 @@ export async function deletePlaceAdmin(
 
 export async function getPlaceForEdit(placeId: string): Promise<PlaceDetails | null> {
   try {
-    const { data, error } = await supabase
+    console.log('[Supabase] getPlaceForEdit called with ID:', placeId);
+    
+    // Try querying by id first (UUID)
+    let { data, error } = await supabase
       .from("places")
       .select("*")
       .eq("id", placeId)
-      .single();
+      .maybeSingle();
+
+    // If not found by id, try fsq_id (Foursquare ID)
+    if (!data && !error) {
+      console.log('[Supabase] Place not found by id, trying fsq_id:', placeId);
+      const result = await supabase
+        .from("places")
+        .select("*")
+        .eq("fsq_id", placeId)
+        .maybeSingle();
+      
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error("[Supabase] Get place for edit error:", error);
       return null;
     }
 
+    if (!data) {
+      console.error("[Supabase] Place not found with id or fsq_id:", placeId);
+      return null;
+    }
+
+    console.log('[Supabase] Place found:', data.name);
     return data;
   } catch (error) {
-    console.error("[Supabase] Get place for edit error:", error);
+    console.error("[Supabase] Get place for edit exception:", error);
     return null;
   }
 }
