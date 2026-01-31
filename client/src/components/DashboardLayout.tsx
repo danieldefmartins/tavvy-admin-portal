@@ -268,7 +268,7 @@ function DashboardLayoutContent({
               {!isCollapsed && (
                 <div className="flex items-center min-w-0 flex-1">
                   <img 
-                    src="/tavvy-logo-horizontal.png" 
+                    src="/tavvy-logo-horizontal.jpg" 
                     alt="Tavvy" 
                     className="h-8 w-auto object-contain"
                   />
@@ -409,7 +409,7 @@ function DashboardLayoutContent({
             <div className="flex items-center gap-3">
               <SidebarTrigger className="h-9 w-9 rounded-lg bg-white/5 text-orange-400 hover:bg-white/10" />
               <img 
-                src="/tavvy-logo-horizontal.png" 
+                src="/tavvy-logo-horizontal.jpg" 
                 alt="Tavvy" 
                 className="h-6 w-auto object-contain"
               />
