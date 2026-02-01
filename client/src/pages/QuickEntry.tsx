@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Search, Zap, ThumbsUp, Sparkles, AlertTriangle, Loader2, MapPin, CheckCircle2, Filter, ChevronDown, ChevronUp, Check, ChevronsUpDown } from "lucide-react";
+import { Search, Zap, ThumbsUp, Sparkles, AlertTriangle, Loader2, MapPin, CheckCircle2, Filter, ChevronDown, ChevronUp, Check, ChevronsUpDown, Clock, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -83,6 +83,13 @@ const countryNames: Record<string, string> = {
 
 const getCountryName = (code: string) => countryNames[code] || code;
 
+// Draft interface for localStorage
+interface QuickEntryDraft {
+  place: { id: string; name: string };
+  signals: [string, number][];
+  timestamp: number;
+}
+
 export default function QuickEntry() {
   // Location filter state
   const [selectedCountry, setSelectedCountry] = useState("");
@@ -101,6 +108,79 @@ export default function QuickEntry() {
   } | null>(null);
   const [selectedSignals, setSelectedSignals] = useState<Map<string, number>>(new Map());
   const [showFilters, setShowFilters] = useState(true);
+
+  // NEW: Signal search and collapsible state
+  const [signalSearchQuery, setSignalSearchQuery] = useState("");
+  const [collapsedCategories, setCollapsedCategories] = useState({
+    bestFor: false,  // Start expanded
+    vibe: true,      // Start collapsed
+    headsUp: true    // Start collapsed
+  });
+
+  // NEW: Draft state
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+
+  // OPTIMIZATION: Add debouncing to search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300); // 300ms debounce
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // NEW: Load draft from localStorage on mount
+  useEffect(() => {
+    const draftStr = localStorage.getItem('quickEntryDraft');
+    if (draftStr) {
+      try {
+        const draft: QuickEntryDraft = JSON.parse(draftStr);
+        // Only load if less than 24 hours old
+        if (Date.now() - draft.timestamp < 24 * 60 * 60 * 1000) {
+          setHasDraft(true);
+        }
+      } catch (e) {
+        // Invalid draft, ignore
+      }
+    }
+  }, []);
+
+  // NEW: Auto-save draft to localStorage
+  useEffect(() => {
+    if (selectedPlace && selectedSignals.size > 0) {
+      const draft: QuickEntryDraft = {
+        place: selectedPlace,
+        signals: Array.from(selectedSignals.entries()),
+        timestamp: Date.now()
+      };
+      localStorage.setItem('quickEntryDraft', JSON.stringify(draft));
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2000);
+    }
+  }, [selectedPlace, selectedSignals]);
+
+  // NEW: Load draft function
+  const loadDraft = () => {
+    const draftStr = localStorage.getItem('quickEntryDraft');
+    if (draftStr) {
+      try {
+        const draft: QuickEntryDraft = JSON.parse(draftStr);
+        setSelectedPlace(draft.place);
+        setSelectedSignals(new Map(draft.signals));
+        setHasDraft(false);
+        toast.success("Draft loaded!");
+      } catch (e) {
+        toast.error("Failed to load draft");
+      }
+    }
+  };
+
+  // NEW: Clear draft function
+  const clearDraft = () => {
+    localStorage.removeItem('quickEntryDraft');
+    setHasDraft(false);
+    toast.success("Draft cleared");
+  };
 
   // Fetch countries from lookup table
   const { data: countries } = trpc.places.getCountries.useQuery();
@@ -131,8 +211,7 @@ export default function QuickEntry() {
     { enabled: !!selectedCountry }
   );
 
-  // Search places using fsq_places_raw with infinite scroll
-  // This uses the same approach as the mobile app for fast searching
+  // OPTIMIZATION: Reduced initial limit from 100 to 30 for faster loading
   const { 
     data: fsqPlacesResult, 
     isLoading: fsqLoading, 
@@ -146,23 +225,23 @@ export default function QuickEntry() {
       country: selectedCountry || undefined, 
       region: selectedRegion || undefined,
       city: citySearch || undefined,
-      limit: 100 
+      limit: 30  // REDUCED from 100
     },
     { 
       enabled: debouncedQuery.length >= 2,
       getNextPageParam: (lastPage, allPages) => {
-        // If the last page has fewer results than the limit, we've reached the end
-        if (lastPage.places.length < 100) return undefined;
-        // Otherwise, return the next offset
-        return allPages.length * 100;
+        if (lastPage.places.length < 30) return undefined;
+        return allPages.length * 30;
       },
     }
   );
 
-  // Keep simple search as additional fallback (searches places table)
+  // OPTIMIZATION: Only use simple search as fallback if fsq search fails
   const { data: simplePlaces, isLoading: simpleLoading, isFetching: simpleFetching } = trpc.places.search.useQuery(
-    { query: debouncedQuery, limit: 100 },
-    { enabled: debouncedQuery.length >= 2 }
+    { query: debouncedQuery, limit: 30 },
+    { 
+      enabled: debouncedQuery.length >= 2 && (!fsqPlacesResult || fsqPlacesResult.pages[0]?.places.length === 0)
+    }
   );
 
   // Ref for infinite scroll observer
@@ -185,7 +264,11 @@ export default function QuickEntry() {
     return () => observer.disconnect();
   }, [hasNextFsqPage, isFetchingNextFsqPage, fetchNextFsqPage]);
 
-  const { data: allSignalDefs, error: signalsError } = trpc.signals.getAll.useQuery();
+  // OPTIMIZATION: Add staleTime to cache signal definitions
+  const { data: allSignalDefs, error: signalsError } = trpc.signals.getAll.useQuery(undefined, {
+    staleTime: 60 * 60 * 1000, // 1 hour
+    cacheTime: 24 * 60 * 60 * 1000, // 24 hours
+  });
 
   const submitMutation = trpc.reviews.submitQuick.useMutation({
     onSuccess: (result) => {
@@ -194,6 +277,7 @@ export default function QuickEntry() {
       setSelectedPlace(null);
       setSearchQuery("");
       setDebouncedQuery("");
+      localStorage.removeItem('quickEntryDraft');
     },
     onError: (error) => {
       toast.error(`Error: ${error.message}`);
@@ -213,7 +297,7 @@ export default function QuickEntry() {
   // Filter cities based on search
   const filteredCities = useMemo(() => {
     if (!cities) return [];
-    if (!citySearch) return cities.slice(0, 100); // Show first 100 if no search
+    if (!citySearch) return cities.slice(0, 100);
     const search = citySearch.toLowerCase();
     return cities.filter(c => c.toLowerCase().includes(search)).slice(0, 100);
   }, [cities, citySearch]);
@@ -227,6 +311,12 @@ export default function QuickEntry() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleSearch();
+    }
+    // NEW: Keyboard shortcut - Escape to clear
+    if (e.key === "Escape") {
+      setSearchQuery("");
+      setDebouncedQuery("");
+      setSignalSearchQuery("");
     }
   };
 
@@ -281,12 +371,18 @@ export default function QuickEntry() {
     setCitySearch("");
   };
 
+  // Toggle category collapse
+  const toggleCategory = (category: 'bestFor' | 'vibe' | 'headsUp') => {
+    setCollapsedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
   // Combine results from both fsq and simple search, deduplicated
-  // Flatten all pages from infinite query
   const fsqPlaces = fsqPlacesResult?.pages.flatMap(page => page.places) || [];
   const simplePlacesData = simplePlaces || [];
   
-  // Merge and deduplicate by id
   const seenIds = new Set<string>();
   const places = [...fsqPlaces, ...simplePlacesData].filter(p => {
     if (seenIds.has(p.id)) return false;
@@ -303,6 +399,26 @@ export default function QuickEntry() {
   const vibeSignals = allSignalDefs?.filter((s) => s.signal_type === "vibe") || [];
   const headsUpSignals = allSignalDefs?.filter((s) => s.signal_type === "heads_up") || [];
 
+  // NEW: Filter signals based on search query
+  const filterSignals = (signals: typeof bestForSignals) => {
+    if (!signalSearchQuery) return signals;
+    const query = signalSearchQuery.toLowerCase();
+    return signals.filter(s => s.label.toLowerCase().includes(query));
+  };
+
+  const filteredBestFor = filterSignals(bestForSignals);
+  const filteredVibe = filterSignals(vibeSignals);
+  const filteredHeadsUp = filterSignals(headsUpSignals);
+
+  // NEW: Get recently used signals (from selectedSignals)
+  const recentlyUsedSignals = useMemo(() => {
+    const allSignals = [...bestForSignals, ...vibeSignals, ...headsUpSignals];
+    return Array.from(selectedSignals.keys())
+      .map(slug => allSignals.find(s => s.slug === slug))
+      .filter(Boolean)
+      .slice(0, 10); // Show top 10
+  }, [selectedSignals, bestForSignals, vibeSignals, headsUpSignals]);
+
   // Show error if signals fail to load
   if (signalsError) {
     return (
@@ -315,13 +431,62 @@ export default function QuickEntry() {
     );
   }
 
+  // NEW: Render signal button component (extracted for reusability)
+  const SignalButton = ({ signal, category }: { signal: typeof bestForSignals[0], category: 'bestFor' | 'vibe' | 'headsUp' }) => {
+    const tapCount = selectedSignals.get(signal.slug) || 0;
+    const colorClass = category === 'bestFor' ? 'emerald' : category === 'vibe' ? 'blue' : 'orange';
+    
+    return (
+      <Button
+        key={signal.slug}
+        variant="outline"
+        size="sm"
+        onClick={() => handleTap(signal.slug)}
+        className={`relative ${
+          tapCount > 0
+            ? `bg-${colorClass}-500/20 border-${colorClass}-500 text-${colorClass}-500`
+            : ""
+        }`}
+      >
+        {signal.label}
+        {tapCount > 0 && (
+          <span className={`ml-2 bg-${colorClass}-500 text-white text-xs px-1.5 py-0.5 rounded-full`}>
+            x{tapCount}
+          </span>
+        )}
+      </Button>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Quick Signal Entry</h1>
-        <p className="text-muted-foreground">
-          Rapidly submit signals for places. Filter by location, search, select, tap, submit.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Quick Signal Entry</h1>
+          <p className="text-muted-foreground">
+            Rapidly submit signals for places. Filter by location, search, select, tap, submit.
+          </p>
+        </div>
+        {/* NEW: Draft indicator and actions */}
+        <div className="flex items-center gap-2">
+          {draftSaved && (
+            <Badge variant="outline" className="gap-1">
+              <CheckCircle2 className="h-3 w-3" />
+              Draft saved
+            </Badge>
+          )}
+          {hasDraft && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={loadDraft}>
+                <Clock className="h-4 w-4 mr-2" />
+                Load Draft
+              </Button>
+              <Button variant="ghost" size="sm" onClick={clearDraft}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Step 1: Search Place */}
@@ -571,7 +736,7 @@ export default function QuickEntry() {
               <p className="text-xs text-muted-foreground mt-2">
                 {selectedCountry 
                   ? `Searching in ${getCountryName(selectedCountry)}${selectedRegion ? ` / ${selectedRegion}` : ''}${citySearch ? ` / ${citySearch}` : ''}. Enter at least 2 characters to search.`
-                  : "Select a country to search the full database (104M+ places), or search without filters for curated places only."}
+                  : "Select a country to search the full database (104M+ places), or search without filters for curated places only. Press ESC to clear."}
               </p>
 
               {/* Search Results */}
@@ -632,102 +797,196 @@ export default function QuickEntry() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* The Good (Best For) */}
-          <div>
-            <h3 className="font-semibold text-emerald-500 flex items-center gap-2 mb-3">
-              <ThumbsUp className="h-4 w-4" />
-              The Good
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {bestForSignals.map((signal) => {
-                const tapCount = selectedSignals.get(signal.slug) || 0;
-                return (
-                  <Button
-                    key={signal.slug}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleTap(signal.slug)}
-                    className={`relative ${
-                      tapCount > 0
-                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-500"
-                        : ""
-                    }`}
-                  >
-                    {signal.label}
-                    {tapCount > 0 && (
-                      <span className="ml-2 bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                        x{tapCount}
-                      </span>
-                    )}
-                  </Button>
-                );
-              })}
-            </div>
+          {/* NEW: Signal Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search signals... (e.g., 'coffee', 'friendly', 'clean')"
+              value={signalSearchQuery}
+              onChange={(e) => setSignalSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+            {signalSearchQuery && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+                onClick={() => setSignalSearchQuery("")}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
 
-          {/* The Vibe */}
-          <div>
-            <h3 className="font-semibold text-blue-500 flex items-center gap-2 mb-3">
-              <Sparkles className="h-4 w-4" />
-              The Vibe
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {vibeSignals.map((signal) => {
-                const tapCount = selectedSignals.get(signal.slug) || 0;
-                return (
-                  <Button
-                    key={signal.slug}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleTap(signal.slug)}
-                    className={`relative ${
-                      tapCount > 0 ? "bg-blue-500/20 border-blue-500 text-blue-500" : ""
-                    }`}
-                  >
-                    {signal.label}
-                    {tapCount > 0 && (
-                      <span className="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                        x{tapCount}
-                      </span>
-                    )}
-                  </Button>
-                );
-              })}
+          {/* NEW: Recently Used Signals (only show if there are any) */}
+          {recentlyUsedSignals.length > 0 && !signalSearchQuery && (
+            <div>
+              <h3 className="font-semibold text-purple-500 flex items-center gap-2 mb-3">
+                <Clock className="h-4 w-4" />
+                Recently Used
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {recentlyUsedSignals.map((signal) => {
+                  if (!signal) return null;
+                  const tapCount = selectedSignals.get(signal.slug) || 0;
+                  return (
+                    <Button
+                      key={signal.slug}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTap(signal.slug)}
+                      className={`relative ${
+                        tapCount > 0
+                          ? "bg-purple-500/20 border-purple-500 text-purple-500"
+                          : ""
+                      }`}
+                    >
+                      {signal.label}
+                      {tapCount > 0 && (
+                        <span className="ml-2 bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                          x{tapCount}
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Heads Up */}
-          <div>
-            <h3 className="font-semibold text-orange-500 flex items-center gap-2 mb-3">
-              <AlertTriangle className="h-4 w-4" />
-              Heads Up
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {headsUpSignals.map((signal) => {
-                const tapCount = selectedSignals.get(signal.slug) || 0;
-                return (
-                  <Button
-                    key={signal.slug}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleTap(signal.slug)}
-                    className={`relative ${
-                      tapCount > 0
-                        ? "bg-orange-500/20 border-orange-500 text-orange-500"
-                        : ""
-                    }`}
-                  >
-                    {signal.label}
-                    {tapCount > 0 && (
-                      <span className="ml-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                        x{tapCount}
-                      </span>
-                    )}
-                  </Button>
-                );
-              })}
+          {/* The Good (Best For) - OPTIMIZED with collapsible */}
+          <Collapsible open={!collapsedCategories.bestFor} onOpenChange={() => toggleCategory('bestFor')}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-start gap-2 p-0 h-auto hover:bg-transparent">
+                <h3 className="font-semibold text-emerald-500 flex items-center gap-2">
+                  <ThumbsUp className="h-4 w-4" />
+                  The Good
+                  <Badge variant="secondary" className="ml-2">
+                    {filteredBestFor.length}
+                  </Badge>
+                  {collapsedCategories.bestFor ? <ChevronDown className="h-4 w-4 ml-auto" /> : <ChevronUp className="h-4 w-4 ml-auto" />}
+                </h3>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <div className="flex flex-wrap gap-2">
+                {filteredBestFor.map((signal) => {
+                  const tapCount = selectedSignals.get(signal.slug) || 0;
+                  return (
+                    <Button
+                      key={signal.slug}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTap(signal.slug)}
+                      className={`relative ${
+                        tapCount > 0
+                          ? "bg-emerald-500/20 border-emerald-500 text-emerald-500"
+                          : ""
+                      }`}
+                    >
+                      {signal.label}
+                      {tapCount > 0 && (
+                        <span className="ml-2 bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                          x{tapCount}
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* The Vibe - OPTIMIZED with collapsible */}
+          <Collapsible open={!collapsedCategories.vibe} onOpenChange={() => toggleCategory('vibe')}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-start gap-2 p-0 h-auto hover:bg-transparent">
+                <h3 className="font-semibold text-blue-500 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  The Vibe
+                  <Badge variant="secondary" className="ml-2">
+                    {filteredVibe.length}
+                  </Badge>
+                  {collapsedCategories.vibe ? <ChevronDown className="h-4 w-4 ml-auto" /> : <ChevronUp className="h-4 w-4 ml-auto" />}
+                </h3>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <div className="flex flex-wrap gap-2">
+                {filteredVibe.map((signal) => {
+                  const tapCount = selectedSignals.get(signal.slug) || 0;
+                  return (
+                    <Button
+                      key={signal.slug}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTap(signal.slug)}
+                      className={`relative ${
+                        tapCount > 0 ? "bg-blue-500/20 border-blue-500 text-blue-500" : ""
+                      }`}
+                    >
+                      {signal.label}
+                      {tapCount > 0 && (
+                        <span className="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                          x{tapCount}
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Heads Up - OPTIMIZED with collapsible */}
+          <Collapsible open={!collapsedCategories.headsUp} onOpenChange={() => toggleCategory('headsUp')}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-start gap-2 p-0 h-auto hover:bg-transparent">
+                <h3 className="font-semibold text-orange-500 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Heads Up
+                  <Badge variant="secondary" className="ml-2">
+                    {filteredHeadsUp.length}
+                  </Badge>
+                  {collapsedCategories.headsUp ? <ChevronDown className="h-4 w-4 ml-auto" /> : <ChevronUp className="h-4 w-4 ml-auto" />}
+                </h3>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <div className="flex flex-wrap gap-2">
+                {filteredHeadsUp.map((signal) => {
+                  const tapCount = selectedSignals.get(signal.slug) || 0;
+                  return (
+                    <Button
+                      key={signal.slug}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTap(signal.slug)}
+                      className={`relative ${
+                        tapCount > 0
+                          ? "bg-orange-500/20 border-orange-500 text-orange-500"
+                          : ""
+                      }`}
+                    >
+                      {signal.label}
+                      {tapCount > 0 && (
+                        <span className="ml-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                          x{tapCount}
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Show message if search has no results */}
+          {signalSearchQuery && filteredBestFor.length === 0 && filteredVibe.length === 0 && filteredHeadsUp.length === 0 && (
+            <div className="text-center p-4 text-muted-foreground bg-muted/50 rounded-lg">
+              No signals found matching "{signalSearchQuery}"
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
