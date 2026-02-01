@@ -96,18 +96,19 @@ export function parseSearchQuery(query: string): ParsedQuery {
   }
 
   // Pattern 2: "Place City State" (no preposition)
-  // Example: "Starbucks Newark NJ" or "pizza Manhattan NY"
-  // Look for 2-letter state code at the end
-  const cityStatePattern = /^(.+?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+([A-Z]{2})$/;
+  // Example: "Starbucks Newark NJ" or "pizza Manhattan NY" or "starbucks newark nj"
+  // Look for 2-letter state code at the end (case-insensitive)
+  const cityStatePattern = /^(.+?)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+([a-zA-Z]{2})$/;
   const cityStateMatch = trimmed.match(cityStatePattern);
   
   if (cityStateMatch) {
     const [_, placeName, city, state] = cityStateMatch;
-    if (US_STATES.has(state)) {
+    const stateUpper = state.toUpperCase();
+    if (US_STATES.has(stateUpper)) {
       return {
         placeName: placeName.trim(),
         city: city.trim(),
-        region: state,
+        region: stateUpper,
         country: 'US',
         isParsed: true,
         originalQuery: query
