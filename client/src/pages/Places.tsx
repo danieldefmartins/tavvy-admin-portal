@@ -954,7 +954,7 @@ export default function Places() {
                 </div>
               </CardContent>
             </Card>
-          ))
+          ))}
             
             {/* Infinite scroll loading indicator */}
             {useAdvancedSearch && isFetching && page > 0 && (
