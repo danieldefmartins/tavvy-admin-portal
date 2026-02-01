@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { Search, Zap, ThumbsUp, Sparkles, AlertTriangle, Loader2, MapPin, CheckCircle2, Filter, ChevronDown, ChevronUp, Check, ChevronsUpDown, Clock, X } from "lucide-react";
 import { toast } from "sonner";
+import { parseSearchQuery, getParseDescription, EXAMPLE_QUERIES } from "@/lib/smartQueryParser";
 import {
   Select,
   SelectContent,
@@ -128,6 +129,32 @@ export default function QuickEntry() {
     }, 300); // 300ms debounce
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // SMART PARSING: Auto-populate filters from natural language queries
+  useEffect(() => {
+    if (debouncedQuery.length >= 2) {
+      const parsed = parseSearchQuery(debouncedQuery);
+      
+      if (parsed.isParsed) {
+        // Auto-populate filters from parsed query
+        if (parsed.country && parsed.country !== selectedCountry) {
+          setSelectedCountry(parsed.country);
+        }
+        if (parsed.region && parsed.region !== selectedRegion) {
+          setSelectedRegion(parsed.region);
+        }
+        if (parsed.city && parsed.city !== citySearch) {
+          setCitySearch(parsed.city);
+        }
+        
+        // Show a toast to indicate smart parsing
+        const description = getParseDescription(parsed);
+        if (description) {
+          toast.info(description, { duration: 2000 });
+        }
+      }
+    }
+  }, [debouncedQuery]);
 
   // NEW: Load draft from localStorage on mount
   useEffect(() => {
@@ -720,7 +747,7 @@ export default function QuickEntry() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder={selectedCountry ? "Search places by name..." : "Select a country first, or search all places..."}
+                    placeholder={`Try: ${EXAMPLE_QUERIES[0]} or just type naturally...`}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -734,9 +761,12 @@ export default function QuickEntry() {
 
               {/* Helper text */}
               <p className="text-xs text-muted-foreground mt-2">
-                {selectedCountry 
-                  ? `Searching in ${getCountryName(selectedCountry)}${selectedRegion ? ` / ${selectedRegion}` : ''}${citySearch ? ` / ${citySearch}` : ''}. Enter at least 2 characters to search.`
-                  : "Select a country to search the full database (104M+ places), or search without filters for curated places only. Press ESC to clear."}
+                💡 <strong>Smart Search:</strong> Type naturally like "Starbucks Newark NJ" and filters will auto-populate.
+                {selectedCountry && (
+                  <span className="ml-2">
+                    Currently searching in {getCountryName(selectedCountry)}{selectedRegion ? ` / ${selectedRegion}` : ''}{citySearch ? ` / ${citySearch}` : ''}.
+                  </span>
+                )}
               </p>
 
               {/* Search Results */}
