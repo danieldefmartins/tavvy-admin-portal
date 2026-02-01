@@ -108,9 +108,19 @@ export async function searchPlacesTypesense(
     sort_by: 'popularity:desc',
     per_page: limit,
     page: page,
-    // Typo tolerance: allow up to 2 typos for better UX
+    // ENHANCED TYPO TOLERANCE:
+    // - Allow up to 2 typos per token
+    // - Start typo tolerance after 1 token (so even single-word queries get typo correction)
+    // - Drop tokens if no results after 2 attempts (helps with multi-word queries)
+    // - Allow 1 typo for words with 4+ characters ("starbcks" -> "starbucks")
+    // - Split/join tokens to handle compound words
+    // - Use "always" mode to ensure typo correction is attempted
     num_typos: 2,
-    typo_tokens_threshold: 1,
+    typo_tokens_threshold: 0,  // Changed from 1 to 0 to enable typo correction for all queries
+    drop_tokens_threshold: 2,
+    min_len_1typo: 4,
+    min_len_2typo: 7,
+    split_join_tokens: 'always',  // Help with compound words
     // Search highlighting: show why results matched
     highlight_fields: 'name,address,categories,locality',
     highlight_full_fields: 'name,address',
