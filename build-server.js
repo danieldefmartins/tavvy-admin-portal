@@ -8,6 +8,23 @@ await esbuild.build({
   format: 'esm',
   outfile: 'dist/index.js',
   external: [
+    // Node.js built-ins
+    'http',
+    'https',
+    'stream',
+    'zlib',
+    'url',
+    'buffer',
+    'crypto',
+    'fs',
+    'path',
+    'os',
+    'util',
+    'events',
+    'net',
+    'tls',
+    'child_process',
+    // Third-party dependencies
     '@supabase/*',
     'express',
     'dotenv',
@@ -22,7 +39,8 @@ await esbuild.build({
     '@aws-sdk/*',
     'jose',
     'nanoid',
-    'axios'
+    'axios',
+    'typesense'
   ],
   sourcemap: true,
   logLevel: 'info'
