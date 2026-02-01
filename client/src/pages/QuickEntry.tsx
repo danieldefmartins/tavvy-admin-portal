@@ -136,15 +136,21 @@ export default function QuickEntry() {
       const parsed = parseSearchQuery(debouncedQuery);
       
       if (parsed.isParsed) {
-        // Auto-populate filters from parsed query
-        if (parsed.country && parsed.country !== selectedCountry) {
+        // Always apply parsed values (override old state)
+        if (parsed.country) {
           setSelectedCountry(parsed.country);
         }
-        if (parsed.region && parsed.region !== selectedRegion) {
+        if (parsed.region) {
           setSelectedRegion(parsed.region);
+        } else {
+          // Clear region if not in parsed query
+          setSelectedRegion('');
         }
-        if (parsed.city && parsed.city !== citySearch) {
+        if (parsed.city) {
           setCitySearch(parsed.city);
+        } else {
+          // Clear city if not in parsed query
+          setCitySearch('');
         }
         
         // Show a toast to indicate smart parsing
