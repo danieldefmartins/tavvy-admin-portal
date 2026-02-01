@@ -102,6 +102,11 @@ export default function QuickEntry() {
   
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<{
     id: string;
@@ -121,14 +126,145 @@ export default function QuickEntry() {
   // NEW: Draft state
   const [hasDraft, setHasDraft] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+  
+  // Load search history from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('quickentry-search-history');
+    if (saved) {
+      try {
+        setSearchHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load search history:', e);
+      }
+    }
+  }, []);
+  
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl+K to focus search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[placeholder*="Try:"]') as HTMLInputElement;
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+  
+  // Save search to history
+  const saveToHistory = (query: string) => {
+    if (!query || query.length < 2) return;
+    
+    setSearchHistory(prev => {
+      // Remove duplicates and add to front
+      const filtered = prev.filter(q => q.toLowerCase() !== query.toLowerCase());
+      const newHistory = [query, ...filtered].slice(0, 10); // Keep last 10
+      
+      // Save to localStorage
+      localStorage.setItem('quickentry-search-history', JSON.stringify(newHistory));
+      
+      return newHistory;
+    });
+  };
+  
+  // Clear search history
+  const clearHistory = () => {
+    setSearchHistory([]);
+    localStorage.removeItem('quickentry-search-history');
+    toast.success('Search history cleared');
+  };
 
-  // OPTIMIZATION: Add debouncing to search input
+  // OPTIMIZATION: Add debouncing to   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
-    }, 300); // 300ms debounce
+      // Generate autocomplete suggestions
+      if (searchQuery.length >= 2) {
+        generateAutocompleteSuggestions(searchQuery);
+      } else {
+        setAutocompleteSuggestions([]);
+        setShowAutocomplete(false);
+      }
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Generate autocomplete suggestions based on query
+  const generateAutocompleteSuggestions = (query: string) => {
+    const suggestions: string[] = [];
+    const lowerQuery = query.toLowerCase();
+    
+    // If query is empty or very short, show search history
+    if (query.length === 0 && searchHistory.length > 0) {
+      setAutocompleteSuggestions(searchHistory.slice(0, 5));
+      setShowHistory(true);
+      setShowAutocomplete(true);
+      return;
+    }
+    
+    setShowHistory(false);
+    
+    // Check search history first for matching queries
+    const historyMatches = searchHistory.filter(h => 
+      h.toLowerCase().includes(lowerQuery)
+    ).slice(0, 3);
+    suggestions.push(...historyMatches);
+    
+    // Common place types
+    const placeTypes = ['starbucks', 'mcdonalds', 'walmart', 'target', 'whole foods', 'trader joes', 'cvs', 'walgreens', 'coffee shop', 'restaurant', 'gas station', 'hotel', 'gym', 'bank', 'pharmacy'];
+    
+    // Common cities
+    const cities = ['new york', 'los angeles', 'chicago', 'houston', 'phoenix', 'philadelphia', 'san antonio', 'san diego', 'dallas', 'san jose', 'austin', 'jacksonville', 'fort worth', 'columbus', 'charlotte', 'san francisco', 'indianapolis', 'seattle', 'denver', 'boston', 'newark', 'manhattan', 'brooklyn', 'queens', 'miami', 'atlanta', 'orlando', 'tampa'];
+    
+    // If query looks like it's starting a place name
+    const matchingPlaces = placeTypes.filter(p => p.startsWith(lowerQuery));
+    if (matchingPlaces.length > 0) {
+      // Suggest place + popular cities
+      matchingPlaces.slice(0, 2).forEach(place => {
+        suggestions.push(`${place} near me`);
+        suggestions.push(`${place} new york ny`);
+      });
+    }
+    
+    // If query has a space, might be "place + city"
+    if (query.includes(' ')) {
+      const parts = query.split(' ');
+      const lastPart = parts[parts.length - 1].toLowerCase();
+      
+      // Suggest cities that match
+      const matchingCities = cities.filter(c => c.startsWith(lastPart));
+      matchingCities.slice(0, 3).forEach(city => {
+        const cityParts = city.split(' ');
+        const state = getCityState(city);
+        const baseParts = parts.slice(0, -1);
+        suggestions.push(`${baseParts.join(' ')} ${city} ${state}`);
+      });
+    }
+    
+    // Remove duplicates
+    const uniqueSuggestions = Array.from(new Set(suggestions));
+    setAutocompleteSuggestions(uniqueSuggestions.slice(0, 5));
+    setShowAutocomplete(uniqueSuggestions.length > 0);
+  };
+  
+  // Helper to get state for common cities
+  const getCityState = (city: string): string => {
+    const cityStates: Record<string, string> = {
+      'new york': 'NY', 'los angeles': 'CA', 'chicago': 'IL', 'houston': 'TX',
+      'phoenix': 'AZ', 'philadelphia': 'PA', 'san antonio': 'TX', 'san diego': 'CA',
+      'dallas': 'TX', 'san jose': 'CA', 'austin': 'TX', 'jacksonville': 'FL',
+      'newark': 'NJ', 'manhattan': 'NY', 'brooklyn': 'NY', 'queens': 'NY',
+      'miami': 'FL', 'atlanta': 'GA', 'orlando': 'FL', 'tampa': 'FL',
+      'seattle': 'WA', 'denver': 'CO', 'boston': 'MA', 'san francisco': 'CA'
+    };
+    return cityStates[city.toLowerCase()] || '';
+  };
 
   // SMART PARSING: Auto-populate filters from natural language queries
   useEffect(() => {
@@ -338,18 +474,47 @@ export default function QuickEntry() {
   const handleSearch = () => {
     if (searchQuery.length >= 2 || citySearch) {
       setDebouncedQuery(searchQuery);
+      saveToHistory(searchQuery); // Save to search history
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle autocomplete navigation
+    if (showAutocomplete && autocompleteSuggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev < autocompleteSuggestions.length - 1 ? prev + 1 : prev
+        );
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
+        return;
+      }
+      if (e.key === "Enter" && selectedSuggestionIndex >= 0) {
+        e.preventDefault();
+        setSearchQuery(autocompleteSuggestions[selectedSuggestionIndex]);
+        setShowAutocomplete(false);
+        setSelectedSuggestionIndex(-1);
+        return;
+      }
+    }
+    
     if (e.key === "Enter") {
       handleSearch();
     }
     // NEW: Keyboard shortcut - Escape to clear
     if (e.key === "Escape") {
-      setSearchQuery("");
-      setDebouncedQuery("");
-      setSignalSearchQuery("");
+      if (showAutocomplete) {
+        setShowAutocomplete(false);
+        setSelectedSuggestionIndex(-1);
+      } else {
+        setSearchQuery("");
+        setDebouncedQuery("");
+        setSignalSearchQuery("");
+      }
     }
   };
 
@@ -757,8 +922,66 @@ export default function QuickEntry() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    onFocus={() => {
+                      if (searchQuery.length >= 2) {
+                        setShowAutocomplete(true);
+                      } else if (searchHistory.length > 0) {
+                        // Show history when focused with empty query
+                        setAutocompleteSuggestions(searchHistory.slice(0, 5));
+                        setShowHistory(true);
+                        setShowAutocomplete(true);
+                      }
+                    }}
+                    onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
                     className="pl-10"
                   />
+                  
+                  {/* Autocomplete Dropdown */}
+                  {showAutocomplete && autocompleteSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+                      {showHistory && searchHistory.length > 0 && (
+                        <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
+                          <span className="text-xs font-medium text-muted-foreground">Recent Searches</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              clearHistory();
+                              setShowAutocomplete(false);
+                            }}
+                            className="h-6 px-2 text-xs"
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      )}
+                      {autocompleteSuggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          onClick={() => {
+                            setSearchQuery(suggestion);
+                            setShowAutocomplete(false);
+                            setSelectedSuggestionIndex(-1);
+                          }}
+                          className={`px-4 py-2 cursor-pointer transition-colors ${
+                            index === selectedSuggestionIndex
+                              ? 'bg-accent text-accent-foreground'
+                              : 'hover:bg-accent/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {showHistory ? (
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                            ) : (
+                              <Search className="h-3 w-3 text-muted-foreground" />
+                            )}
+                            <span className="text-sm">{suggestion}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <Button onClick={handleSearch} disabled={searchQuery.length < 2 && !citySearch}>
                   {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
@@ -768,6 +991,9 @@ export default function QuickEntry() {
               {/* Helper text */}
               <p className="text-xs text-muted-foreground mt-2">
                 💡 <strong>Smart Search:</strong> Type naturally like "Starbucks Newark NJ" and filters will auto-populate.
+                <span className="ml-2 opacity-70">
+                  Press <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded border">⌘K</kbd> or <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded border">Ctrl+K</kbd> to focus search.
+                </span>
                 {selectedCountry && (
                   <span className="ml-2">
                     Currently searching in {getCountryName(selectedCountry)}{selectedRegion ? ` / ${selectedRegion}` : ''}{citySearch ? ` / ${citySearch}` : ''}.
