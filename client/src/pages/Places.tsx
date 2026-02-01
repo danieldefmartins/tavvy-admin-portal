@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
+import { parseSearchQuery } from "@/lib/smartQueryParser";
 import { Link } from "wouter";
 import { 
   Search, 
@@ -70,6 +71,33 @@ export default function Places() {
   const [hasMore, setHasMore] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const limit = 50; // Reduced from 1000 for better infinite scroll UX
+
+  // Smart search parsing effect
+  useEffect(() => {
+    if (searchQuery.length >= 3) {
+      const parsed = parseSearchQuery(searchQuery);
+      
+      if (parsed.isParsed) {
+        // Auto-populate filters based on parsed query
+        const newFilters = { ...filters };
+        
+        if (parsed.country) {
+          newFilters.country = parsed.country;
+        }
+        if (parsed.region) {
+          newFilters.state = parsed.region;
+        }
+        if (parsed.city) {
+          newFilters.city = parsed.city;
+        }
+        if (parsed.placeName) {
+          newFilters.name = parsed.placeName;
+        }
+        
+        setFilters(newFilters);
+      }
+    }
+  }, [searchQuery]);
 
   // Fetch dropdown data
   const { data: countries } = trpc.places.getCountries.useQuery();
@@ -602,7 +630,7 @@ export default function Places() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Quick search by name, address, or ID..."
+                placeholder="Try: 'Starbucks Newark NJ' or 'starbucks near newark nj'..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -617,6 +645,11 @@ export default function Places() {
               )}
             </Button>
           </div>
+          
+          {/* Smart Search Helper */}
+          <p className="text-sm text-muted-foreground mt-2">
+            💡 <strong>Smart Search:</strong> Type naturally like "Starbucks Newark NJ" and filters will auto-populate.
+          </p>
 
           {/* Advanced Filters Toggle */}
           <Collapsible open={showFilters} onOpenChange={setShowFilters}>
