@@ -1,4 +1,5 @@
 import Typesense from 'typesense';
+import { cache } from './cache';
 
 /**
  * Typesense Search Service for Tavvy Admin Portal
@@ -107,6 +108,12 @@ export async function searchPlacesTypesense(
     sort_by: 'popularity:desc',
     per_page: limit,
     page: page,
+    // Typo tolerance: allow up to 2 typos for better UX
+    num_typos: 2,
+    typo_tokens_threshold: 1,
+    // Search highlighting: show why results matched
+    highlight_fields: 'name,address,categories,locality',
+    highlight_full_fields: 'name,address',
   };
 
   try {
@@ -207,9 +214,16 @@ export async function getPlaceByIdTypesense(
 }
 
 /**
- * Get distinct countries from Typesense
+ * Get distinct countries from Typesense (cached for 1 hour)
  */
 export async function getDistinctCountriesTypesense(): Promise<string[]> {
+  const cacheKey = 'countries';
+  const cached = cache.get<string[]>(cacheKey);
+  if (cached) {
+    console.log('[Typesense] Returning cached countries');
+    return cached;
+  }
+
   try {
     const result = await typesenseClient
       .collections('places')
@@ -225,9 +239,12 @@ export async function getDistinctCountriesTypesense(): Promise<string[]> {
     if (result.facet_counts && result.facet_counts.length > 0) {
       const countryFacet = result.facet_counts.find((f: any) => f.field_name === 'country');
       if (countryFacet && countryFacet.counts) {
-        return countryFacet.counts
+        const countries = countryFacet.counts
           .map((c: any) => c.value)
           .filter((v: string) => v && v.trim().length > 0);
+        cache.set(cacheKey, countries);
+        console.log(`[Typesense] Cached ${countries.length} countries`);
+        return countries;
       }
     }
 
@@ -239,9 +256,16 @@ export async function getDistinctCountriesTypesense(): Promise<string[]> {
 }
 
 /**
- * Get distinct regions for a country
+ * Get distinct regions for a country (cached for 1 hour)
  */
 export async function getDistinctRegionsTypesense(country: string): Promise<string[]> {
+  const cacheKey = `regions:${country}`;
+  const cached = cache.get<string[]>(cacheKey);
+  if (cached) {
+    console.log(`[Typesense] Returning cached regions for ${country}`);
+    return cached;
+  }
+
   try {
     const result = await typesenseClient
       .collections('places')
@@ -258,9 +282,12 @@ export async function getDistinctRegionsTypesense(country: string): Promise<stri
     if (result.facet_counts && result.facet_counts.length > 0) {
       const regionFacet = result.facet_counts.find((f: any) => f.field_name === 'region');
       if (regionFacet && regionFacet.counts) {
-        return regionFacet.counts
+        const regions = regionFacet.counts
           .map((c: any) => c.value)
           .filter((v: string) => v && v.trim().length > 0);
+        cache.set(cacheKey, regions);
+        console.log(`[Typesense] Cached ${regions.length} regions for ${country}`);
+        return regions;
       }
     }
 
@@ -272,12 +299,19 @@ export async function getDistinctRegionsTypesense(country: string): Promise<stri
 }
 
 /**
- * Get distinct cities for a region
+ * Get distinct cities for a region (cached for 1 hour)
  */
 export async function getDistinctCitiesTypesense(
   country: string,
   region: string
 ): Promise<string[]> {
+  const cacheKey = `cities:${country}:${region}`;
+  const cached = cache.get<string[]>(cacheKey);
+  if (cached) {
+    console.log(`[Typesense] Returning cached cities for ${country}/${region}`);
+    return cached;
+  }
+
   try {
     const result = await typesenseClient
       .collections('places')
@@ -294,9 +328,12 @@ export async function getDistinctCitiesTypesense(
     if (result.facet_counts && result.facet_counts.length > 0) {
       const cityFacet = result.facet_counts.find((f: any) => f.field_name === 'locality');
       if (cityFacet && cityFacet.counts) {
-        return cityFacet.counts
+        const cities = cityFacet.counts
           .map((c: any) => c.value)
           .filter((v: string) => v && v.trim().length > 0);
+        cache.set(cacheKey, cities);
+        console.log(`[Typesense] Cached ${cities.length} cities for ${country}/${region}`);
+        return cities;
       }
     }
 
