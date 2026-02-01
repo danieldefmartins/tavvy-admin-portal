@@ -95,6 +95,13 @@ export default function Places() {
         }
         
         setFilters(newFilters);
+        
+        // Auto-trigger advanced search after populating filters
+        setTimeout(() => {
+          setAppliedFilters(newFilters);
+          setUseAdvancedSearch(true);
+          setPage(0);
+        }, 300); // Small delay to ensure filters are set
       }
     }
   }, [searchQuery]);
