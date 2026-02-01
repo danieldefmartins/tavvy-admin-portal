@@ -63,9 +63,10 @@ export function parseSearchQuery(query: string): ParsedQuery {
     };
   }
 
-  // Pattern 1: "Place near City, State" or "Place in City, State"
-  // Example: "Starbucks near Newark, NJ" or "coffee shops in Manhattan, NY"
-  const nearPattern = /^(.+?)\s+(?:near|in|at)\s+(.+?)(?:,\s*(.+))?$/i;
+  // Pattern 1: "Place near City State" or "Place near City, State"
+  // Example: "Starbucks near Newark NJ" or "coffee shops in Manhattan, NY"
+  // Supports both "near Newark NJ" and "near Newark, NJ"
+  const nearPattern = /^(.+?)\s+(?:near|in|at)\s+(.+?)(?:(?:,\s*|\s+)([a-zA-Z]{2}))?$/i;
   const nearMatch = trimmed.match(nearPattern);
   
   if (nearMatch) {
