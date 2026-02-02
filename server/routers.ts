@@ -22,6 +22,19 @@ import {
   markDraftSynced,
 } from "./draftDb";
 import { TRPCError } from "@trpc/server";
+import {
+  getProsWithPlaces,
+  getProWithPlaceById,
+  updateProWithPlace,
+  verifyPro,
+  unverifyPro,
+  activatePro,
+  deactivatePro,
+  featurePro,
+  unfeaturePro,
+  getProStatsNew,
+  getDistinctProviderTypesNew,
+} from "./prosDb";
 import { z } from "zod";
 import {
   searchPlaces,
@@ -95,19 +108,8 @@ import {
   updateUser,
   updateUserEmail,
   deleteUser,
-  // Pro Providers Management
-  getProProviders,
-  getProProviderById,
-  updateProProvider,
-  verifyProProvider,
-  unverifyProProvider,
-  activateProProvider,
-  deactivateProProvider,
-  featureProProvider,
-  unfeatureProProvider,
+  // Pro Providers Management (legacy - kept for fallback)
   getProReviews,
-  getProStats,
-  getDistinctProviderTypes,
   // Story Moderation
   getStories,
   getStoryById,
@@ -1779,13 +1781,13 @@ export const appRouter = router({
       )
       .query(async ({ input }) => {
         const { limit, offset, search, providerType, isVerified, isActive } = input || {};
-        return getProProviders(limit, offset, search, providerType, isVerified, isActive);
+        return getProsWithPlaces(limit, offset, search, providerType, isVerified, isActive);
       }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
-        return getProProviderById(input.id);
+        return getProWithPlaceById(input.id);
       }),
 
     update: protectedProcedure
@@ -1798,7 +1800,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
         // @ts-ignore - TypeScript incorrectly infers argument count
-        const success = await updateProProvider(input.id, input.updates, adminId);
+        const success = await updateProWithPlace(input.id, input.updates, {}, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -1812,7 +1814,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const success = await verifyProProvider(input.id, adminId);
+        const success = await verifyPro(input.id, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -1826,7 +1828,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const success = await unverifyProProvider(input.id, adminId);
+        const success = await unverifyPro(input.id, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -1840,7 +1842,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const success = await activateProProvider(input.id, adminId);
+        const success = await activatePro(input.id, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -1854,7 +1856,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const success = await deactivateProProvider(input.id, adminId);
+        const success = await deactivatePro(input.id, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -1868,7 +1870,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const success = await featureProProvider(input.id, adminId);
+        const success = await featurePro(input.id, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -1882,7 +1884,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        const success = await unfeatureProProvider(input.id, adminId);
+        const success = await unfeaturePro(input.id, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -1899,11 +1901,11 @@ export const appRouter = router({
       }),
 
     getStats: protectedProcedure.query(async () => {
-      return getProStats();
+      return getProStatsNew();
     }),
 
     getProviderTypes: protectedProcedure.query(async () => {
-      return getDistinctProviderTypes();
+      return getDistinctProviderTypesNew();
     }),
   }),
 
