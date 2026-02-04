@@ -252,11 +252,11 @@ function DashboardLayoutContent({
       <div className="relative" ref={sidebarRef}>
         <Sidebar
           collapsible="icon"
-          className="border-r border-orange-500/20 bg-gradient-to-b from-[#141842] to-[#0F1233]"
+          className="border-r border-white/10 bg-black"
           disableTransition={isResizing}
         >
           {/* Header with Logo */}
-          <SidebarHeader className="h-20 justify-center border-b border-orange-500/20 bg-[#0F1233]">
+          <SidebarHeader className="h-20 justify-center border-b border-white/10 bg-black">
             <div className="flex items-center gap-3 px-3 transition-all w-full">
               <button
                 onClick={toggleSidebar}
@@ -403,9 +403,9 @@ function DashboardLayoutContent({
       </div>
 
       {/* Main Content Area */}
-      <SidebarInset className="bg-[#0a0d24]">
+      <SidebarInset className="bg-black">
         {isMobile && (
-          <div className="flex border-b border-orange-500/20 h-14 items-center justify-between bg-gradient-to-r from-[#141842] to-[#0F1233] px-3 backdrop-blur sticky top-0 z-40">
+          <div className="flex border-b border-white/10 h-14 items-center justify-between bg-black px-3 backdrop-blur sticky top-0 z-40">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="h-9 w-9 rounded-lg bg-white/5 text-orange-400 hover:bg-white/10" />
               <img 

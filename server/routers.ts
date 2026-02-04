@@ -1499,10 +1499,11 @@ export const appRouter = router({
         z.object({
           query: z.string().min(1),
           limit: z.number().optional().default(20),
+          excludeUniverseId: z.string().optional(),
         })
       )
       .query(async ({ input }) => {
-        return searchPlacesForLinking(input.query, input.limit);
+        return searchPlacesForLinking(input.query, input.limit, input.excludeUniverseId);
       }),
 
     updatePlaceOrder: protectedProcedure

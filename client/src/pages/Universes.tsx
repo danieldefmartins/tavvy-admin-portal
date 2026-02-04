@@ -33,11 +33,14 @@ import {
   Trash2, 
   Image as ImageIcon,
   Palette,
-  Eye
+  Eye,
+  MapPin,
+  ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import ImageUpload from "@/components/ImageUpload";
+import { useIsMobile } from "@/hooks/useMobile";
 
 interface Universe {
   id: string;
@@ -54,6 +57,7 @@ interface Universe {
 
 export default function Universes() {
   const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -172,7 +176,7 @@ export default function Universes() {
 
   const UniverseForm = ({ isEdit = false }: { isEdit?: boolean }) => (
     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-      <div className="grid grid-cols-2 gap-4">
+      <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
         <div className="space-y-2">
           <Label htmlFor="name">Universe Name *</Label>
           <Input
@@ -186,6 +190,7 @@ export default function Universes() {
               });
             }}
             placeholder="Disney World"
+            className="h-12"
           />
         </div>
         <div className="space-y-2">
@@ -195,6 +200,7 @@ export default function Universes() {
             value={formData.slug}
             onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
             placeholder="disney-world"
+            className="h-12"
           />
         </div>
       </div>
@@ -237,18 +243,19 @@ export default function Universes() {
           value={formData.location}
           onChange={(e) => setFormData({ ...formData, location: e.target.value })}
           placeholder="e.g., Orlando, FL"
+          className="h-12"
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
         <div className="space-y-2">
           <Label>Featured</Label>
-          <div className="flex items-center h-10">
+          <div className="flex items-center h-12">
             <input
               type="checkbox"
               checked={formData.is_featured}
               onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300"
+              className="h-5 w-5 rounded border-gray-300"
             />
             <span className="ml-2 text-sm">Featured universe</span>
           </div>
@@ -259,7 +266,7 @@ export default function Universes() {
             id="status"
             value={formData.status}
             onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
             <option value="active">Active</option>
             <option value="draft">Draft</option>
@@ -270,21 +277,124 @@ export default function Universes() {
     </div>
   );
 
+  // Mobile Card Component for each universe
+  const UniverseCard = ({ universe }: { universe: Universe }) => (
+    <Card 
+      className="mb-3 active:scale-[0.98] transition-transform cursor-pointer"
+      onClick={() => setLocation(`/universes/${universe.id}`)}
+    >
+      <CardContent className="p-4">
+        <div className="flex gap-3">
+          {/* Thumbnail */}
+          {universe.thumbnail_image_url ? (
+            <img 
+              src={universe.thumbnail_image_url} 
+              alt={universe.name}
+              className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+              <ImageIcon className="h-6 w-6 text-muted-foreground" />
+            </div>
+          )}
+          
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="font-semibold truncate">{universe.name}</h3>
+                {universe.location && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <MapPin className="h-3 w-3" />
+                    {universe.location}
+                  </p>
+                )}
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            </div>
+            
+            {/* Badges */}
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {universe.is_featured && (
+                <Badge variant="secondary" className="text-xs">
+                  <Palette className="h-3 w-3 mr-1" />
+                  Featured
+                </Badge>
+              )}
+              <Badge 
+                variant={
+                  universe.status === "active" ? "default" : 
+                  universe.status === "draft" ? "secondary" : "outline"
+                }
+                className="text-xs"
+              >
+                {universe.status}
+              </Badge>
+            </div>
+          </div>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="flex gap-2 mt-3 pt-3 border-t">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="flex-1 h-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLocation(`/universes/${universe.id}`);
+            }}
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            Manage
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="h-10 px-3"
+            onClick={(e) => {
+              e.stopPropagation();
+              openEditDialog(universe);
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="h-10 px-3"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete(universe.id);
+            }}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Universes</h1>
-          <p className="text-muted-foreground">Manage universes (theme parks, brands, etc.)</p>
+    <div className="space-y-4 md:space-y-6">
+      {/* Header */}
+      <div className={`flex items-center justify-between ${isMobile ? 'flex-col gap-3' : ''}`}>
+        <div className={isMobile ? 'text-center w-full' : ''}>
+          <h1 className={`font-bold tracking-tight ${isMobile ? 'text-2xl' : 'text-3xl'}`}>Universes</h1>
+          <p className="text-muted-foreground text-sm">Manage universes (theme parks, brands, etc.)</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setIsCreateDialogOpen(true); }}>
+            <Button 
+              onClick={() => { resetForm(); setIsCreateDialogOpen(true); }}
+              className={`h-11 ${isMobile ? 'w-full' : ''}`}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Universe
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className={isMobile ? 'max-w-[95vw] max-h-[90vh]' : 'max-w-2xl'}>
             <DialogHeader>
               <DialogTitle>Create New Universe</DialogTitle>
               <DialogDescription>
@@ -292,11 +402,19 @@ export default function Universes() {
               </DialogDescription>
             </DialogHeader>
             <UniverseForm />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+            <DialogFooter className={isMobile ? 'flex-col gap-2' : ''}>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsCreateDialogOpen(false)}
+                className={isMobile ? 'w-full h-11' : ''}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending}>
+              <Button 
+                onClick={handleCreate} 
+                disabled={createMutation.isPending}
+                className={isMobile ? 'w-full h-11' : ''}
+              >
                 {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Create Universe
               </Button>
@@ -307,49 +425,57 @@ export default function Universes() {
 
       {/* Search */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className={isMobile ? 'p-3' : 'pt-6'}>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search universes by name or slug..."
+              placeholder="Search universes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className={`pl-10 ${isMobile ? 'h-12' : ''}`}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Universes Table */}
+      {/* Universes List */}
       <Card>
-        <CardHeader>
-          <CardTitle>All Universes</CardTitle>
+        <CardHeader className={isMobile ? 'pb-2' : ''}>
+          <CardTitle className={isMobile ? 'text-lg' : ''}>All Universes</CardTitle>
           <CardDescription>
             {filteredUniverses?.length || 0} universes found
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className={isMobile ? 'px-3' : ''}>
           {isLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
+                <Skeleton key={i} className={isMobile ? 'h-32' : 'h-16'} />
               ))}
             </div>
           ) : filteredUniverses?.length === 0 ? (
-            <div className="text-center py-12">
+            <div className="text-center py-8">
               <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No universes found</h3>
               <p className="text-muted-foreground mb-4">
                 {searchQuery ? "Try a different search term" : "Get started by creating your first universe"}
               </p>
               {!searchQuery && (
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                <Button onClick={() => setIsCreateDialogOpen(true)} className="h-11">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Universe
                 </Button>
               )}
             </div>
+          ) : isMobile ? (
+            // Mobile: Card-based layout
+            <div className="space-y-0">
+              {filteredUniverses?.map((universe) => (
+                <UniverseCard key={universe.id} universe={universe} />
+              ))}
+            </div>
           ) : (
+            // Desktop: Table layout
             <Table>
               <TableHeader>
                 <TableRow>
@@ -437,7 +563,7 @@ export default function Universes() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className={isMobile ? 'max-w-[95vw] max-h-[90vh]' : 'max-w-2xl'}>
           <DialogHeader>
             <DialogTitle>Edit Universe</DialogTitle>
             <DialogDescription>
@@ -445,11 +571,19 @@ export default function Universes() {
             </DialogDescription>
           </DialogHeader>
           <UniverseForm isEdit />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+          <DialogFooter className={isMobile ? 'flex-col gap-2' : ''}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsEditDialogOpen(false)}
+              className={isMobile ? 'w-full h-11' : ''}
+            >
               Cancel
             </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+            <Button 
+              onClick={handleUpdate} 
+              disabled={updateMutation.isPending}
+              className={isMobile ? 'w-full h-11' : ''}
+            >
               {updateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Changes
             </Button>

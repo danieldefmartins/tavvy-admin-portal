@@ -1956,17 +1956,33 @@ export async function updateUniversePlaceCount(universeId: string): Promise<void
     .eq("id", universeId);
 }
 
-export async function searchPlacesForLinking(query: string, limit: number = 20) {
-  const { data, error } = await supabase
+export async function searchPlacesForLinking(query: string, limit: number = 20, excludeUniverseId?: string) {
+  let queryBuilder = supabase
     .from("places")
     .select("id, name, address, city, region, country, category_name, thumbnail_url")
     .ilike("name", `%${query}%`)
     .limit(limit);
 
+  // If excludeUniverseId is provided, exclude places already linked to that universe
+  // This is a simple implementation - for better performance, consider a different approach
+  const { data, error } = await queryBuilder;
+
   if (error) {
     console.error("[Supabase] Search places for linking error:", error);
     throw error;
   }
+
+  // Filter out already linked places if excludeUniverseId is provided
+  if (excludeUniverseId && data) {
+    const { data: linkedPlaces } = await supabase
+      .from("atlas_universe_places")
+      .select("place_id")
+      .eq("universe_id", excludeUniverseId);
+    
+    const linkedPlaceIds = new Set(linkedPlaces?.map(p => p.place_id) || []);
+    return data.filter(place => !linkedPlaceIds.has(place.id));
+  }
+
   return data;
 }
 

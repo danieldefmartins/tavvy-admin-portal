@@ -38,10 +38,12 @@ import {
   Unlink,
   Star,
   StarOff,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import ImageUpload from "@/components/ImageUpload";
+import { useIsMobile } from "@/hooks/useMobile";
 
 interface Planet {
   id: string;
@@ -89,6 +91,7 @@ export default function UniverseDetail() {
   const [, params] = useRoute("/universes/:id");
   const id = params?.id;
   const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("planets");
   
   // Planet dialog state
@@ -125,11 +128,11 @@ export default function UniverseDetail() {
   );
   
   const { data: searchResults, isLoading: searchLoading } = trpc.universes.searchPlaces.useQuery(
-    { query: placeSearchQuery, limit: 20 },
-    { enabled: placeSearchQuery.length >= 2 }
+    { query: placeSearchQuery, excludeUniverseId: id! },
+    { enabled: placeSearchQuery.length >= 2 && !!id }
   );
 
-  // Planet mutations
+  // Mutations
   const createPlanetMutation = trpc.universes.createPlanet.useMutation({
     onSuccess: () => {
       toast.success("Planet created successfully!");
@@ -137,9 +140,7 @@ export default function UniverseDetail() {
       resetPlanetForm();
       refetchPlanets();
     },
-    onError: (error) => {
-      toast.error(`Error: ${error.message}`);
-    },
+    onError: (error) => toast.error(`Error: ${error.message}`),
   });
 
   const updatePlanetMutation = trpc.universes.updatePlanet.useMutation({
@@ -150,9 +151,7 @@ export default function UniverseDetail() {
       resetPlanetForm();
       refetchPlanets();
     },
-    onError: (error) => {
-      toast.error(`Error: ${error.message}`);
-    },
+    onError: (error) => toast.error(`Error: ${error.message}`),
   });
 
   const deletePlanetMutation = trpc.universes.deletePlanet.useMutation({
@@ -160,27 +159,18 @@ export default function UniverseDetail() {
       toast.success("Planet deleted successfully!");
       refetchPlanets();
     },
-    onError: (error) => {
-      toast.error(`Error: ${error.message}`);
-    },
+    onError: (error) => toast.error(`Error: ${error.message}`),
   });
 
-  // Place mutations
   const linkPlaceMutation = trpc.universes.linkPlace.useMutation({
-    onSuccess: (result) => {
-      if (result.alreadyLinked) {
-        toast.info("This place is already linked to this universe");
-      } else {
-        toast.success("Place linked successfully!");
-      }
+    onSuccess: () => {
+      toast.success("Place linked successfully!");
       setIsLinkPlaceDialogOpen(false);
       setPlaceSearchQuery("");
       setSelectedPlaceId(null);
       refetchPlaces();
     },
-    onError: (error) => {
-      toast.error(`Error: ${error.message}`);
-    },
+    onError: (error) => toast.error(`Error: ${error.message}`),
   });
 
   const unlinkPlaceMutation = trpc.universes.unlinkPlace.useMutation({
@@ -188,9 +178,7 @@ export default function UniverseDetail() {
       toast.success("Place unlinked successfully!");
       refetchPlaces();
     },
-    onError: (error) => {
-      toast.error(`Error: ${error.message}`);
-    },
+    onError: (error) => toast.error(`Error: ${error.message}`),
   });
 
   const toggleFeaturedMutation = trpc.universes.togglePlaceFeatured.useMutation({
@@ -198,9 +186,7 @@ export default function UniverseDetail() {
       toast.success("Featured status updated!");
       refetchPlaces();
     },
-    onError: (error) => {
-      toast.error(`Error: ${error.message}`);
-    },
+    onError: (error) => toast.error(`Error: ${error.message}`),
   });
 
   const resetPlanetForm = () => {
@@ -240,8 +226,8 @@ export default function UniverseDetail() {
       return;
     }
     createPlanetMutation.mutate({
-      ...planetForm,
       parent_universe_id: id!,
+      ...planetForm,
     });
   };
 
@@ -254,16 +240,13 @@ export default function UniverseDetail() {
   };
 
   const handleDeletePlanet = (planetId: string) => {
-    if (confirm("Are you sure you want to delete this planet? This will also unlink all places.")) {
+    if (confirm("Are you sure you want to delete this planet?")) {
       deletePlanetMutation.mutate({ id: planetId });
     }
   };
 
   const handleLinkPlace = () => {
-    if (!selectedPlaceId) {
-      toast.error("Please select a place to link");
-      return;
-    }
+    if (!selectedPlaceId) return;
     linkPlaceMutation.mutate({
       universeId: id!,
       placeId: selectedPlaceId,
@@ -287,10 +270,165 @@ export default function UniverseDetail() {
     });
   };
 
+  // Mobile Card Components
+  const PlanetCard = ({ planet }: { planet: Planet }) => (
+    <Card 
+      className="mb-3 active:scale-[0.98] transition-transform cursor-pointer border-border/50 bg-card/50"
+      onClick={() => setLocation(`/universes/${planet.id}`)}
+    >
+      <CardContent className="p-4">
+        <div className="flex gap-3">
+          {planet.thumbnail_url ? (
+            <img 
+              src={planet.thumbnail_url} 
+              alt={planet.name}
+              className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+              <Globe className="h-6 w-6 text-muted-foreground" />
+            </div>
+          )}
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="font-semibold truncate">{planet.name}</h3>
+                {planet.location && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <MapPin className="h-3 w-3" />
+                    {planet.location}
+                  </p>
+                )}
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            </div>
+            
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="secondary" className="text-xs">
+                {planet.place_count || 0} places
+              </Badge>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="flex-1 h-11"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLocation(`/universes/${planet.id}`);
+            }}
+          >
+            <Globe className="h-4 w-4 mr-2" />
+            View
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="h-11 px-4"
+            onClick={(e) => {
+              e.stopPropagation();
+              openEditPlanetDialog(planet);
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="h-11 px-4"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeletePlanet(planet.id);
+            }}
+            disabled={deletePlanetMutation.isPending}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const PlaceCard = ({ link }: { link: LinkedPlace }) => (
+    <Card className="mb-3 border-border/50 bg-card/50">
+      <CardContent className="p-4">
+        <div className="flex gap-3">
+          {link.places?.thumbnail_url ? (
+            <img 
+              src={link.places.thumbnail_url} 
+              alt={link.places.name}
+              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+              <MapPin className="h-6 w-6 text-muted-foreground" />
+            </div>
+          )}
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="font-semibold truncate">{link.places?.name || "Unknown"}</h3>
+                <p className="text-sm text-muted-foreground truncate">
+                  {link.places?.category_name || "No category"}
+                </p>
+              </div>
+              {link.is_featured && (
+                <Star className="h-5 w-5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+              )}
+            </div>
+            
+            <p className="text-xs text-muted-foreground mt-1 truncate">
+              {[link.places?.city, link.places?.region, link.places?.country]
+                .filter(Boolean)
+                .join(", ") || "No location"}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="flex-1 h-11"
+            onClick={() => handleToggleFeatured(link.place_id, link.is_featured)}
+            disabled={toggleFeaturedMutation.isPending}
+          >
+            {link.is_featured ? (
+              <>
+                <StarOff className="h-4 w-4 mr-2" />
+                Unfeature
+              </>
+            ) : (
+              <>
+                <Star className="h-4 w-4 mr-2" />
+                Feature
+              </>
+            )}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="h-11 px-4"
+            onClick={() => handleUnlinkPlace(link.place_id)}
+            disabled={unlinkPlaceMutation.isPending}
+          >
+            <Unlink className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   if (universeLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 p-4">
         <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-32 w-full" />
         <Skeleton className="h-48 w-full" />
       </div>
     );
@@ -298,10 +436,10 @@ export default function UniverseDetail() {
 
   if (!universe) {
     return (
-      <div className="text-center py-12">
+      <div className="text-center py-12 px-4">
         <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold mb-2">Universe not found</h3>
-        <Button onClick={() => setLocation("/universes")}>
+        <Button onClick={() => setLocation("/universes")} className="h-11">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Universes
         </Button>
@@ -310,46 +448,53 @@ export default function UniverseDetail() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-4 ${isMobile ? 'pb-20' : 'space-y-6'}`}>
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/universes")}>
+      <div className={`flex items-center gap-3 ${isMobile ? 'flex-wrap' : 'gap-4'}`}>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => setLocation("/universes")}
+          className="h-11 w-11"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">{universe.name}</h1>
-          <p className="text-muted-foreground">
-            Manage planets and places for this universe
+        <div className="flex-1 min-w-0">
+          <h1 className={`font-bold tracking-tight truncate ${isMobile ? 'text-xl' : 'text-3xl'}`}>
+            {universe.name}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Manage planets and places
           </p>
         </div>
         {universe.thumbnail_url && (
           <img 
             src={universe.thumbnail_url} 
             alt={universe.name}
-            className="w-16 h-16 rounded-lg object-cover"
+            className={`rounded-lg object-cover ${isMobile ? 'w-12 h-12' : 'w-16 h-16'}`}
           />
         )}
       </div>
 
       {/* Universe Info Card */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-4 gap-4 text-sm">
+      <Card className="border-border/50 bg-card/50">
+        <CardContent className={isMobile ? 'p-4' : 'pt-6'}>
+          <div className={`grid gap-3 text-sm ${isMobile ? 'grid-cols-2' : 'grid-cols-4'}`}>
             <div>
-              <span className="text-muted-foreground">Slug:</span>
-              <span className="ml-2 font-mono">{universe.slug}</span>
+              <span className="text-muted-foreground block text-xs">Slug</span>
+              <span className="font-mono text-xs">{universe.slug}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Location:</span>
-              <span className="ml-2">{universe.location || "Not set"}</span>
+              <span className="text-muted-foreground block text-xs">Location</span>
+              <span>{universe.location || "Not set"}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Place Count:</span>
-              <span className="ml-2">{universe.place_count || 0}</span>
+              <span className="text-muted-foreground block text-xs">Places</span>
+              <span>{universe.place_count || 0}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Status:</span>
-              <Badge variant="outline" className="ml-2">
+              <span className="text-muted-foreground block text-xs">Status</span>
+              <Badge variant="outline" className="mt-0.5">
                 {universe.status || "active"}
               </Badge>
             </div>
@@ -361,61 +506,75 @@ export default function UniverseDetail() {
       </Card>
 
       {/* Tabs for Planets and Places */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="planets">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className={`w-full ${isMobile ? 'grid grid-cols-2 h-12' : ''}`}>
+          <TabsTrigger value="planets" className={isMobile ? 'h-10' : ''}>
             <Globe className="h-4 w-4 mr-2" />
             Planets ({planets?.length || 0})
           </TabsTrigger>
-          <TabsTrigger value="places">
+          <TabsTrigger value="places" className={isMobile ? 'h-10' : ''}>
             <MapPin className="h-4 w-4 mr-2" />
             Places ({linkedPlaces?.length || 0})
           </TabsTrigger>
         </TabsList>
 
         {/* Planets Tab */}
-        <TabsContent value="planets" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+        <TabsContent value="planets" className="space-y-4 mt-4">
+          <Card className="border-border/50 bg-card/50">
+            <CardHeader className={`${isMobile ? 'pb-3' : ''} flex ${isMobile ? 'flex-col gap-3' : 'flex-row items-center justify-between'}`}>
               <div>
-                <CardTitle>Planets</CardTitle>
+                <CardTitle className={isMobile ? 'text-lg' : ''}>Planets</CardTitle>
                 <CardDescription>
-                  Sub-locations within this universe (e.g., Magic Kingdom within Walt Disney World)
+                  Sub-locations within this universe
                 </CardDescription>
               </div>
-              <Button onClick={() => {
-                resetPlanetForm();
-                setEditingPlanet(null);
-                setIsPlanetDialogOpen(true);
-              }}>
+              <Button 
+                onClick={() => {
+                  resetPlanetForm();
+                  setEditingPlanet(null);
+                  setIsPlanetDialogOpen(true);
+                }}
+                className={`h-11 ${isMobile ? 'w-full' : ''}`}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Planet
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className={isMobile ? 'px-3' : ''}>
               {planetsLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
+                    <Skeleton key={i} className={isMobile ? 'h-32' : 'h-16'} />
                   ))}
                 </div>
               ) : planets?.length === 0 ? (
                 <div className="text-center py-8">
                   <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No planets yet</h3>
-                  <p className="text-muted-foreground mb-4">
+                  <p className="text-muted-foreground mb-4 text-sm">
                     Add planets to organize places within this universe
                   </p>
-                  <Button onClick={() => {
-                    resetPlanetForm();
-                    setEditingPlanet(null);
-                    setIsPlanetDialogOpen(true);
-                  }}>
+                  <Button 
+                    onClick={() => {
+                      resetPlanetForm();
+                      setEditingPlanet(null);
+                      setIsPlanetDialogOpen(true);
+                    }}
+                    className="h-11"
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Add First Planet
                   </Button>
                 </div>
+              ) : isMobile ? (
+                // Mobile: Card layout
+                <div className="space-y-0">
+                  {planets?.map((planet) => (
+                    <PlanetCard key={planet.id} planet={planet} />
+                  ))}
+                </div>
               ) : (
+                // Desktop: Table layout
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -490,40 +649,51 @@ export default function UniverseDetail() {
         </TabsContent>
 
         {/* Places Tab */}
-        <TabsContent value="places" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+        <TabsContent value="places" className="space-y-4 mt-4">
+          <Card className="border-border/50 bg-card/50">
+            <CardHeader className={`${isMobile ? 'pb-3' : ''} flex ${isMobile ? 'flex-col gap-3' : 'flex-row items-center justify-between'}`}>
               <div>
-                <CardTitle>Linked Places</CardTitle>
+                <CardTitle className={isMobile ? 'text-lg' : ''}>Linked Places</CardTitle>
                 <CardDescription>
                   Places that belong to this universe
                 </CardDescription>
               </div>
-              <Button onClick={() => setIsLinkPlaceDialogOpen(true)}>
+              <Button 
+                onClick={() => setIsLinkPlaceDialogOpen(true)}
+                className={`h-11 ${isMobile ? 'w-full' : ''}`}
+              >
                 <LinkIcon className="h-4 w-4 mr-2" />
                 Link Place
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className={isMobile ? 'px-3' : ''}>
               {placesLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
+                    <Skeleton key={i} className={isMobile ? 'h-28' : 'h-16'} />
                   ))}
                 </div>
               ) : linkedPlaces?.length === 0 ? (
                 <div className="text-center py-8">
                   <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No places linked</h3>
-                  <p className="text-muted-foreground mb-4">
+                  <p className="text-muted-foreground mb-4 text-sm">
                     Link places to this universe to organize them
                   </p>
-                  <Button onClick={() => setIsLinkPlaceDialogOpen(true)}>
+                  <Button onClick={() => setIsLinkPlaceDialogOpen(true)} className="h-11">
                     <LinkIcon className="h-4 w-4 mr-2" />
                     Link First Place
                   </Button>
                 </div>
+              ) : isMobile ? (
+                // Mobile: Card layout
+                <div className="space-y-0">
+                  {linkedPlaces?.map((link) => (
+                    <PlaceCard key={link.id} link={link} />
+                  ))}
+                </div>
               ) : (
+                // Desktop: Table layout
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -599,7 +769,7 @@ export default function UniverseDetail() {
 
       {/* Planet Dialog */}
       <Dialog open={isPlanetDialogOpen} onOpenChange={setIsPlanetDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className={isMobile ? 'max-w-[95vw] max-h-[90vh]' : 'max-w-2xl'}>
           <DialogHeader>
             <DialogTitle>
               {editingPlanet ? "Edit Planet" : "Add New Planet"}
@@ -611,7 +781,7 @@ export default function UniverseDetail() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
               <div className="space-y-2">
                 <Label htmlFor="planet-name">Planet Name *</Label>
                 <Input
@@ -625,6 +795,7 @@ export default function UniverseDetail() {
                     });
                   }}
                   placeholder="Magic Kingdom"
+                  className="h-12"
                 />
               </div>
               <div className="space-y-2">
@@ -634,6 +805,7 @@ export default function UniverseDetail() {
                   value={planetForm.slug}
                   onChange={(e) => setPlanetForm({ ...planetForm, slug: e.target.value })}
                   placeholder="magic-kingdom"
+                  className="h-12"
                 />
               </div>
             </div>
@@ -674,16 +846,22 @@ export default function UniverseDetail() {
                 value={planetForm.location}
                 onChange={(e) => setPlanetForm({ ...planetForm, location: e.target.value })}
                 placeholder="e.g., Orlando, FL"
+                className="h-12"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPlanetDialogOpen(false)}>
+          <DialogFooter className={isMobile ? 'flex-col gap-2' : ''}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsPlanetDialogOpen(false)}
+              className={isMobile ? 'w-full h-11' : ''}
+            >
               Cancel
             </Button>
             <Button 
               onClick={editingPlanet ? handleUpdatePlanet : handleCreatePlanet}
               disabled={createPlanetMutation.isPending || updatePlanetMutation.isPending}
+              className={isMobile ? 'w-full h-11' : ''}
             >
               {(createPlanetMutation.isPending || updatePlanetMutation.isPending) && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -696,7 +874,7 @@ export default function UniverseDetail() {
 
       {/* Link Place Dialog */}
       <Dialog open={isLinkPlaceDialogOpen} onOpenChange={setIsLinkPlaceDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className={isMobile ? 'max-w-[95vw] max-h-[90vh]' : 'max-w-2xl'}>
           <DialogHeader>
             <DialogTitle>Link Place to Universe</DialogTitle>
             <DialogDescription>
@@ -710,7 +888,7 @@ export default function UniverseDetail() {
                 placeholder="Search places by name..."
                 value={placeSearchQuery}
                 onChange={(e) => setPlaceSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-12"
               />
             </div>
             
@@ -735,8 +913,8 @@ export default function UniverseDetail() {
                     key={place.id}
                     className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                       selectedPlaceId === place.id 
-                        ? "border-primary bg-primary/5" 
-                        : "hover:bg-muted"
+                        ? "border-primary bg-primary/10" 
+                        : "border-border/50 hover:bg-muted/50"
                     }`}
                     onClick={() => setSelectedPlaceId(place.id)}
                   >
@@ -774,17 +952,22 @@ export default function UniverseDetail() {
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setIsLinkPlaceDialogOpen(false);
-              setPlaceSearchQuery("");
-              setSelectedPlaceId(null);
-            }}>
+          <DialogFooter className={isMobile ? 'flex-col gap-2' : ''}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsLinkPlaceDialogOpen(false);
+                setPlaceSearchQuery("");
+                setSelectedPlaceId(null);
+              }}
+              className={isMobile ? 'w-full h-11' : ''}
+            >
               Cancel
             </Button>
             <Button 
               onClick={handleLinkPlace}
               disabled={!selectedPlaceId || linkPlaceMutation.isPending}
+              className={isMobile ? 'w-full h-11' : ''}
             >
               {linkPlaceMutation.isPending && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
