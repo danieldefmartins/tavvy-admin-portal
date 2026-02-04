@@ -1316,6 +1316,7 @@ export const appRouter = router({
           location: z.string().optional(),
           is_featured: z.boolean().default(false),
           status: z.string().default("active"),
+          category_id: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -1325,6 +1326,7 @@ export const appRouter = router({
           thumbnail_image_url: input.thumbnail_image_url || null,
           banner_image_url: input.banner_image_url || null,
           location: input.location || null,
+          category_id: input.category_id === '' ? null : (input.category_id || null),
         });
         if (!id) {
           throw new TRPCError({
@@ -1347,11 +1349,17 @@ export const appRouter = router({
           location: z.string().optional(),
           is_featured: z.boolean().optional(),
           status: z.string().optional(),
+          category_id: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
-        const success = await updateUniverse(id, data);
+        // Convert empty string to null for category_id
+        const updateData = {
+          ...data,
+          category_id: data.category_id === '' ? null : data.category_id,
+        };
+        const success = await updateUniverse(id, updateData);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",

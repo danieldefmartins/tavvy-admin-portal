@@ -1729,6 +1729,7 @@ export async function createUniverse(universe: {
   location?: string | null;
   is_featured?: boolean;
   status?: string;
+  category_id?: string | null;
 }) {
   const { data, error } = await supabase
     .from("atlas_universes")

@@ -62,6 +62,7 @@ interface Universe {
   is_featured: boolean;
   status: string;
   created_at: string;
+  category_id?: string | null;
   category_name?: string | null;
   category_slug?: string | null;
   parent_universe_id?: string | null;
@@ -95,13 +96,21 @@ export default function Universes() {
     location: "",
     is_featured: false,
     status: "active",
+    category_id: "",
   });
 
-  // Queries
-  const { data: universes, isLoading, refetch } = trpc.universes.getAll.useQuery({
-    type: typeFilter,
-    categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
-  });
+  // Queries - refetch when filters change
+  const { data: universes, isLoading, refetch } = trpc.universes.getAll.useQuery(
+    {
+      type: typeFilter,
+      categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
+    },
+    {
+      // Ensure query refetches when filters change
+      refetchOnMount: true,
+      staleTime: 0,
+    }
+  );
   
   const { data: categories } = trpc.universes.getCategories.useQuery();
 
@@ -151,6 +160,7 @@ export default function Universes() {
       location: "",
       is_featured: false,
       status: "active",
+      category_id: "",
     });
   };
 
@@ -184,6 +194,7 @@ export default function Universes() {
       location: universe.location || "",
       is_featured: universe.is_featured,
       status: universe.status || "active",
+      category_id: universe.category_id || "",
     });
     setIsEditDialogOpen(true);
   };
@@ -271,15 +282,36 @@ export default function Universes() {
         placeholder="Enter banner URL or upload a file"
       />
 
-      <div className="space-y-2">
-        <Label htmlFor="location">Location</Label>
-        <Input
-          id="location"
-          value={formData.location}
-          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-          placeholder="e.g., Orlando, FL"
-          className="h-12"
-        />
+      <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+        <div className="space-y-2">
+          <Label htmlFor="location">Location</Label>
+          <Input
+            id="location"
+            value={formData.location}
+            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            placeholder="e.g., Orlando, FL"
+            className="h-12"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="category">Category</Label>
+          <Select 
+            value={formData.category_id || "none"} 
+            onValueChange={(v) => setFormData({ ...formData, category_id: v === "none" ? "" : v })}
+          >
+            <SelectTrigger className="h-12">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No Category</SelectItem>
+              {categories?.map((cat: Category) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
