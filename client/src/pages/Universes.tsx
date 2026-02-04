@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import ImageUpload from "@/components/ImageUpload";
 
 interface Universe {
   id: string;
@@ -206,26 +207,25 @@ export default function Universes() {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="thumbnail_image_url">Thumbnail Image URL</Label>
-          <Input
-            id="thumbnail_image_url"
-            value={formData.thumbnail_image_url}
-            onChange={(e) => setFormData({ ...formData, thumbnail_image_url: e.target.value })}
-            placeholder="https://..."
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="banner_image_url">Banner Image URL</Label>
-          <Input
-            id="banner_image_url"
-            value={formData.banner_image_url}
-            onChange={(e) => setFormData({ ...formData, banner_image_url: e.target.value })}
-            placeholder="https://..."
-          />
-        </div>
-      </div>
+      {/* Thumbnail Image with Upload */}
+      <ImageUpload
+        value={formData.thumbnail_image_url}
+        onChange={(url) => setFormData({ ...formData, thumbnail_image_url: url })}
+        bucket="universe-images"
+        folder="thumbnails"
+        label="Thumbnail Image"
+        placeholder="Enter thumbnail URL or upload a file"
+      />
+
+      {/* Banner Image with Upload */}
+      <ImageUpload
+        value={formData.banner_image_url}
+        onChange={(url) => setFormData({ ...formData, banner_image_url: url })}
+        bucket="universe-images"
+        folder="banners"
+        label="Banner Image"
+        placeholder="Enter banner URL or upload a file"
+      />
 
       <div className="space-y-2">
         <Label htmlFor="location">Location</Label>
@@ -332,75 +332,87 @@ export default function Universes() {
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          ) : filteredUniverses && filteredUniverses.length > 0 ? (
+          ) : filteredUniverses?.length === 0 ? (
+            <div className="text-center py-12">
+              <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No universes found</h3>
+              <p className="text-muted-foreground mb-4">
+                {searchQuery ? "Try a different search term" : "Get started by creating your first universe"}
+              </p>
+              {!searchQuery && (
+                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Universe
+                </Button>
+              )}
+            </div>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Universe</TableHead>
+                  <TableHead className="w-[60px]">Image</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Slug</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUniverses.map((universe) => (
+                {filteredUniverses?.map((universe) => (
                   <TableRow key={universe.id}>
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        {universe.thumbnail_image_url ? (
-                          <img
-                            src={universe.thumbnail_image_url}
-                            alt={universe.name}
-                            className="h-10 w-10 object-cover rounded"
-                          />
-                        ) : universe.banner_image_url ? (
-                          <img
-                            src={universe.banner_image_url}
-                            alt={universe.name}
-                            className="h-10 w-10 object-cover rounded"
-                          />
-                        ) : (
-                          <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
-                            <Globe className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium">{universe.name}</p>
-                          <p className="text-xs text-muted-foreground">{universe.slug}</p>
+                      {universe.thumbnail_image_url ? (
+                        <img 
+                          src={universe.thumbnail_image_url} 
+                          alt={universe.name}
+                          className="w-10 h-10 rounded object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
                         </div>
-                      </div>
+                      )}
                     </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">{universe.location || "—"}</span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Badge variant={universe.status === "active" ? "default" : "secondary"}>
-                          {universe.status || "active"}
-                        </Badge>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {universe.name}
                         {universe.is_featured && (
-                          <Badge variant="outline" className="text-yellow-500 border-yellow-500">
+                          <Badge variant="secondary" className="text-xs">
+                            <Palette className="h-3 w-3 mr-1" />
                             Featured
                           </Badge>
                         )}
                       </div>
                     </TableCell>
+                    <TableCell className="text-muted-foreground">{universe.slug}</TableCell>
+                    <TableCell className="text-muted-foreground">{universe.location || "-"}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant={
+                          universe.status === "active" ? "default" : 
+                          universe.status === "draft" ? "secondary" : "outline"
+                        }
+                      >
+                        {universe.status}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
                           size="icon"
                           onClick={() => openEditDialog(universe)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
+                        <Button 
+                          variant="ghost" 
                           size="icon"
                           onClick={() => handleDelete(universe.id)}
-                          className="text-destructive hover:text-destructive"
+                          disabled={deleteMutation.isPending}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
                     </TableCell>
@@ -408,14 +420,6 @@ export default function Universes() {
                 ))}
               </TableBody>
             </Table>
-          ) : (
-            <div className="py-12 text-center">
-              <Globe className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="font-semibold text-lg mb-2">No universes found</h3>
-              <p className="text-muted-foreground">
-                Add your first universe to get started
-              </p>
-            </div>
           )}
         </CardContent>
       </Card>
