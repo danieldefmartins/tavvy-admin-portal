@@ -1673,6 +1673,7 @@ export async function getUniverses() {
   const { data, error } = await supabase
     .from("atlas_universes")
     .select("*")
+    .is("parent_universe_id", null)  // Only get top-level universes, not planets
     .order("name", { ascending: true });
 
   if (error) throw error;
