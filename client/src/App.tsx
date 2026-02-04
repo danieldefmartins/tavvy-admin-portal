@@ -16,6 +16,7 @@ import AtlasBulkImport from "@/pages/AtlasBulkImport";
 import MarkdownImport from "@/pages/MarkdownImport";
 import Cities from "@/pages/Cities";
 import Universes from "@/pages/Universes";
+import UniverseDetail from "@/pages/UniverseDetail";
 // Admin & Safety Pages
 import BusinessClaims from "@/pages/BusinessClaims";
 import Moderation from "@/pages/Moderation";
@@ -135,6 +136,12 @@ function App() {
         <Route path="/universes">
           <ProtectedRoute>
             <Universes />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/universes/:id">
+          <ProtectedRoute>
+            <UniverseDetail />
           </ProtectedRoute>
         </Route>
 

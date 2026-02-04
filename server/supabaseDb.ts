@@ -1744,6 +1744,260 @@ export async function deleteUniverse(id: string): Promise<boolean> {
   return true;
 }
 
+// ============ PLANETS (Child Universes) ============
+// Planets are universes with a parent_universe_id
+
+export async function getPlanetsByUniverse(universeId: string) {
+  const { data, error } = await supabase
+    .from("atlas_universes")
+    .select("*")
+    .eq("parent_universe_id", universeId)
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function createPlanet(planet: {
+  name: string;
+  slug: string;
+  parent_universe_id: string;
+  description?: string | null;
+  thumbnail_url?: string | null;
+  banner_url?: string | null;
+  location?: string | null;
+}) {
+  const { data, error } = await supabase
+    .from("atlas_universes")
+    .insert({
+      name: planet.name,
+      slug: planet.slug,
+      parent_universe_id: planet.parent_universe_id,
+      description: planet.description || null,
+      thumbnail_url: planet.thumbnail_url || null,
+      banner_url: planet.banner_url || null,
+      location: planet.location || null,
+      place_count: 0,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data?.id || null;
+}
+
+export async function updatePlanet(id: string, updates: {
+  name?: string;
+  slug?: string;
+  description?: string | null;
+  thumbnail_url?: string | null;
+  banner_url?: string | null;
+  location?: string | null;
+}): Promise<boolean> {
+  const { error } = await supabase
+    .from("atlas_universes")
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] Update planet error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function deletePlanet(id: string): Promise<boolean> {
+  // First, delete any place links
+  await supabase
+    .from("atlas_universe_places")
+    .delete()
+    .eq("universe_id", id);
+
+  // Then delete the planet
+  const { error } = await supabase
+    .from("atlas_universes")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] Delete planet error:", error);
+    return false;
+  }
+  return true;
+}
+
+// ============ UNIVERSE PLACES (Linking) ============
+
+export async function getUniversePlaces(universeId: string) {
+  const { data, error } = await supabase
+    .from("atlas_universe_places")
+    .select(`
+      id,
+      universe_id,
+      place_id,
+      display_order,
+      is_featured,
+      created_at
+    `)
+    .eq("universe_id", universeId)
+    .order("display_order", { ascending: true });
+
+  if (error) {
+    console.error("[Supabase] Get universe places error:", error);
+    throw error;
+  }
+
+  // Fetch place details separately for each link
+  if (!data || data.length === 0) return [];
+
+  const placeIds = data.map(d => d.place_id);
+  const { data: placesData, error: placesError } = await supabase
+    .from("places")
+    .select("id, name, address, city, region, country, category_name, thumbnail_url")
+    .in("id", placeIds);
+
+  if (placesError) {
+    console.error("[Supabase] Get places for universe error:", placesError);
+    throw placesError;
+  }
+
+  // Map places to links
+  const placesMap = new Map(placesData?.map(p => [p.id, p]) || []);
+  return data.map(link => ({
+    ...link,
+    places: placesMap.get(link.place_id) || null
+  }));
+}
+
+export async function linkPlaceToUniverse(universeId: string, placeId: string, options?: {
+  display_order?: number;
+  is_featured?: boolean;
+}) {
+  // Check if already linked
+  const { data: existing } = await supabase
+    .from("atlas_universe_places")
+    .select("id")
+    .eq("universe_id", universeId)
+    .eq("place_id", placeId)
+    .maybeSingle();
+
+  if (existing) {
+    return { id: existing.id, alreadyLinked: true };
+  }
+
+  // Get max display order
+  const { data: maxOrder } = await supabase
+    .from("atlas_universe_places")
+    .select("display_order")
+    .eq("universe_id", universeId)
+    .order("display_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const nextOrder = (maxOrder?.display_order || 0) + 1;
+
+  const { data, error } = await supabase
+    .from("atlas_universe_places")
+    .insert({
+      universe_id: universeId,
+      place_id: placeId,
+      display_order: options?.display_order ?? nextOrder,
+      is_featured: options?.is_featured ?? false,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[Supabase] Link place to universe error:", error);
+    throw error;
+  }
+
+  // Update place count on universe
+  await updateUniversePlaceCount(universeId);
+
+  return { id: data?.id, alreadyLinked: false };
+}
+
+export async function unlinkPlaceFromUniverse(universeId: string, placeId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("atlas_universe_places")
+    .delete()
+    .eq("universe_id", universeId)
+    .eq("place_id", placeId);
+
+  if (error) {
+    console.error("[Supabase] Unlink place from universe error:", error);
+    return false;
+  }
+
+  // Update place count on universe
+  await updateUniversePlaceCount(universeId);
+
+  return true;
+}
+
+export async function updateUniversePlaceCount(universeId: string): Promise<void> {
+  const { count, error } = await supabase
+    .from("atlas_universe_places")
+    .select("id", { count: "exact", head: true })
+    .eq("universe_id", universeId);
+
+  if (error) {
+    console.error("[Supabase] Count universe places error:", error);
+    return;
+  }
+
+  await supabase
+    .from("atlas_universes")
+    .update({ place_count: count || 0 })
+    .eq("id", universeId);
+}
+
+export async function searchPlacesForLinking(query: string, limit: number = 20) {
+  const { data, error } = await supabase
+    .from("places")
+    .select("id, name, address, city, region, country, category_name, thumbnail_url")
+    .ilike("name", `%${query}%`)
+    .limit(limit);
+
+  if (error) {
+    console.error("[Supabase] Search places for linking error:", error);
+    throw error;
+  }
+  return data;
+}
+
+export async function updateUniversePlaceOrder(universeId: string, placeId: string, newOrder: number): Promise<boolean> {
+  const { error } = await supabase
+    .from("atlas_universe_places")
+    .update({ display_order: newOrder })
+    .eq("universe_id", universeId)
+    .eq("place_id", placeId);
+
+  if (error) {
+    console.error("[Supabase] Update place order error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function toggleUniversePlaceFeatured(universeId: string, placeId: string, isFeatured: boolean): Promise<boolean> {
+  const { error } = await supabase
+    .from("atlas_universe_places")
+    .update({ is_featured: isFeatured })
+    .eq("universe_id", universeId)
+    .eq("place_id", placeId);
+
+  if (error) {
+    console.error("[Supabase] Toggle place featured error:", error);
+    return false;
+  }
+  return true;
+}
+
 // ============ CITIES ============
 // Uses the new tavvy_cities table with all rich content fields
 export async function getCities() {

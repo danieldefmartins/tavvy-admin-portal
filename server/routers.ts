@@ -70,9 +70,22 @@ import {
   deleteCity,
   // Universes
   getAllUniverses,
+  getUniverseById,
   createUniverse,
   updateUniverse,
   deleteUniverse,
+  // Planets (Child Universes)
+  getPlanetsByUniverse,
+  createPlanet,
+  updatePlanet,
+  deletePlanet,
+  // Universe Places
+  getUniversePlaces,
+  linkPlaceToUniverse,
+  unlinkPlaceFromUniverse,
+  searchPlacesForLinking,
+  updateUniversePlaceOrder,
+  toggleUniversePlaceFeatured,
   // Business Claims
   getBusinessClaims,
   getBusinessClaimById,
@@ -1343,6 +1356,196 @@ export const appRouter = router({
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: "Failed to delete universe",
+          });
+        }
+        return { success: true };
+      }),
+
+    // Get a single universe by ID
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        const universe = await getUniverseById(input.id);
+        if (!universe) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Universe not found",
+          });
+        }
+        return universe;
+      }),
+
+    // ============ PLANETS (Child Universes) ============
+    getPlanets: protectedProcedure
+      .input(z.object({ universeId: z.string() }))
+      .query(async ({ input }) => {
+        return getPlanetsByUniverse(input.universeId);
+      }),
+
+    createPlanet: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().min(1),
+          slug: z.string().min(1),
+          parent_universe_id: z.string(),
+          description: z.string().optional(),
+          thumbnail_url: z.string().optional(),
+          banner_url: z.string().optional(),
+          location: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const id = await createPlanet({
+          ...input,
+          description: input.description || null,
+          thumbnail_url: input.thumbnail_url || null,
+          banner_url: input.banner_url || null,
+          location: input.location || null,
+        });
+        if (!id) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create planet",
+          });
+        }
+        return { id };
+      }),
+
+    updatePlanet: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          name: z.string().optional(),
+          slug: z.string().optional(),
+          description: z.string().optional(),
+          thumbnail_url: z.string().optional(),
+          banner_url: z.string().optional(),
+          location: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        const success = await updatePlanet(id, data);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update planet",
+          });
+        }
+        return { success: true };
+      }),
+
+    deletePlanet: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        const success = await deletePlanet(input.id);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete planet",
+          });
+        }
+        return { success: true };
+      }),
+
+    // ============ UNIVERSE PLACES ============
+    getPlaces: protectedProcedure
+      .input(z.object({ universeId: z.string() }))
+      .query(async ({ input }) => {
+        return getUniversePlaces(input.universeId);
+      }),
+
+    linkPlace: protectedProcedure
+      .input(
+        z.object({
+          universeId: z.string(),
+          placeId: z.string(),
+          display_order: z.number().optional(),
+          is_featured: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const result = await linkPlaceToUniverse(
+          input.universeId,
+          input.placeId,
+          {
+            display_order: input.display_order,
+            is_featured: input.is_featured,
+          }
+        );
+        return result;
+      }),
+
+    unlinkPlace: protectedProcedure
+      .input(
+        z.object({
+          universeId: z.string(),
+          placeId: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const success = await unlinkPlaceFromUniverse(input.universeId, input.placeId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to unlink place from universe",
+          });
+        }
+        return { success: true };
+      }),
+
+    searchPlaces: protectedProcedure
+      .input(
+        z.object({
+          query: z.string().min(1),
+          limit: z.number().optional().default(20),
+        })
+      )
+      .query(async ({ input }) => {
+        return searchPlacesForLinking(input.query, input.limit);
+      }),
+
+    updatePlaceOrder: protectedProcedure
+      .input(
+        z.object({
+          universeId: z.string(),
+          placeId: z.string(),
+          newOrder: z.number(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const success = await updateUniversePlaceOrder(
+          input.universeId,
+          input.placeId,
+          input.newOrder
+        );
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update place order",
+          });
+        }
+        return { success: true };
+      }),
+
+    togglePlaceFeatured: protectedProcedure
+      .input(
+        z.object({
+          universeId: z.string(),
+          placeId: z.string(),
+          isFeatured: z.boolean(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const success = await toggleUniversePlaceFeatured(
+          input.universeId,
+          input.placeId,
+          input.isFeatured
+        );
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to toggle place featured status",
           });
         }
         return { success: true };
