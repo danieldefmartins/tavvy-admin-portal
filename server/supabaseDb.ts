@@ -1669,15 +1669,41 @@ export async function deleteCategory(id: string) {
 
 // ============ UNIVERSES ============
 // Matches your existing atlas_universes table structure
-export async function getUniverses() {
-  const { data, error } = await supabase
+export async function getUniverses(filters?: {
+  type?: 'all' | 'universes' | 'planets';
+  categoryId?: string;
+}) {
+  let query = supabase
     .from("atlas_universes")
-    .select("*")
-    .is("parent_universe_id", null)  // Only get top-level universes, not planets
-    .order("name", { ascending: true });
+    .select(`
+      *,
+      category:atlas_categories(id, name, slug)
+    `);
+
+  // Apply type filter
+  const typeFilter = filters?.type || 'universes';
+  if (typeFilter === 'universes') {
+    query = query.is("parent_universe_id", null);
+  } else if (typeFilter === 'planets') {
+    query = query.not("parent_universe_id", "is", null);
+  }
+  // 'all' shows both universes and planets
+
+  // Apply category filter
+  if (filters?.categoryId) {
+    query = query.eq("category_id", filters.categoryId);
+  }
+
+  const { data, error } = await query.order("name", { ascending: true });
 
   if (error) throw error;
-  return data;
+  
+  // Flatten category data
+  return data?.map(item => ({
+    ...item,
+    category_name: item.category?.name || null,
+    category_slug: item.category?.slug || null,
+  }));
 }
 
 // Alias for router compatibility
@@ -5631,4 +5657,16 @@ export async function getTavvyCategories(): Promise<{ slug: string; name: string
     { slug: 'transportation', name: 'Transportation' },
     { slug: 'other', name: 'Other' },
   ];
+}
+
+
+// Get distinct categories used by universes
+export async function getUniverseCategories() {
+  const { data, error } = await supabase
+    .from("atlas_categories")
+    .select("id, name, slug")
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+  return data;
 }

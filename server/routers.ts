@@ -70,6 +70,8 @@ import {
   deleteCity,
   // Universes
   getAllUniverses,
+  getUniverses,
+  getUniverseCategories,
   getUniverseById,
   createUniverse,
   updateUniverse,
@@ -1288,8 +1290,19 @@ export const appRouter = router({
 
   // ============ UNIVERSES ROUTER ============
   universes: router({
-    getAll: protectedProcedure.query(async () => {
-      return getAllUniverses();
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          type: z.enum(['all', 'universes', 'planets']).optional().default('universes'),
+          categoryId: z.string().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getUniverses(input);
+      }),
+
+    getCategories: protectedProcedure.query(async () => {
+      return getUniverseCategories();
     }),
 
     create: protectedProcedure

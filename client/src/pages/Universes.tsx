@@ -7,6 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -35,7 +42,9 @@ import {
   Palette,
   Eye,
   MapPin,
-  ChevronRight
+  ChevronRight,
+  Filter,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -53,6 +62,15 @@ interface Universe {
   is_featured: boolean;
   status: string;
   created_at: string;
+  category_name?: string | null;
+  category_slug?: string | null;
+  parent_universe_id?: string | null;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 export default function Universes() {
@@ -62,6 +80,10 @@ export default function Universes() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUniverse, setSelectedUniverse] = useState<Universe | null>(null);
+  
+  // Filter state
+  const [typeFilter, setTypeFilter] = useState<'all' | 'universes' | 'planets'>('universes');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   
   // Form state
   const [formData, setFormData] = useState({
@@ -76,7 +98,12 @@ export default function Universes() {
   });
 
   // Queries
-  const { data: universes, isLoading, refetch } = trpc.universes.getAll.useQuery();
+  const { data: universes, isLoading, refetch } = trpc.universes.getAll.useQuery({
+    type: typeFilter,
+    categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
+  });
+  
+  const { data: categories } = trpc.universes.getCategories.useQuery();
 
   // Mutations
   const createMutation = trpc.universes.create.useMutation({
@@ -167,6 +194,14 @@ export default function Universes() {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
   };
+
+  const clearFilters = () => {
+    setTypeFilter('universes');
+    setCategoryFilter('all');
+    setSearchQuery('');
+  };
+
+  const hasActiveFilters = typeFilter !== 'universes' || categoryFilter !== 'all' || searchQuery !== '';
 
   const filteredUniverses = universes?.filter(
     (universe) =>
@@ -280,7 +315,7 @@ export default function Universes() {
   // Mobile Card Component for each universe
   const UniverseCard = ({ universe }: { universe: Universe }) => (
     <Card 
-      className="mb-3 active:scale-[0.98] transition-transform cursor-pointer"
+      className="mb-3 active:scale-[0.98] transition-transform cursor-pointer border-border/50 bg-card/50"
       onClick={() => setLocation(`/universes/${universe.id}`)}
     >
       <CardContent className="p-4">
@@ -315,27 +350,28 @@ export default function Universes() {
             
             {/* Badges */}
             <div className="flex flex-wrap gap-1.5 mt-2">
+              {universe.parent_universe_id && (
+                <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/30">
+                  Planet
+                </Badge>
+              )}
+              {universe.category_name && (
+                <Badge variant="outline" className="text-xs">
+                  {universe.category_name}
+                </Badge>
+              )}
               {universe.is_featured && (
                 <Badge variant="secondary" className="text-xs">
                   <Palette className="h-3 w-3 mr-1" />
                   Featured
                 </Badge>
               )}
-              <Badge 
-                variant={
-                  universe.status === "active" ? "default" : 
-                  universe.status === "draft" ? "secondary" : "outline"
-                }
-                className="text-xs"
-              >
-                {universe.status}
-              </Badge>
             </div>
           </div>
         </div>
         
         {/* Action Buttons */}
-        <div className="flex gap-2 mt-3 pt-3 border-t">
+        <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
           <Button 
             variant="outline" 
             size="sm"
@@ -423,27 +459,101 @@ export default function Universes() {
         </Dialog>
       </div>
 
-      {/* Search */}
-      <Card>
+      {/* Filters */}
+      <Card className="border-border/50 bg-card/50">
         <CardContent className={isMobile ? 'p-3' : 'pt-6'}>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search universes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`pl-10 ${isMobile ? 'h-12' : ''}`}
-            />
+          <div className={`flex gap-3 ${isMobile ? 'flex-col' : 'items-center'}`}>
+            {/* Search */}
+            <div className={`relative ${isMobile ? 'w-full' : 'flex-1'}`}>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or slug..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`pl-10 ${isMobile ? 'h-12' : ''}`}
+              />
+            </div>
+            
+            {/* Type Filter */}
+            <div className={isMobile ? 'w-full' : 'w-[180px]'}>
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+                <SelectTrigger className={isMobile ? 'h-12' : ''}>
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="universes">Universes Only</SelectItem>
+                  <SelectItem value="planets">Planets Only</SelectItem>
+                  <SelectItem value="all">All (Both)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Category Filter */}
+            <div className={isMobile ? 'w-full' : 'w-[200px]'}>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className={isMobile ? 'h-12' : ''}>
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories?.map((cat: Category) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Clear Filters */}
+            {hasActiveFilters && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={clearFilters}
+                className={`text-muted-foreground ${isMobile ? 'w-full h-11' : ''}`}
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
           </div>
+          
+          {/* Active Filters Display */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border/50">
+              <span className="text-xs text-muted-foreground flex items-center">
+                <Filter className="h-3 w-3 mr-1" />
+                Active filters:
+              </span>
+              {typeFilter !== 'universes' && (
+                <Badge variant="secondary" className="text-xs">
+                  Type: {typeFilter === 'planets' ? 'Planets' : 'All'}
+                </Badge>
+              )}
+              {categoryFilter !== 'all' && (
+                <Badge variant="secondary" className="text-xs">
+                  Category: {categories?.find((c: Category) => c.id === categoryFilter)?.name}
+                </Badge>
+              )}
+              {searchQuery && (
+                <Badge variant="secondary" className="text-xs">
+                  Search: "{searchQuery}"
+                </Badge>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Universes List */}
-      <Card>
+      <Card className="border-border/50 bg-card/50">
         <CardHeader className={isMobile ? 'pb-2' : ''}>
-          <CardTitle className={isMobile ? 'text-lg' : ''}>All Universes</CardTitle>
+          <CardTitle className={isMobile ? 'text-lg' : ''}>
+            {typeFilter === 'universes' ? 'Universes' : typeFilter === 'planets' ? 'Planets' : 'All Items'}
+          </CardTitle>
           <CardDescription>
-            {filteredUniverses?.length || 0} universes found
+            {filteredUniverses?.length || 0} {typeFilter === 'all' ? 'items' : typeFilter} found
           </CardDescription>
         </CardHeader>
         <CardContent className={isMobile ? 'px-3' : ''}>
@@ -456,11 +566,18 @@ export default function Universes() {
           ) : filteredUniverses?.length === 0 ? (
             <div className="text-center py-8">
               <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No universes found</h3>
+              <h3 className="text-lg font-semibold mb-2">No {typeFilter} found</h3>
               <p className="text-muted-foreground mb-4">
-                {searchQuery ? "Try a different search term" : "Get started by creating your first universe"}
+                {searchQuery || categoryFilter !== 'all' 
+                  ? "Try adjusting your filters" 
+                  : "Get started by creating your first universe"}
               </p>
-              {!searchQuery && (
+              {hasActiveFilters ? (
+                <Button onClick={clearFilters} variant="outline" className="h-11">
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Filters
+                </Button>
+              ) : (
                 <Button onClick={() => setIsCreateDialogOpen(true)} className="h-11">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Universe
@@ -481,7 +598,8 @@ export default function Universes() {
                 <TableRow>
                   <TableHead className="w-[60px]">Image</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Slug</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -514,7 +632,20 @@ export default function Universes() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{universe.slug}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant="outline" 
+                        className={universe.parent_universe_id 
+                          ? "bg-blue-500/10 text-blue-400 border-blue-500/30" 
+                          : "bg-green-500/10 text-green-400 border-green-500/30"
+                        }
+                      >
+                        {universe.parent_universe_id ? "Planet" : "Universe"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {universe.category_name || "-"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{universe.location || "-"}</TableCell>
                     <TableCell>
                       <Badge 
