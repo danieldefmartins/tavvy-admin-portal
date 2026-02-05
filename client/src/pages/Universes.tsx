@@ -93,6 +93,10 @@ export default function Universes() {
     description: "",
     thumbnail_image_url: "",
     banner_image_url: "",
+    thumbnail_fit: "cover",
+    thumbnail_position: "center",
+    banner_fit: "cover",
+    banner_position: "center",
     location: "",
     is_featured: false,
     status: "active",
@@ -157,6 +161,10 @@ export default function Universes() {
       description: "",
       thumbnail_image_url: "",
       banner_image_url: "",
+      thumbnail_fit: "cover",
+      thumbnail_position: "center",
+      banner_fit: "cover",
+      banner_position: "center",
       location: "",
       is_featured: false,
       status: "active",
@@ -183,7 +191,7 @@ export default function Universes() {
     }
   };
 
-  const openEditDialog = (universe: Universe) => {
+  const openEditDialog = (universe: any) => {
     setSelectedUniverse(universe);
     setFormData({
       name: universe.name,
@@ -191,6 +199,10 @@ export default function Universes() {
       description: universe.description || "",
       thumbnail_image_url: universe.thumbnail_image_url || "",
       banner_image_url: universe.banner_image_url || "",
+      thumbnail_fit: universe.thumbnail_fit || "cover",
+      thumbnail_position: universe.thumbnail_position || "center",
+      banner_fit: universe.banner_fit || "cover",
+      banner_position: universe.banner_position || "center",
       location: universe.location || "",
       is_featured: universe.is_featured,
       status: universe.status || "active",
@@ -271,6 +283,46 @@ export default function Universes() {
         label="Thumbnail Image"
         placeholder="Enter thumbnail URL or upload a file"
       />
+      
+      {/* Thumbnail Display Options */}
+      {formData.thumbnail_image_url && (
+        <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} p-3 rounded-lg bg-muted/30 border border-border/50`}>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Thumbnail Fit</Label>
+            <Select 
+              value={formData.thumbnail_fit} 
+              onValueChange={(v) => setFormData({ ...formData, thumbnail_fit: v })}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cover">Cover (fill & crop)</SelectItem>
+                <SelectItem value="contain">Contain (show all)</SelectItem>
+                <SelectItem value="fill">Stretch to fill</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Thumbnail Position</Label>
+            <Select 
+              value={formData.thumbnail_position} 
+              onValueChange={(v) => setFormData({ ...formData, thumbnail_position: v })}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="center">Center</SelectItem>
+                <SelectItem value="top">Top</SelectItem>
+                <SelectItem value="bottom">Bottom</SelectItem>
+                <SelectItem value="left">Left</SelectItem>
+                <SelectItem value="right">Right</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
 
       {/* Banner Image with Upload */}
       <ImageUpload
@@ -281,6 +333,46 @@ export default function Universes() {
         label="Banner Image"
         placeholder="Enter banner URL or upload a file"
       />
+      
+      {/* Banner Display Options */}
+      {formData.banner_image_url && (
+        <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} p-3 rounded-lg bg-muted/30 border border-border/50`}>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Banner Fit</Label>
+            <Select 
+              value={formData.banner_fit} 
+              onValueChange={(v) => setFormData({ ...formData, banner_fit: v })}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cover">Cover (fill & crop)</SelectItem>
+                <SelectItem value="contain">Contain (show all)</SelectItem>
+                <SelectItem value="fill">Stretch to fill</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Banner Position</Label>
+            <Select 
+              value={formData.banner_position} 
+              onValueChange={(v) => setFormData({ ...formData, banner_position: v })}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="center">Center</SelectItem>
+                <SelectItem value="top">Top</SelectItem>
+                <SelectItem value="bottom">Bottom</SelectItem>
+                <SelectItem value="left">Left</SelectItem>
+                <SelectItem value="right">Right</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
 
       <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
         <div className="space-y-2">
