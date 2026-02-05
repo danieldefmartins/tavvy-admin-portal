@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,9 @@ import {
   MapPin,
   ChevronRight,
   Filter,
-  X
+  X,
+  Move,
+  GripVertical
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -232,6 +234,65 @@ export default function Universes() {
       universe.slug.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Drag-to-position handlers for image focus point
+  const thumbnailRef = useRef<HTMLDivElement>(null);
+  const bannerRef = useRef<HTMLDivElement>(null);
+  const [isDraggingThumbnail, setIsDraggingThumbnail] = useState(false);
+  const [isDraggingBanner, setIsDraggingBanner] = useState(false);
+
+  const handleImageDrag = useCallback((e: React.MouseEvent | React.TouchEvent, containerRef: React.RefObject<HTMLDivElement>, field: 'thumbnail_position' | 'banner_position') => {
+    if (!containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    let clientX: number, clientY: number;
+    
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    const x = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+    
+    setFormData(prev => ({
+      ...prev,
+      [field]: `${Math.round(x)}% ${Math.round(y)}%`
+    }));
+  }, []);
+
+  const handleThumbnailDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsDraggingThumbnail(true);
+    handleImageDrag(e, thumbnailRef, 'thumbnail_position');
+  };
+
+  const handleThumbnailDragMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDraggingThumbnail) return;
+    handleImageDrag(e, thumbnailRef, 'thumbnail_position');
+  };
+
+  const handleThumbnailDragEnd = () => {
+    setIsDraggingThumbnail(false);
+  };
+
+  const handleBannerDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsDraggingBanner(true);
+    handleImageDrag(e, bannerRef, 'banner_position');
+  };
+
+  const handleBannerDragMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDraggingBanner) return;
+    handleImageDrag(e, bannerRef, 'banner_position');
+  };
+
+  const handleBannerDragEnd = () => {
+    setIsDraggingBanner(false);
+  };
+
   const UniverseForm = ({ isEdit = false }: { isEdit?: boolean }) => (
     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
       <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
@@ -284,62 +345,106 @@ export default function Universes() {
         placeholder="Enter thumbnail URL or upload a file"
       />
       
-      {/* Thumbnail Display Options with Live Preview */}
+      {/* Thumbnail Display Options with Draggable Preview */}
       {formData.thumbnail_image_url && (
         <div className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-3">
-          <Label className="text-xs text-muted-foreground font-medium">Thumbnail Preview & Settings</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground font-medium">Thumbnail Preview & Settings</Label>
+            <div className="flex items-center gap-1 text-xs text-orange-400">
+              <Move className="h-3 w-3" />
+              <span>Drag to set focus</span>
+            </div>
+          </div>
           
-          {/* Live Preview */}
-          <div className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10" style={{ height: '160px' }}>
+          {/* Draggable Preview */}
+          <div 
+            ref={thumbnailRef}
+            className={`relative rounded-lg overflow-hidden bg-black/40 border-2 transition-colors cursor-crosshair select-none ${
+              isDraggingThumbnail ? 'border-orange-500' : 'border-white/10 hover:border-orange-500/50'
+            }`}
+            style={{ height: '180px' }}
+            onMouseDown={handleThumbnailDragStart}
+            onMouseMove={handleThumbnailDragMove}
+            onMouseUp={handleThumbnailDragEnd}
+            onMouseLeave={handleThumbnailDragEnd}
+            onTouchStart={handleThumbnailDragStart}
+            onTouchMove={handleThumbnailDragMove}
+            onTouchEnd={handleThumbnailDragEnd}
+          >
             <img 
               src={formData.thumbnail_image_url} 
               alt="Thumbnail Preview" 
-              className="w-full h-full transition-all duration-300"
+              className="w-full h-full transition-all duration-150 pointer-events-none"
               style={{
                 objectFit: formData.thumbnail_fit as 'cover' | 'contain' | 'fill',
                 objectPosition: formData.thumbnail_position,
               }}
+              draggable={false}
             />
+            {/* Focus point indicator */}
+            {formData.thumbnail_position.includes('%') && (
+              <div 
+                className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                style={{
+                  left: formData.thumbnail_position.split(' ')[0],
+                  top: formData.thumbnail_position.split(' ')[1] || formData.thumbnail_position.split(' ')[0],
+                }}
+              >
+                <div className="w-full h-full rounded-full border-2 border-orange-500 bg-orange-500/30 animate-pulse" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-orange-500" />
+                </div>
+              </div>
+            )}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1">
-              <p className="text-xs text-white/80">Preview: {formData.thumbnail_fit} / {formData.thumbnail_position}</p>
+              <p className="text-xs text-white/80">Focus: {formData.thumbnail_position}</p>
             </div>
           </div>
           
-          {/* Controls */}
-          <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Fit Mode</Label>
-              <Select 
-                value={formData.thumbnail_fit} 
-                onValueChange={(v) => setFormData({ ...formData, thumbnail_fit: v })}
-              >
-                <SelectTrigger className="h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cover">Cover (fill & crop)</SelectItem>
-                  <SelectItem value="contain">Contain (show all)</SelectItem>
-                  <SelectItem value="fill">Stretch to fill</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Focus Position</Label>
-              <Select 
-                value={formData.thumbnail_position} 
-                onValueChange={(v) => setFormData({ ...formData, thumbnail_position: v })}
-              >
-                <SelectTrigger className="h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="center">Center</SelectItem>
-                  <SelectItem value="top">Top</SelectItem>
-                  <SelectItem value="bottom">Bottom</SelectItem>
-                  <SelectItem value="left">Left</SelectItem>
-                  <SelectItem value="right">Right</SelectItem>
-                </SelectContent>
-              </Select>
+          {/* Fit Mode Control */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Fit Mode</Label>
+            <Select 
+              value={formData.thumbnail_fit} 
+              onValueChange={(v) => setFormData({ ...formData, thumbnail_fit: v })}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cover">Cover (fill & crop)</SelectItem>
+                <SelectItem value="contain">Contain (show all)</SelectItem>
+                <SelectItem value="fill">Stretch to fill</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Quick Position Presets */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Quick Presets</Label>
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                { label: '↖', value: '0% 0%' },
+                { label: '↑', value: '50% 0%' },
+                { label: '↗', value: '100% 0%' },
+                { label: '←', value: '0% 50%' },
+                { label: '●', value: '50% 50%' },
+                { label: '→', value: '100% 50%' },
+                { label: '↙', value: '0% 100%' },
+                { label: '↓', value: '50% 100%' },
+                { label: '↘', value: '100% 100%' },
+              ].map((preset) => (
+                <Button
+                  key={preset.value}
+                  type="button"
+                  variant={formData.thumbnail_position === preset.value ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8 text-sm"
+                  onClick={() => setFormData({ ...formData, thumbnail_position: preset.value })}
+                >
+                  {preset.label}
+                </Button>
+              ))}
             </div>
           </div>
         </div>
@@ -355,62 +460,106 @@ export default function Universes() {
         placeholder="Enter banner URL or upload a file"
       />
       
-      {/* Banner Display Options with Live Preview */}
+      {/* Banner Display Options with Draggable Preview */}
       {formData.banner_image_url && (
         <div className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-3">
-          <Label className="text-xs text-muted-foreground font-medium">Banner Preview & Settings</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground font-medium">Banner Preview & Settings</Label>
+            <div className="flex items-center gap-1 text-xs text-orange-400">
+              <Move className="h-3 w-3" />
+              <span>Drag to set focus</span>
+            </div>
+          </div>
           
-          {/* Live Preview - Banner is wider aspect ratio */}
-          <div className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10" style={{ height: '120px' }}>
+          {/* Draggable Preview - Banner is wider aspect ratio */}
+          <div 
+            ref={bannerRef}
+            className={`relative rounded-lg overflow-hidden bg-black/40 border-2 transition-colors cursor-crosshair select-none ${
+              isDraggingBanner ? 'border-orange-500' : 'border-white/10 hover:border-orange-500/50'
+            }`}
+            style={{ height: '140px' }}
+            onMouseDown={handleBannerDragStart}
+            onMouseMove={handleBannerDragMove}
+            onMouseUp={handleBannerDragEnd}
+            onMouseLeave={handleBannerDragEnd}
+            onTouchStart={handleBannerDragStart}
+            onTouchMove={handleBannerDragMove}
+            onTouchEnd={handleBannerDragEnd}
+          >
             <img 
               src={formData.banner_image_url} 
               alt="Banner Preview" 
-              className="w-full h-full transition-all duration-300"
+              className="w-full h-full transition-all duration-150 pointer-events-none"
               style={{
                 objectFit: formData.banner_fit as 'cover' | 'contain' | 'fill',
                 objectPosition: formData.banner_position,
               }}
+              draggable={false}
             />
+            {/* Focus point indicator */}
+            {formData.banner_position.includes('%') && (
+              <div 
+                className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                style={{
+                  left: formData.banner_position.split(' ')[0],
+                  top: formData.banner_position.split(' ')[1] || formData.banner_position.split(' ')[0],
+                }}
+              >
+                <div className="w-full h-full rounded-full border-2 border-orange-500 bg-orange-500/30 animate-pulse" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-orange-500" />
+                </div>
+              </div>
+            )}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1">
-              <p className="text-xs text-white/80">Preview: {formData.banner_fit} / {formData.banner_position}</p>
+              <p className="text-xs text-white/80">Focus: {formData.banner_position}</p>
             </div>
           </div>
           
-          {/* Controls */}
-          <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Fit Mode</Label>
-              <Select 
-                value={formData.banner_fit} 
-                onValueChange={(v) => setFormData({ ...formData, banner_fit: v })}
-              >
-                <SelectTrigger className="h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cover">Cover (fill & crop)</SelectItem>
-                  <SelectItem value="contain">Contain (show all)</SelectItem>
-                  <SelectItem value="fill">Stretch to fill</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Focus Position</Label>
-              <Select 
-                value={formData.banner_position} 
-                onValueChange={(v) => setFormData({ ...formData, banner_position: v })}
-              >
-                <SelectTrigger className="h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="center">Center</SelectItem>
-                  <SelectItem value="top">Top</SelectItem>
-                  <SelectItem value="bottom">Bottom</SelectItem>
-                  <SelectItem value="left">Left</SelectItem>
-                  <SelectItem value="right">Right</SelectItem>
-                </SelectContent>
-              </Select>
+          {/* Fit Mode Control */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Fit Mode</Label>
+            <Select 
+              value={formData.banner_fit} 
+              onValueChange={(v) => setFormData({ ...formData, banner_fit: v })}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cover">Cover (fill & crop)</SelectItem>
+                <SelectItem value="contain">Contain (show all)</SelectItem>
+                <SelectItem value="fill">Stretch to fill</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Quick Position Presets */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Quick Presets</Label>
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                { label: '↖', value: '0% 0%' },
+                { label: '↑', value: '50% 0%' },
+                { label: '↗', value: '100% 0%' },
+                { label: '←', value: '0% 50%' },
+                { label: '●', value: '50% 50%' },
+                { label: '→', value: '100% 50%' },
+                { label: '↙', value: '0% 100%' },
+                { label: '↓', value: '50% 100%' },
+                { label: '↘', value: '100% 100%' },
+              ].map((preset) => (
+                <Button
+                  key={preset.value}
+                  type="button"
+                  variant={formData.banner_position === preset.value ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8 text-sm"
+                  onClick={() => setFormData({ ...formData, banner_position: preset.value })}
+                >
+                  {preset.label}
+                </Button>
+              ))}
             </div>
           </div>
         </div>
