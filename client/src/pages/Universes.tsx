@@ -284,42 +284,63 @@ export default function Universes() {
         placeholder="Enter thumbnail URL or upload a file"
       />
       
-      {/* Thumbnail Display Options */}
+      {/* Thumbnail Display Options with Live Preview */}
       {formData.thumbnail_image_url && (
-        <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} p-3 rounded-lg bg-muted/30 border border-border/50`}>
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Thumbnail Fit</Label>
-            <Select 
-              value={formData.thumbnail_fit} 
-              onValueChange={(v) => setFormData({ ...formData, thumbnail_fit: v })}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cover">Cover (fill & crop)</SelectItem>
-                <SelectItem value="contain">Contain (show all)</SelectItem>
-                <SelectItem value="fill">Stretch to fill</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-3">
+          <Label className="text-xs text-muted-foreground font-medium">Thumbnail Preview & Settings</Label>
+          
+          {/* Live Preview */}
+          <div className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10" style={{ height: '160px' }}>
+            <img 
+              src={formData.thumbnail_image_url} 
+              alt="Thumbnail Preview" 
+              className="w-full h-full transition-all duration-300"
+              style={{
+                objectFit: formData.thumbnail_fit as 'cover' | 'contain' | 'fill',
+                objectPosition: formData.thumbnail_position,
+              }}
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1">
+              <p className="text-xs text-white/80">Preview: {formData.thumbnail_fit} / {formData.thumbnail_position}</p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Thumbnail Position</Label>
-            <Select 
-              value={formData.thumbnail_position} 
-              onValueChange={(v) => setFormData({ ...formData, thumbnail_position: v })}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="center">Center</SelectItem>
-                <SelectItem value="top">Top</SelectItem>
-                <SelectItem value="bottom">Bottom</SelectItem>
-                <SelectItem value="left">Left</SelectItem>
-                <SelectItem value="right">Right</SelectItem>
-              </SelectContent>
-            </Select>
+          
+          {/* Controls */}
+          <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Fit Mode</Label>
+              <Select 
+                value={formData.thumbnail_fit} 
+                onValueChange={(v) => setFormData({ ...formData, thumbnail_fit: v })}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cover">Cover (fill & crop)</SelectItem>
+                  <SelectItem value="contain">Contain (show all)</SelectItem>
+                  <SelectItem value="fill">Stretch to fill</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Focus Position</Label>
+              <Select 
+                value={formData.thumbnail_position} 
+                onValueChange={(v) => setFormData({ ...formData, thumbnail_position: v })}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="center">Center</SelectItem>
+                  <SelectItem value="top">Top</SelectItem>
+                  <SelectItem value="bottom">Bottom</SelectItem>
+                  <SelectItem value="left">Left</SelectItem>
+                  <SelectItem value="right">Right</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       )}
@@ -334,42 +355,63 @@ export default function Universes() {
         placeholder="Enter banner URL or upload a file"
       />
       
-      {/* Banner Display Options */}
+      {/* Banner Display Options with Live Preview */}
       {formData.banner_image_url && (
-        <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} p-3 rounded-lg bg-muted/30 border border-border/50`}>
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Banner Fit</Label>
-            <Select 
-              value={formData.banner_fit} 
-              onValueChange={(v) => setFormData({ ...formData, banner_fit: v })}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cover">Cover (fill & crop)</SelectItem>
-                <SelectItem value="contain">Contain (show all)</SelectItem>
-                <SelectItem value="fill">Stretch to fill</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-3">
+          <Label className="text-xs text-muted-foreground font-medium">Banner Preview & Settings</Label>
+          
+          {/* Live Preview - Banner is wider aspect ratio */}
+          <div className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10" style={{ height: '120px' }}>
+            <img 
+              src={formData.banner_image_url} 
+              alt="Banner Preview" 
+              className="w-full h-full transition-all duration-300"
+              style={{
+                objectFit: formData.banner_fit as 'cover' | 'contain' | 'fill',
+                objectPosition: formData.banner_position,
+              }}
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1">
+              <p className="text-xs text-white/80">Preview: {formData.banner_fit} / {formData.banner_position}</p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Banner Position</Label>
-            <Select 
-              value={formData.banner_position} 
-              onValueChange={(v) => setFormData({ ...formData, banner_position: v })}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="center">Center</SelectItem>
-                <SelectItem value="top">Top</SelectItem>
-                <SelectItem value="bottom">Bottom</SelectItem>
-                <SelectItem value="left">Left</SelectItem>
-                <SelectItem value="right">Right</SelectItem>
-              </SelectContent>
-            </Select>
+          
+          {/* Controls */}
+          <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Fit Mode</Label>
+              <Select 
+                value={formData.banner_fit} 
+                onValueChange={(v) => setFormData({ ...formData, banner_fit: v })}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cover">Cover (fill & crop)</SelectItem>
+                  <SelectItem value="contain">Contain (show all)</SelectItem>
+                  <SelectItem value="fill">Stretch to fill</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Focus Position</Label>
+              <Select 
+                value={formData.banner_position} 
+                onValueChange={(v) => setFormData({ ...formData, banner_position: v })}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="center">Center</SelectItem>
+                  <SelectItem value="top">Top</SelectItem>
+                  <SelectItem value="bottom">Bottom</SelectItem>
+                  <SelectItem value="left">Left</SelectItem>
+                  <SelectItem value="right">Right</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       )}
