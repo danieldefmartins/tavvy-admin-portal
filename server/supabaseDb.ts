@@ -1884,7 +1884,7 @@ export async function getUniversePlaces(universeId: string) {
   const placeIds = data.map(d => d.place_id);
   const { data: placesData, error: placesError } = await supabase
     .from("places")
-    .select("id, name, address, city, region, country, category_name, thumbnail_url")
+    .select("id, name, street, city, region, country, category_name, thumbnail_url")
     .in("id", placeIds);
 
   if (placesError) {
@@ -1987,7 +1987,7 @@ export async function updateUniversePlaceCount(universeId: string): Promise<void
 export async function searchPlacesForLinking(query: string, limit: number = 20, excludeUniverseId?: string) {
   let queryBuilder = supabase
     .from("places")
-    .select("id, name, address, city, region, country, category_name, thumbnail_url")
+    .select("id, name, street, city, region, country, category_name, thumbnail_url")
     .ilike("name", `%${query}%`)
     .limit(limit);
 
