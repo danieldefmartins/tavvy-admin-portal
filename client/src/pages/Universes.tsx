@@ -264,7 +264,10 @@ export default function Universes() {
   }, []);
 
   const handleThumbnailDragStart = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
+    // Only prevent default for mouse events, not touch (to allow scrolling)
+    if (!('touches' in e)) {
+      e.preventDefault();
+    }
     setIsDraggingThumbnail(true);
     handleImageDrag(e, thumbnailRef, 'thumbnail_position');
   };
@@ -279,7 +282,10 @@ export default function Universes() {
   };
 
   const handleBannerDragStart = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
+    // Only prevent default for mouse events, not touch (to allow scrolling)
+    if (!('touches' in e)) {
+      e.preventDefault();
+    }
     setIsDraggingBanner(true);
     handleImageDrag(e, bannerRef, 'banner_position');
   };
