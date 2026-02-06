@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +49,7 @@ import {
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import ImageUpload from "@/components/ImageUpload";
+import ImageCropPreview from "@/components/ImageCropPreview";
 import { useIsMobile } from "@/hooks/useMobile";
 
 interface Universe {
@@ -287,146 +287,16 @@ export default function Universes() {
         placeholder="Enter thumbnail URL or upload a file"
       />
       
-      {/* Thumbnail Display Options */}
+      {/* Thumbnail Crop & Position */}
       {formData.thumbnail_image_url && (
-        <div className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-3">
-          <Label className="text-xs text-muted-foreground font-medium">Thumbnail Settings (1:1 Preview)</Label>
-          
-          {/* 1:1 Aspect Ratio Preview with Drag-to-Position */}
-          <div 
-            className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10 mx-auto cursor-move select-none touch-none"
-            style={{ 
-              width: '200px', 
-              height: '200px',
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
-            }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const container = e.currentTarget;
-              const rect = container.getBoundingClientRect();
-              const startX = e.clientX;
-              const startY = e.clientY;
-              const currentPos = formData.thumbnail_position.split(' ');
-              const startPosX = parseFloat(currentPos[0]) || 50;
-              const startPosY = parseFloat(currentPos[1]) || 50;
-              
-              const handleMouseMove = (moveEvent: MouseEvent) => {
-                moveEvent.preventDefault();
-                moveEvent.stopPropagation();
-                const deltaX = ((moveEvent.clientX - startX) / rect.width) * -100;
-                const deltaY = ((moveEvent.clientY - startY) / rect.height) * -100;
-                const newX = Math.max(0, Math.min(100, startPosX + deltaX));
-                const newY = Math.max(0, Math.min(100, startPosY + deltaY));
-                setFormData(prev => ({ ...prev, thumbnail_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` }));
-              };
-              
-              const handleMouseUp = (upEvent: MouseEvent) => {
-                upEvent.preventDefault();
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-              };
-              
-              document.body.style.cursor = 'move';
-              document.body.style.userSelect = 'none';
-              document.addEventListener('mousemove', handleMouseMove);
-              document.addEventListener('mouseup', handleMouseUp);
-            }}
-            onTouchStart={(e) => {
-              e.stopPropagation();
-              const touch = e.touches[0];
-              const container = e.currentTarget;
-              const rect = container.getBoundingClientRect();
-              const startX = touch.clientX;
-              const startY = touch.clientY;
-              const currentPos = formData.thumbnail_position.split(' ');
-              const startPosX = parseFloat(currentPos[0]) || 50;
-              const startPosY = parseFloat(currentPos[1]) || 50;
-              
-              const handleTouchMove = (moveEvent: TouchEvent) => {
-                moveEvent.preventDefault();
-                const moveTouch = moveEvent.touches[0];
-                const deltaX = ((moveTouch.clientX - startX) / rect.width) * -100;
-                const deltaY = ((moveTouch.clientY - startY) / rect.height) * -100;
-                const newX = Math.max(0, Math.min(100, startPosX + deltaX));
-                const newY = Math.max(0, Math.min(100, startPosY + deltaY));
-                setFormData(prev => ({ ...prev, thumbnail_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` }));
-              };
-              
-              const handleTouchEnd = () => {
-                document.removeEventListener('touchmove', handleTouchMove);
-                document.removeEventListener('touchend', handleTouchEnd);
-              };
-              
-              document.addEventListener('touchmove', handleTouchMove, { passive: false });
-              document.addEventListener('touchend', handleTouchEnd);
-            }}
-          >
-            <img 
-              src={formData.thumbnail_image_url} 
-              alt="Thumbnail Preview" 
-              className="w-full h-full pointer-events-none select-none"
-              draggable={false}
-              style={{
-                objectFit: formData.thumbnail_fit as 'cover' | 'contain' | 'fill',
-                objectPosition: formData.thumbnail_position,
-              }}
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/30 pointer-events-none">
-              <span className="text-white text-xs font-medium px-2 py-1 bg-black/50 rounded">Drag to position</span>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground text-center">Position: {formData.thumbnail_position}</p>
-          
-          {/* Fit Mode Control */}
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Fit Mode</Label>
-            <Select 
-              value={formData.thumbnail_fit} 
-              onValueChange={(v) => setFormData({ ...formData, thumbnail_fit: v })}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cover">Cover (fill & crop)</SelectItem>
-                <SelectItem value="contain">Contain (show all)</SelectItem>
-                <SelectItem value="fill">Stretch to fill</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Quick Position Presets */}
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Quick Presets</Label>
-            <div className="grid grid-cols-3 gap-1">
-              {[
-                { label: '↖', value: '0% 0%' },
-                { label: '↑', value: '50% 0%' },
-                { label: '↗', value: '100% 0%' },
-                { label: '←', value: '0% 50%' },
-                { label: '●', value: '50% 50%' },
-                { label: '→', value: '100% 50%' },
-                { label: '↙', value: '0% 100%' },
-                { label: '↓', value: '50% 100%' },
-                { label: '↘', value: '100% 100%' },
-              ].map((preset) => (
-                <Button
-                  key={preset.value}
-                  type="button"
-                  variant={formData.thumbnail_position === preset.value ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-8 text-sm"
-                  onClick={() => setFormData({ ...formData, thumbnail_position: preset.value })}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
-          </div>
+        <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+          <ImageCropPreview
+            imageUrl={formData.thumbnail_image_url}
+            position={formData.thumbnail_position}
+            onPositionChange={(pos) => setFormData(prev => ({ ...prev, thumbnail_position: pos }))}
+            aspectRatio="1:1"
+            label="Thumbnail Crop (1:1)"
+          />
         </div>
       )}
 
@@ -440,146 +310,16 @@ export default function Universes() {
         placeholder="Enter banner URL or upload a file"
       />
       
-      {/* Banner Display Options */}
+      {/* Banner Crop & Position */}
       {formData.banner_image_url && (
-        <div className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-3">
-          <Label className="text-xs text-muted-foreground font-medium">Banner Settings (16:9 Preview)</Label>
-          
-          {/* 16:9 Aspect Ratio Preview with Drag-to-Position */}
-          <div 
-            className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10 cursor-move select-none touch-none"
-            style={{ 
-              width: '100%', 
-              aspectRatio: '16/9',
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
-            }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const container = e.currentTarget;
-              const rect = container.getBoundingClientRect();
-              const startX = e.clientX;
-              const startY = e.clientY;
-              const currentPos = formData.banner_position.split(' ');
-              const startPosX = parseFloat(currentPos[0]) || 50;
-              const startPosY = parseFloat(currentPos[1]) || 50;
-              
-              const handleMouseMove = (moveEvent: MouseEvent) => {
-                moveEvent.preventDefault();
-                moveEvent.stopPropagation();
-                const deltaX = ((moveEvent.clientX - startX) / rect.width) * -100;
-                const deltaY = ((moveEvent.clientY - startY) / rect.height) * -100;
-                const newX = Math.max(0, Math.min(100, startPosX + deltaX));
-                const newY = Math.max(0, Math.min(100, startPosY + deltaY));
-                setFormData(prev => ({ ...prev, banner_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` }));
-              };
-              
-              const handleMouseUp = (upEvent: MouseEvent) => {
-                upEvent.preventDefault();
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-              };
-              
-              document.body.style.cursor = 'move';
-              document.body.style.userSelect = 'none';
-              document.addEventListener('mousemove', handleMouseMove);
-              document.addEventListener('mouseup', handleMouseUp);
-            }}
-            onTouchStart={(e) => {
-              e.stopPropagation();
-              const touch = e.touches[0];
-              const container = e.currentTarget;
-              const rect = container.getBoundingClientRect();
-              const startX = touch.clientX;
-              const startY = touch.clientY;
-              const currentPos = formData.banner_position.split(' ');
-              const startPosX = parseFloat(currentPos[0]) || 50;
-              const startPosY = parseFloat(currentPos[1]) || 50;
-              
-              const handleTouchMove = (moveEvent: TouchEvent) => {
-                moveEvent.preventDefault();
-                const moveTouch = moveEvent.touches[0];
-                const deltaX = ((moveTouch.clientX - startX) / rect.width) * -100;
-                const deltaY = ((moveTouch.clientY - startY) / rect.height) * -100;
-                const newX = Math.max(0, Math.min(100, startPosX + deltaX));
-                const newY = Math.max(0, Math.min(100, startPosY + deltaY));
-                setFormData(prev => ({ ...prev, banner_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` }));
-              };
-              
-              const handleTouchEnd = () => {
-                document.removeEventListener('touchmove', handleTouchMove);
-                document.removeEventListener('touchend', handleTouchEnd);
-              };
-              
-              document.addEventListener('touchmove', handleTouchMove, { passive: false });
-              document.addEventListener('touchend', handleTouchEnd);
-            }}
-          >
-            <img 
-              src={formData.banner_image_url} 
-              alt="Banner Preview" 
-              className="w-full h-full pointer-events-none select-none"
-              draggable={false}
-              style={{
-                objectFit: formData.banner_fit as 'cover' | 'contain' | 'fill',
-                objectPosition: formData.banner_position,
-              }}
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/30 pointer-events-none">
-              <span className="text-white text-xs font-medium px-2 py-1 bg-black/50 rounded">Drag to position</span>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground text-center">Position: {formData.banner_position}</p>
-          
-          {/* Fit Mode Control */}
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Fit Mode</Label>
-            <Select 
-              value={formData.banner_fit} 
-              onValueChange={(v) => setFormData({ ...formData, banner_fit: v })}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cover">Cover (fill & crop)</SelectItem>
-                <SelectItem value="contain">Contain (show all)</SelectItem>
-                <SelectItem value="fill">Stretch to fill</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Quick Position Presets */}
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Quick Presets</Label>
-            <div className="grid grid-cols-3 gap-1">
-              {[
-                { label: '↖', value: '0% 0%' },
-                { label: '↑', value: '50% 0%' },
-                { label: '↗', value: '100% 0%' },
-                { label: '←', value: '0% 50%' },
-                { label: '●', value: '50% 50%' },
-                { label: '→', value: '100% 50%' },
-                { label: '↙', value: '0% 100%' },
-                { label: '↓', value: '50% 100%' },
-                { label: '↘', value: '100% 100%' },
-              ].map((preset) => (
-                <Button
-                  key={preset.value}
-                  type="button"
-                  variant={formData.banner_position === preset.value ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-8 text-sm"
-                  onClick={() => setFormData({ ...formData, banner_position: preset.value })}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
-          </div>
+        <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+          <ImageCropPreview
+            imageUrl={formData.banner_image_url}
+            position={formData.banner_position}
+            onPositionChange={(pos) => setFormData(prev => ({ ...prev, banner_position: pos }))}
+            aspectRatio="16:9"
+            label="Banner Crop (16:9)"
+          />
         </div>
       )}
 
