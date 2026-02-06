@@ -299,6 +299,8 @@ export default function Universes() {
               height: '200px',
             }}
             onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               const container = e.currentTarget;
               const rect = container.getBoundingClientRect();
               const startX = e.clientX;
@@ -412,6 +414,8 @@ export default function Universes() {
               aspectRatio: '16/9',
             }}
             onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               const container = e.currentTarget;
               const rect = container.getBoundingClientRect();
               const startX = e.clientX;
