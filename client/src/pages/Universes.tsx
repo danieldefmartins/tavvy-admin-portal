@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -293,10 +294,12 @@ export default function Universes() {
           
           {/* 1:1 Aspect Ratio Preview with Drag-to-Position */}
           <div 
-            className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10 mx-auto cursor-move"
+            className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10 mx-auto cursor-move select-none touch-none"
             style={{ 
               width: '200px', 
               height: '200px',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
             }}
             onMouseDown={(e) => {
               e.preventDefault();
@@ -310,20 +313,56 @@ export default function Universes() {
               const startPosY = parseFloat(currentPos[1]) || 50;
               
               const handleMouseMove = (moveEvent: MouseEvent) => {
+                moveEvent.preventDefault();
+                moveEvent.stopPropagation();
                 const deltaX = ((moveEvent.clientX - startX) / rect.width) * -100;
                 const deltaY = ((moveEvent.clientY - startY) / rect.height) * -100;
                 const newX = Math.max(0, Math.min(100, startPosX + deltaX));
                 const newY = Math.max(0, Math.min(100, startPosY + deltaY));
-                setFormData({ ...formData, thumbnail_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` });
+                setFormData(prev => ({ ...prev, thumbnail_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` }));
               };
               
-              const handleMouseUp = () => {
+              const handleMouseUp = (upEvent: MouseEvent) => {
+                upEvent.preventDefault();
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
               };
               
+              document.body.style.cursor = 'move';
+              document.body.style.userSelect = 'none';
               document.addEventListener('mousemove', handleMouseMove);
               document.addEventListener('mouseup', handleMouseUp);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              const touch = e.touches[0];
+              const container = e.currentTarget;
+              const rect = container.getBoundingClientRect();
+              const startX = touch.clientX;
+              const startY = touch.clientY;
+              const currentPos = formData.thumbnail_position.split(' ');
+              const startPosX = parseFloat(currentPos[0]) || 50;
+              const startPosY = parseFloat(currentPos[1]) || 50;
+              
+              const handleTouchMove = (moveEvent: TouchEvent) => {
+                moveEvent.preventDefault();
+                const moveTouch = moveEvent.touches[0];
+                const deltaX = ((moveTouch.clientX - startX) / rect.width) * -100;
+                const deltaY = ((moveTouch.clientY - startY) / rect.height) * -100;
+                const newX = Math.max(0, Math.min(100, startPosX + deltaX));
+                const newY = Math.max(0, Math.min(100, startPosY + deltaY));
+                setFormData(prev => ({ ...prev, thumbnail_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` }));
+              };
+              
+              const handleTouchEnd = () => {
+                document.removeEventListener('touchmove', handleTouchMove);
+                document.removeEventListener('touchend', handleTouchEnd);
+              };
+              
+              document.addEventListener('touchmove', handleTouchMove, { passive: false });
+              document.addEventListener('touchend', handleTouchEnd);
             }}
           >
             <img 
@@ -336,7 +375,7 @@ export default function Universes() {
                 objectPosition: formData.thumbnail_position,
               }}
             />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/30">
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/30 pointer-events-none">
               <span className="text-white text-xs font-medium px-2 py-1 bg-black/50 rounded">Drag to position</span>
             </div>
           </div>
@@ -408,10 +447,12 @@ export default function Universes() {
           
           {/* 16:9 Aspect Ratio Preview with Drag-to-Position */}
           <div 
-            className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10 cursor-move"
+            className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10 cursor-move select-none touch-none"
             style={{ 
               width: '100%', 
               aspectRatio: '16/9',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
             }}
             onMouseDown={(e) => {
               e.preventDefault();
@@ -425,20 +466,56 @@ export default function Universes() {
               const startPosY = parseFloat(currentPos[1]) || 50;
               
               const handleMouseMove = (moveEvent: MouseEvent) => {
+                moveEvent.preventDefault();
+                moveEvent.stopPropagation();
                 const deltaX = ((moveEvent.clientX - startX) / rect.width) * -100;
                 const deltaY = ((moveEvent.clientY - startY) / rect.height) * -100;
                 const newX = Math.max(0, Math.min(100, startPosX + deltaX));
                 const newY = Math.max(0, Math.min(100, startPosY + deltaY));
-                setFormData({ ...formData, banner_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` });
+                setFormData(prev => ({ ...prev, banner_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` }));
               };
               
-              const handleMouseUp = () => {
+              const handleMouseUp = (upEvent: MouseEvent) => {
+                upEvent.preventDefault();
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
               };
               
+              document.body.style.cursor = 'move';
+              document.body.style.userSelect = 'none';
               document.addEventListener('mousemove', handleMouseMove);
               document.addEventListener('mouseup', handleMouseUp);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              const touch = e.touches[0];
+              const container = e.currentTarget;
+              const rect = container.getBoundingClientRect();
+              const startX = touch.clientX;
+              const startY = touch.clientY;
+              const currentPos = formData.banner_position.split(' ');
+              const startPosX = parseFloat(currentPos[0]) || 50;
+              const startPosY = parseFloat(currentPos[1]) || 50;
+              
+              const handleTouchMove = (moveEvent: TouchEvent) => {
+                moveEvent.preventDefault();
+                const moveTouch = moveEvent.touches[0];
+                const deltaX = ((moveTouch.clientX - startX) / rect.width) * -100;
+                const deltaY = ((moveTouch.clientY - startY) / rect.height) * -100;
+                const newX = Math.max(0, Math.min(100, startPosX + deltaX));
+                const newY = Math.max(0, Math.min(100, startPosY + deltaY));
+                setFormData(prev => ({ ...prev, banner_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` }));
+              };
+              
+              const handleTouchEnd = () => {
+                document.removeEventListener('touchmove', handleTouchMove);
+                document.removeEventListener('touchend', handleTouchEnd);
+              };
+              
+              document.addEventListener('touchmove', handleTouchMove, { passive: false });
+              document.addEventListener('touchend', handleTouchEnd);
             }}
           >
             <img 
@@ -451,7 +528,7 @@ export default function Universes() {
                 objectPosition: formData.banner_position,
               }}
             />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/30">
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/30 pointer-events-none">
               <span className="text-white text-xs font-medium px-2 py-1 bg-black/50 rounded">Drag to position</span>
             </div>
           </div>
