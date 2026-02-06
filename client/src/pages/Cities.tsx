@@ -31,6 +31,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Pencil, Trash2, Search, MapPin, Users, Building2, Plane } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { trpc } from "@/lib/trpc";
+import ImageUpload from "@/components/ImageUpload";
+import ImageCropPreview from "@/components/ImageCropPreview";
 
 interface City {
   id: string;
@@ -46,6 +48,8 @@ interface City {
   longitude: number;
   cover_image_url: string;
   thumbnail_image_url: string;
+  thumbnail_position: string;
+  cover_position: string;
   description: string;
   history: string;
   culture: string;
@@ -105,6 +109,8 @@ export default function Cities() {
     longitude: 0,
     cover_image_url: "",
     thumbnail_image_url: "",
+    thumbnail_position: "center",
+    cover_position: "center",
     description: "",
     history: "",
     culture: "",
@@ -178,6 +184,8 @@ export default function Cities() {
       longitude: 0,
       cover_image_url: "",
       thumbnail_image_url: "",
+      thumbnail_position: "center",
+      cover_position: "center",
       description: "",
       history: "",
       culture: "",
@@ -212,6 +220,8 @@ export default function Cities() {
       longitude: city.longitude || 0,
       cover_image_url: city.cover_image_url || "",
       thumbnail_image_url: city.thumbnail_image_url || "",
+      thumbnail_position: city.thumbnail_position || "center",
+      cover_position: city.cover_position || "center",
       description: city.description || "",
       history: city.history || "",
       culture: city.culture || "",
@@ -399,26 +409,51 @@ export default function Cities() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="cover_image_url">Cover Image URL</Label>
-                      <Input
-                        id="cover_image_url"
-                        value={formData.cover_image_url}
-                        onChange={(e) => setFormData({ ...formData, cover_image_url: e.target.value })}
-                        placeholder="https://..."
+                  {/* Thumbnail Image with Upload */}
+                  <ImageUpload
+                    value={formData.thumbnail_image_url}
+                    onChange={(url) => setFormData({ ...formData, thumbnail_image_url: url })}
+                    bucket="city-images"
+                    folder="thumbnails"
+                    label="Thumbnail Image"
+                    placeholder="Enter thumbnail URL or upload a file"
+                  />
+
+                  {/* Thumbnail Crop & Position */}
+                  {formData.thumbnail_image_url && (
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                      <ImageCropPreview
+                        imageUrl={formData.thumbnail_image_url}
+                        position={formData.thumbnail_position}
+                        onPositionChange={(pos) => setFormData(prev => ({ ...prev, thumbnail_position: pos }))}
+                        aspectRatio="1:1"
+                        label="Thumbnail Crop (1:1)"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="thumbnail_image_url">Thumbnail Image URL</Label>
-                      <Input
-                        id="thumbnail_image_url"
-                        value={formData.thumbnail_image_url}
-                        onChange={(e) => setFormData({ ...formData, thumbnail_image_url: e.target.value })}
-                        placeholder="https://..."
+                  )}
+
+                  {/* Cover Image with Upload */}
+                  <ImageUpload
+                    value={formData.cover_image_url}
+                    onChange={(url) => setFormData({ ...formData, cover_image_url: url })}
+                    bucket="city-images"
+                    folder="covers"
+                    label="Cover Image"
+                    placeholder="Enter cover image URL or upload a file"
+                  />
+
+                  {/* Cover Crop & Position */}
+                  {formData.cover_image_url && (
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                      <ImageCropPreview
+                        imageUrl={formData.cover_image_url}
+                        position={formData.cover_position}
+                        onPositionChange={(pos) => setFormData(prev => ({ ...prev, cover_position: pos }))}
+                        aspectRatio="16:9"
+                        label="Cover Crop (16:9)"
                       />
                     </div>
-                  </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="location" className="space-y-4 mt-4">
