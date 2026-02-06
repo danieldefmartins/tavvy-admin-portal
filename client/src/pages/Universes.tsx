@@ -289,20 +289,56 @@ export default function Universes() {
       {/* Thumbnail Display Options */}
       {formData.thumbnail_image_url && (
         <div className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-3">
-          <Label className="text-xs text-muted-foreground font-medium">Thumbnail Settings</Label>
+          <Label className="text-xs text-muted-foreground font-medium">Thumbnail Settings (1:1 Preview)</Label>
           
-          {/* Simple Preview - No drag, just shows the result */}
-          <div className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10" style={{ height: '120px' }}>
+          {/* 1:1 Aspect Ratio Preview with Drag-to-Position */}
+          <div 
+            className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10 mx-auto cursor-move"
+            style={{ 
+              width: '200px', 
+              height: '200px',
+            }}
+            onMouseDown={(e) => {
+              const container = e.currentTarget;
+              const rect = container.getBoundingClientRect();
+              const startX = e.clientX;
+              const startY = e.clientY;
+              const currentPos = formData.thumbnail_position.split(' ');
+              const startPosX = parseFloat(currentPos[0]) || 50;
+              const startPosY = parseFloat(currentPos[1]) || 50;
+              
+              const handleMouseMove = (moveEvent: MouseEvent) => {
+                const deltaX = ((moveEvent.clientX - startX) / rect.width) * -100;
+                const deltaY = ((moveEvent.clientY - startY) / rect.height) * -100;
+                const newX = Math.max(0, Math.min(100, startPosX + deltaX));
+                const newY = Math.max(0, Math.min(100, startPosY + deltaY));
+                setFormData({ ...formData, thumbnail_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` });
+              };
+              
+              const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+              };
+              
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+            }}
+          >
             <img 
               src={formData.thumbnail_image_url} 
               alt="Thumbnail Preview" 
-              className="w-full h-full"
+              className="w-full h-full pointer-events-none select-none"
+              draggable={false}
               style={{
                 objectFit: formData.thumbnail_fit as 'cover' | 'contain' | 'fill',
                 objectPosition: formData.thumbnail_position,
               }}
             />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/30">
+              <span className="text-white text-xs font-medium px-2 py-1 bg-black/50 rounded">Drag to position</span>
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground text-center">Position: {formData.thumbnail_position}</p>
           
           {/* Fit Mode Control */}
           <div className="space-y-2">
@@ -366,20 +402,56 @@ export default function Universes() {
       {/* Banner Display Options */}
       {formData.banner_image_url && (
         <div className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-3">
-          <Label className="text-xs text-muted-foreground font-medium">Banner Settings</Label>
+          <Label className="text-xs text-muted-foreground font-medium">Banner Settings (16:9 Preview)</Label>
           
-          {/* Simple Preview - No drag, just shows the result */}
-          <div className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10" style={{ height: '100px' }}>
+          {/* 16:9 Aspect Ratio Preview with Drag-to-Position */}
+          <div 
+            className="relative rounded-lg overflow-hidden bg-black/40 border border-white/10 cursor-move"
+            style={{ 
+              width: '100%', 
+              aspectRatio: '16/9',
+            }}
+            onMouseDown={(e) => {
+              const container = e.currentTarget;
+              const rect = container.getBoundingClientRect();
+              const startX = e.clientX;
+              const startY = e.clientY;
+              const currentPos = formData.banner_position.split(' ');
+              const startPosX = parseFloat(currentPos[0]) || 50;
+              const startPosY = parseFloat(currentPos[1]) || 50;
+              
+              const handleMouseMove = (moveEvent: MouseEvent) => {
+                const deltaX = ((moveEvent.clientX - startX) / rect.width) * -100;
+                const deltaY = ((moveEvent.clientY - startY) / rect.height) * -100;
+                const newX = Math.max(0, Math.min(100, startPosX + deltaX));
+                const newY = Math.max(0, Math.min(100, startPosY + deltaY));
+                setFormData({ ...formData, banner_position: `${newX.toFixed(0)}% ${newY.toFixed(0)}%` });
+              };
+              
+              const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+              };
+              
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+            }}
+          >
             <img 
               src={formData.banner_image_url} 
               alt="Banner Preview" 
-              className="w-full h-full"
+              className="w-full h-full pointer-events-none select-none"
+              draggable={false}
               style={{
                 objectFit: formData.banner_fit as 'cover' | 'contain' | 'fill',
                 objectPosition: formData.banner_position,
               }}
             />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/30">
+              <span className="text-white text-xs font-medium px-2 py-1 bg-black/50 rounded">Drag to position</span>
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground text-center">Position: {formData.banner_position}</p>
           
           {/* Fit Mode Control */}
           <div className="space-y-2">
