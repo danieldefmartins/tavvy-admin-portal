@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Move, RotateCcw, ZoomIn, Maximize2 } from "lucide-react";
+import { Move, RotateCcw, Maximize2 } from "lucide-react";
 
 interface ImageCropPreviewProps {
   imageUrl: string;
@@ -13,9 +13,15 @@ interface ImageCropPreviewProps {
 
 /**
  * Visual image crop preview component.
- * Shows the full original image with a semi-transparent overlay,
- * and a bright crop window that can be dragged to select the visible area.
- * The crop window maintains the target aspect ratio.
+ * 
+ * The image ALWAYS fills the full container width. The container height
+ * adjusts dynamically based on the image's natural aspect ratio.
+ * A crop window overlay shows exactly what portion will be visible
+ * at the target aspect ratio, and can be dragged to reposition.
+ * 
+ * For portrait images: image fills width, container becomes tall, crop window slides vertically.
+ * For landscape images: image fills width, container is shorter, crop window slides horizontally.
+ * For images matching the target ratio: no crop needed, shown at full size.
  */
 export default function ImageCropPreview({
   imageUrl,
@@ -27,11 +33,12 @@ export default function ImageCropPreview({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 0, height: 0 });
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [containerWidth, setContainerWidth] = useState(0);
 
   // Parse position string like "50% 50%" into x, y percentages
   const parsePosition = (pos: string): { x: number; y: number } => {
-    const parts = pos.split(" ");
+    if (pos === "center") return { x: 50, y: 50 };
+    const parts = pos.replace(/%/g, "").split(" ");
     const x = parseFloat(parts[0]) || 50;
     const y = parseFloat(parts[1] || parts[0]) || 50;
     return { x, y };
@@ -49,82 +56,78 @@ export default function ImageCropPreview({
     img.src = imageUrl;
   }, [imageUrl]);
 
-  // Observe container size
+  // Observe container width
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerSize({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        });
+        setContainerWidth(entry.contentRect.width);
       }
     });
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
 
-  // Calculate the crop window size relative to the displayed image
-  const getCropDimensions = () => {
-    if (!imageNaturalSize.width || !imageNaturalSize.height || !containerSize.width) {
-      return { cropW: 0, cropH: 0, imgW: 0, imgH: 0, offsetX: 0, offsetY: 0 };
+  // Calculate all dimensions
+  const getDimensions = () => {
+    if (!imageNaturalSize.width || !imageNaturalSize.height || !containerWidth) {
+      return { imgW: 0, imgH: 0, cropW: 0, cropH: 0 };
     }
 
-    const containerW = containerSize.width;
-    const containerH = containerSize.height;
-
-    // The image is displayed with object-fit: contain inside the container
     const imgAspect = imageNaturalSize.width / imageNaturalSize.height;
-    const containerAspect = containerW / containerH;
-
-    let imgW: number, imgH: number;
-    if (imgAspect > containerAspect) {
-      // Image is wider - fits width
-      imgW = containerW;
-      imgH = containerW / imgAspect;
-    } else {
-      // Image is taller - fits height
-      imgH = containerH;
-      imgW = containerH * imgAspect;
-    }
-
-    const offsetX = (containerW - imgW) / 2;
-    const offsetY = (containerH - imgH) / 2;
-
-    // Target aspect ratio
     const targetAspect = aspectRatio === "1:1" ? 1 : 16 / 9;
 
-    // The crop window represents what object-fit: cover would show
-    // When using cover, the image fills the target container, cropping the excess
-    const imageAspect = imageNaturalSize.width / imageNaturalSize.height;
+    // Image ALWAYS fills the full container width
+    const imgW = containerWidth;
+    const imgH = containerWidth / imgAspect;
 
+    // Crop window: represents what object-fit: cover would show
     let cropW: number, cropH: number;
-    if (imageAspect > targetAspect) {
-      // Image is wider than target - height fills, width crops
+    if (imgAspect > targetAspect) {
+      // Image is wider than target — height fills, width crops
       cropH = imgH;
       cropW = imgH * targetAspect;
     } else {
-      // Image is taller than target - width fills, height crops
+      // Image is taller than target — width fills, height crops
       cropW = imgW;
       cropH = imgW / targetAspect;
     }
 
-    return { cropW, cropH, imgW, imgH, offsetX, offsetY };
+    return { imgW, imgH, cropW, cropH };
   };
 
-  const { cropW, cropH, imgW, imgH, offsetX, offsetY } = getCropDimensions();
+  const { imgW, imgH, cropW, cropH } = getDimensions();
+
+  // Does the image need cropping?
+  const needsCrop = cropW > 0 && cropH > 0 && (Math.abs(cropW - imgW) > 2 || Math.abs(cropH - imgH) > 2);
+
+  // Max container height to prevent extremely tall containers for very portrait images
+  const maxContainerHeight = 400;
+  const naturalContainerHeight = imgH;
+  const containerHeight = Math.min(naturalContainerHeight, maxContainerHeight);
+
+  // If we capped the height, we need to scale everything down
+  const scale = containerHeight > 0 && naturalContainerHeight > 0
+    ? containerHeight / naturalContainerHeight
+    : 1;
+
+  const scaledImgW = imgW * scale;
+  const scaledImgH = imgH * scale;
+  const scaledCropW = cropW * scale;
+  const scaledCropH = cropH * scale;
+
+  // Offset to center the image horizontally if it was scaled down
+  const offsetX = (containerWidth - scaledImgW) / 2;
 
   // Calculate crop window position based on object-position percentages
   const getCropPosition = () => {
-    if (!cropW || !cropH || !imgW || !imgH) return { left: 0, top: 0 };
+    if (!scaledCropW || !scaledCropH || !scaledImgW || !scaledImgH) return { left: 0, top: 0 };
 
-    // The position percentage determines where the crop window sits
-    // 0% = left/top edge, 50% = center, 100% = right/bottom edge
-    const maxLeft = imgW - cropW;
-    const maxTop = imgH - cropH;
+    const maxLeft = scaledImgW - scaledCropW;
+    const maxTop = scaledImgH - scaledCropH;
 
     const left = offsetX + (posX / 100) * maxLeft;
-    const top = offsetY + (posY / 100) * maxTop;
+    const top = (posY / 100) * maxTop;
 
     return { left, top };
   };
@@ -143,8 +146,8 @@ export default function ImageCropPreview({
       const startPosX = posX;
       const startPosY = posY;
 
-      const maxLeft = imgW - cropW;
-      const maxTop = imgH - cropH;
+      const maxLeft = scaledImgW - scaledCropW;
+      const maxTop = scaledImgH - scaledCropH;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         moveEvent.preventDefault();
@@ -153,7 +156,6 @@ export default function ImageCropPreview({
         const deltaX = moveEvent.clientX - startX;
         const deltaY = moveEvent.clientY - startY;
 
-        // Convert pixel delta to percentage delta
         const pctDeltaX = maxLeft > 0 ? (deltaX / maxLeft) * 100 : 0;
         const pctDeltaY = maxTop > 0 ? (deltaY / maxTop) * 100 : 0;
 
@@ -176,7 +178,7 @@ export default function ImageCropPreview({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [posX, posY, imgW, imgH, cropW, cropH, onPositionChange]
+    [posX, posY, scaledImgW, scaledImgH, scaledCropW, scaledCropH, onPositionChange]
   );
 
   // Handle touch
@@ -191,8 +193,8 @@ export default function ImageCropPreview({
       const startPosX = posX;
       const startPosY = posY;
 
-      const maxLeft = imgW - cropW;
-      const maxTop = imgH - cropH;
+      const maxLeft = scaledImgW - scaledCropW;
+      const maxTop = scaledImgH - scaledCropH;
 
       const handleTouchMove = (moveEvent: TouchEvent) => {
         moveEvent.preventDefault();
@@ -218,7 +220,7 @@ export default function ImageCropPreview({
       document.addEventListener("touchmove", handleTouchMove, { passive: false });
       document.addEventListener("touchend", handleTouchEnd);
     },
-    [posX, posY, imgW, imgH, cropW, cropH, onPositionChange]
+    [posX, posY, scaledImgW, scaledImgH, scaledCropW, scaledCropH, onPositionChange]
   );
 
   // Quick presets
@@ -234,8 +236,6 @@ export default function ImageCropPreview({
     { label: "↘", x: 100, y: 100 },
   ];
 
-  const needsCrop = cropW > 0 && cropH > 0 && (Math.abs(cropW - imgW) > 1 || Math.abs(cropH - imgH) > 1);
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -247,30 +247,34 @@ export default function ImageCropPreview({
         )}
       </div>
 
-      {/* Crop Editor - Shows full image with crop overlay */}
+      {/* Crop Editor - Image fills full width, height adjusts dynamically */}
       <div
         ref={containerRef}
         className="relative rounded-lg overflow-hidden bg-black/80 border border-white/10"
         style={{
           width: "100%",
-          height: aspectRatio === "1:1" ? "280px" : "220px",
+          height: containerHeight > 0 ? `${containerHeight}px` : "200px",
         }}
       >
-        {/* Full image displayed with object-fit: contain */}
+        {/* Full image - fills width, positioned to show correctly */}
         <img
           src={imageUrl}
           alt="Full image"
-          className="absolute inset-0 w-full h-full select-none pointer-events-none"
+          className="absolute select-none pointer-events-none"
           draggable={false}
           style={{
-            objectFit: "contain",
+            width: `${scaledImgW}px`,
+            height: `${scaledImgH}px`,
+            left: `${offsetX}px`,
+            top: 0,
             opacity: 0.35,
             filter: "brightness(0.7)",
+            maxWidth: "none",
           }}
         />
 
         {/* Crop window - bright area showing what will be visible */}
-        {cropW > 0 && cropH > 0 && (
+        {scaledCropW > 0 && scaledCropH > 0 && (
           <div
             className={`absolute rounded-sm overflow-hidden ${
               isDragging ? "ring-2 ring-orange-400" : "ring-1 ring-white/60"
@@ -278,25 +282,25 @@ export default function ImageCropPreview({
             style={{
               left: `${cropLeft}px`,
               top: `${cropTop}px`,
-              width: `${cropW}px`,
-              height: `${cropH}px`,
+              width: `${scaledCropW}px`,
+              height: `${scaledCropH}px`,
               transition: isDragging ? "none" : "left 0.15s ease, top 0.15s ease",
               boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
             }}
             onMouseDown={needsCrop ? handleMouseDown : undefined}
             onTouchStart={needsCrop ? handleTouchStart : undefined}
           >
-            {/* The actual cropped preview */}
+            {/* The actual cropped preview - bright version of the image */}
             <img
               src={imageUrl}
               alt="Crop preview"
               className="absolute select-none pointer-events-none"
               draggable={false}
               style={{
-                width: `${imgW}px`,
-                height: `${imgH}px`,
+                width: `${scaledImgW}px`,
+                height: `${scaledImgH}px`,
                 left: `${offsetX - cropLeft}px`,
-                top: `${offsetY - cropTop}px`,
+                top: `${-cropTop}px`,
                 maxWidth: "none",
               }}
             />
@@ -309,7 +313,7 @@ export default function ImageCropPreview({
                 }`}
                 style={{ background: "rgba(0,0,0,0.25)" }}
               >
-                <div className="flex items-center gap-1.5 text-white text-xs font-medium px-2.5 py-1.5 bg-black/60 rounded-full backdrop-blur-sm">
+                <div className="flex items-center gap-1 text-white text-[10px] font-medium px-2 py-1 bg-black/50 rounded-full">
                   <Move className="h-3 w-3" />
                   <span>Drag to reposition</span>
                 </div>
@@ -329,7 +333,7 @@ export default function ImageCropPreview({
         )}
 
         {/* No crop needed badge */}
-        {!needsCrop && cropW > 0 && (
+        {!needsCrop && scaledCropW > 0 && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 text-green-400 text-[10px] font-medium px-2 py-1 bg-black/60 rounded-full">
             <Maximize2 className="h-2.5 w-2.5" />
             Image fits perfectly
@@ -387,8 +391,8 @@ export default function ImageCropPreview({
         <div
           className="rounded-md overflow-hidden border border-white/5 bg-black/30"
           style={{
-            width: aspectRatio === "1:1" ? "80px" : "100%",
-            height: aspectRatio === "1:1" ? "80px" : "0",
+            width: aspectRatio === "1:1" ? "120px" : "100%",
+            height: aspectRatio === "1:1" ? "120px" : "0",
             paddingBottom: aspectRatio === "16:9" ? "56.25%" : undefined,
             position: "relative",
           }}

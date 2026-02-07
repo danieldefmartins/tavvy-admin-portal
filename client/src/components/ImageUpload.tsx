@@ -245,7 +245,8 @@ export default function ImageUpload({
           <img 
             src={value} 
             alt="Preview" 
-            className="w-full h-40 object-cover"
+            className="w-full object-contain"
+            style={{ maxHeight: "300px" }}
             onError={() => setError("Failed to load image preview")}
           />
           <Button
