@@ -20,28 +20,51 @@ interface ImageUploadProps {
   placeholder?: string;
 }
 
-// Helper to optimize any image URL
-function optimizeImageUrl(url: string, width: number = 800, quality: number = 75): string {
+/**
+ * Get the clean, original URL for storage in the database.
+ * Strips any render/transformation parameters so we always store the original.
+ */
+function getCleanUrl(url: string): string {
+  if (!url) return url;
+  
+  // If it's a Supabase render URL, convert back to object URL
+  if (url.includes('supabase.co/storage')) {
+    let clean = url.replace('/render/image/public/', '/object/public/');
+    // Remove any query parameters (width, quality, etc.)
+    const qIndex = clean.indexOf('?');
+    if (qIndex !== -1) {
+      clean = clean.substring(0, qIndex);
+    }
+    return clean;
+  }
+  
+  return url;
+}
+
+/**
+ * Get an optimized URL for display purposes only (NOT for storage).
+ * Uses Supabase/Unsplash/Cloudinary transformation endpoints.
+ */
+export function getOptimizedImageUrl(url: string, width: number = 800, quality: number = 75): string {
   if (!url) return url;
   
   // Supabase Storage - use render endpoint with transformations
   if (url.includes('supabase.co/storage')) {
-    // Convert /object/public/ to /render/image/public/ for transformations
-    const transformedUrl = url.replace('/object/public/', '/render/image/public/');
-    const separator = transformedUrl.includes('?') ? '&' : '?';
-    return `${transformedUrl}${separator}width=${width}&quality=${quality}`;
+    // First get the clean object URL
+    const clean = getCleanUrl(url);
+    // Convert to render endpoint
+    const renderUrl = clean.replace('/object/public/', '/render/image/public/');
+    return `${renderUrl}?width=${width}&quality=${quality}`;
   }
   
   // Unsplash - use their URL parameters
   if (url.includes('unsplash.com')) {
-    // Remove existing width/quality params and add optimized ones
     const baseUrl = url.split('?')[0];
     return `${baseUrl}?w=${width}&q=${quality}&auto=format&fit=crop`;
   }
   
   // Cloudinary - use their transformation URL format
   if (url.includes('cloudinary.com')) {
-    // Insert transformation before /upload/
     return url.replace('/upload/', `/upload/w_${width},q_${quality},f_auto/`);
   }
   
@@ -51,12 +74,8 @@ function optimizeImageUrl(url: string, width: number = 800, quality: number = 75
     return `${url}${separator}w=${width}&q=${quality}&auto=format`;
   }
   
-  // For other URLs, return as-is (can't optimize externally)
+  // For other URLs, return as-is
   return url;
-}
-
-export function getOptimizedImageUrl(url: string, width: number = 800, quality: number = 75): string {
-  return optimizeImageUrl(url, width, quality);
 }
 
 export default function ImageUpload({ 
@@ -91,14 +110,13 @@ export default function ImageUpload({
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
+      // Get public URL - store the CLEAN original URL (no transformations)
       const { data: urlData } = supabase.storage
         .from(bucket)
         .getPublicUrl(data.path);
 
-      // Return optimized URL
-      const optimizedUrl = optimizeImageUrl(urlData.publicUrl);
-      onChange(optimizedUrl);
+      // Store the original, clean URL - NOT the optimized one
+      onChange(urlData.publicUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to upload image");
     } finally {
@@ -147,15 +165,19 @@ export default function ImageUpload({
   }, []);
 
   const handleUrlChange = (url: string) => {
-    // Automatically optimize the URL when entered
-    const optimizedUrl = optimizeImageUrl(url);
-    onChange(optimizedUrl);
+    // Store the clean URL - no transformations applied
+    const cleanUrl = getCleanUrl(url);
+    onChange(cleanUrl);
   };
 
   const clearImage = () => {
     onChange("");
     setError(null);
   };
+
+  // For display in the preview, use the original URL (not transformed)
+  // The ImageCropPreview will handle display optimization
+  const displayUrl = value || "";
 
   return (
     <div className="space-y-3">
@@ -239,11 +261,11 @@ export default function ImageUpload({
         </div>
       )}
 
-      {/* Preview */}
-      {value && (
+      {/* Preview - shows the original image at natural aspect ratio */}
+      {displayUrl && (
         <div className="relative rounded-lg overflow-hidden bg-black/20">
           <img 
-            src={value} 
+            src={displayUrl} 
             alt="Preview" 
             className="w-full object-contain"
             style={{ maxHeight: "300px" }}
@@ -260,9 +282,9 @@ export default function ImageUpload({
           </Button>
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
             <p className="text-xs text-white/80 truncate">
-              {value.includes('supabase.co') ? '✓ Optimized (Supabase)' : 
-               value.includes('unsplash.com') ? '✓ Optimized (Unsplash)' :
-               '⚠ External URL (not optimized)'}
+              {displayUrl.includes('supabase.co') ? '✓ Stored (Supabase)' : 
+               displayUrl.includes('unsplash.com') ? '✓ Unsplash' :
+               '⚠ External URL'}
             </p>
           </div>
         </div>

@@ -13,15 +13,15 @@ interface ImageCropPreviewProps {
 
 /**
  * Visual image crop preview component.
- * 
- * The image ALWAYS fills the full container width. The container height
- * adjusts dynamically based on the image's natural aspect ratio.
- * A crop window overlay shows exactly what portion will be visible
- * at the target aspect ratio, and can be dragged to reposition.
- * 
- * For portrait images: image fills width, container becomes tall, crop window slides vertically.
- * For landscape images: image fills width, container is shorter, crop window slides horizontally.
- * For images matching the target ratio: no crop needed, shown at full size.
+ *
+ * KEY DESIGN: The image ALWAYS fills the full container width.
+ * - For landscape images: container is shorter, crop window slides horizontally
+ * - For portrait images: container is capped at max height, image fills width,
+ *   and the crop window shows the visible portion that slides vertically
+ * - For images matching the target ratio: no crop needed, shown at full size
+ *
+ * The container uses overflow:hidden so tall portrait images are clipped,
+ * but the image still fills the full width (no black side bars).
  */
 export default function ImageCropPreview({
   imageUrl,
@@ -46,14 +46,21 @@ export default function ImageCropPreview({
 
   const { x: posX, y: posY } = parsePosition(position);
 
-  // Load image natural dimensions
+  // Load image natural dimensions — use clean URL to get real dimensions
   useEffect(() => {
     if (!imageUrl) return;
     const img = new Image();
     img.onload = () => {
       setImageNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
     };
-    img.src = imageUrl;
+    // Strip any render/transformation params to get the real image
+    let cleanUrl = imageUrl;
+    if (cleanUrl.includes('supabase.co/storage')) {
+      cleanUrl = cleanUrl.replace('/render/image/public/', '/object/public/');
+      const qIdx = cleanUrl.indexOf('?');
+      if (qIdx !== -1) cleanUrl = cleanUrl.substring(0, qIdx);
+    }
+    img.src = cleanUrl;
   }, [imageUrl]);
 
   // Observe container width
@@ -68,21 +75,34 @@ export default function ImageCropPreview({
     return () => observer.disconnect();
   }, []);
 
-  // Calculate all dimensions
-  const getDimensions = () => {
-    if (!imageNaturalSize.width || !imageNaturalSize.height || !containerWidth) {
-      return { imgW: 0, imgH: 0, cropW: 0, cropH: 0 };
+  // Get clean URL for display (strip render transforms)
+  const getDisplayUrl = (url: string) => {
+    if (!url) return url;
+    if (url.includes('supabase.co/storage')) {
+      let clean = url.replace('/render/image/public/', '/object/public/');
+      const qIdx = clean.indexOf('?');
+      if (qIdx !== -1) clean = clean.substring(0, qIdx);
+      return clean;
     }
+    return url;
+  };
 
-    const imgAspect = imageNaturalSize.width / imageNaturalSize.height;
-    const targetAspect = aspectRatio === "1:1" ? 1 : 16 / 9;
+  const displayUrl = getDisplayUrl(imageUrl);
 
-    // Image ALWAYS fills the full container width
-    const imgW = containerWidth;
-    const imgH = containerWidth / imgAspect;
+  // Calculate all dimensions
+  // Image ALWAYS fills the full container width. No scaling down.
+  const imgAspect = imageNaturalSize.width && imageNaturalSize.height
+    ? imageNaturalSize.width / imageNaturalSize.height
+    : 1;
+  const targetAspect = aspectRatio === "1:1" ? 1 : 16 / 9;
 
-    // Crop window: represents what object-fit: cover would show
-    let cropW: number, cropH: number;
+  // Image fills full width
+  const imgW = containerWidth;
+  const imgH = containerWidth > 0 ? containerWidth / imgAspect : 0;
+
+  // Crop window dimensions (what object-fit: cover would show)
+  let cropW = 0, cropH = 0;
+  if (imgW > 0 && imgH > 0) {
     if (imgAspect > targetAspect) {
       // Image is wider than target — height fills, width crops
       cropH = imgH;
@@ -92,44 +112,43 @@ export default function ImageCropPreview({
       cropW = imgW;
       cropH = imgW / targetAspect;
     }
-
-    return { imgW, imgH, cropW, cropH };
-  };
-
-  const { imgW, imgH, cropW, cropH } = getDimensions();
+  }
 
   // Does the image need cropping?
   const needsCrop = cropW > 0 && cropH > 0 && (Math.abs(cropW - imgW) > 2 || Math.abs(cropH - imgH) > 2);
 
-  // Max container height to prevent extremely tall containers for very portrait images
+  // Container height: cap at reasonable max, but image still fills width
+  // For landscape: imgH is small, no capping needed
+  // For portrait: imgH is large, we cap the container but image stays full width
   const maxContainerHeight = 400;
-  const naturalContainerHeight = imgH;
-  const containerHeight = Math.min(naturalContainerHeight, maxContainerHeight);
+  const containerHeight = imgH > 0 ? Math.min(imgH, maxContainerHeight) : 200;
 
-  // If we capped the height, we need to scale everything down
-  const scale = containerHeight > 0 && naturalContainerHeight > 0
-    ? containerHeight / naturalContainerHeight
-    : 1;
+  // The image position within the container (for portrait images, we scroll the image)
+  // The image top position is calculated so the crop window is visible
+  const getImageTop = () => {
+    if (imgH <= containerHeight) return 0; // Image fits in container
+    // For tall images, position the image so the crop area is centered in the container
+    const maxTop = imgH - cropH;
+    const cropTop = (posY / 100) * maxTop;
+    // Center the crop window in the container
+    const idealTop = cropTop - (containerHeight - cropH) / 2;
+    // Clamp so image doesn't go past edges
+    return -Math.max(0, Math.min(imgH - containerHeight, idealTop));
+  };
 
-  const scaledImgW = imgW * scale;
-  const scaledImgH = imgH * scale;
-  const scaledCropW = cropW * scale;
-  const scaledCropH = cropH * scale;
+  const imageTop = getImageTop();
 
-  // Offset to center the image horizontally if it was scaled down
-  const offsetX = (containerWidth - scaledImgW) / 2;
-
-  // Calculate crop window position based on object-position percentages
+  // Calculate crop window position relative to the image
   const getCropPosition = () => {
-    if (!scaledCropW || !scaledCropH || !scaledImgW || !scaledImgH) return { left: 0, top: 0 };
+    if (!cropW || !cropH || !imgW || !imgH) return { left: 0, top: 0 };
 
-    const maxLeft = scaledImgW - scaledCropW;
-    const maxTop = scaledImgH - scaledCropH;
+    const maxLeft = imgW - cropW;
+    const maxTop = imgH - cropH;
 
-    const left = offsetX + (posX / 100) * maxLeft;
+    const left = (posX / 100) * maxLeft;
     const top = (posY / 100) * maxTop;
 
-    return { left, top };
+    return { left, top: top + imageTop }; // Adjust for image scroll
   };
 
   const { left: cropLeft, top: cropTop } = getCropPosition();
@@ -146,8 +165,8 @@ export default function ImageCropPreview({
       const startPosX = posX;
       const startPosY = posY;
 
-      const maxLeft = scaledImgW - scaledCropW;
-      const maxTop = scaledImgH - scaledCropH;
+      const maxLeft = imgW - cropW;
+      const maxTop = imgH - cropH;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         moveEvent.preventDefault();
@@ -178,7 +197,7 @@ export default function ImageCropPreview({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [posX, posY, scaledImgW, scaledImgH, scaledCropW, scaledCropH, onPositionChange]
+    [posX, posY, imgW, imgH, cropW, cropH, onPositionChange]
   );
 
   // Handle touch
@@ -193,8 +212,8 @@ export default function ImageCropPreview({
       const startPosX = posX;
       const startPosY = posY;
 
-      const maxLeft = scaledImgW - scaledCropW;
-      const maxTop = scaledImgH - scaledCropH;
+      const maxLeft = imgW - cropW;
+      const maxTop = imgH - cropH;
 
       const handleTouchMove = (moveEvent: TouchEvent) => {
         moveEvent.preventDefault();
@@ -220,7 +239,7 @@ export default function ImageCropPreview({
       document.addEventListener("touchmove", handleTouchMove, { passive: false });
       document.addEventListener("touchend", handleTouchEnd);
     },
-    [posX, posY, scaledImgW, scaledImgH, scaledCropW, scaledCropH, onPositionChange]
+    [posX, posY, imgW, imgH, cropW, cropH, onPositionChange]
   );
 
   // Quick presets
@@ -247,7 +266,7 @@ export default function ImageCropPreview({
         )}
       </div>
 
-      {/* Crop Editor - Image fills full width, height adjusts dynamically */}
+      {/* Crop Editor - Image ALWAYS fills full width, container clips overflow */}
       <div
         ref={containerRef}
         className="relative rounded-lg overflow-hidden bg-black/80 border border-white/10"
@@ -256,17 +275,17 @@ export default function ImageCropPreview({
           height: containerHeight > 0 ? `${containerHeight}px` : "200px",
         }}
       >
-        {/* Full image - fills width, positioned to show correctly */}
+        {/* Full image - always fills the container width */}
         <img
-          src={imageUrl}
+          src={displayUrl}
           alt="Full image"
           className="absolute select-none pointer-events-none"
           draggable={false}
           style={{
-            width: `${scaledImgW}px`,
-            height: `${scaledImgH}px`,
-            left: `${offsetX}px`,
-            top: 0,
+            width: `${imgW}px`,
+            height: `${imgH}px`,
+            left: 0,
+            top: `${imageTop}px`,
             opacity: 0.35,
             filter: "brightness(0.7)",
             maxWidth: "none",
@@ -274,7 +293,7 @@ export default function ImageCropPreview({
         />
 
         {/* Crop window - bright area showing what will be visible */}
-        {scaledCropW > 0 && scaledCropH > 0 && (
+        {cropW > 0 && cropH > 0 && (
           <div
             className={`absolute rounded-sm overflow-hidden ${
               isDragging ? "ring-2 ring-orange-400" : "ring-1 ring-white/60"
@@ -282,8 +301,8 @@ export default function ImageCropPreview({
             style={{
               left: `${cropLeft}px`,
               top: `${cropTop}px`,
-              width: `${scaledCropW}px`,
-              height: `${scaledCropH}px`,
+              width: `${cropW}px`,
+              height: `${Math.min(cropH, containerHeight)}px`,
               transition: isDragging ? "none" : "left 0.15s ease, top 0.15s ease",
               boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
             }}
@@ -292,15 +311,15 @@ export default function ImageCropPreview({
           >
             {/* The actual cropped preview - bright version of the image */}
             <img
-              src={imageUrl}
+              src={displayUrl}
               alt="Crop preview"
               className="absolute select-none pointer-events-none"
               draggable={false}
               style={{
-                width: `${scaledImgW}px`,
-                height: `${scaledImgH}px`,
-                left: `${offsetX - cropLeft}px`,
-                top: `${-cropTop}px`,
+                width: `${imgW}px`,
+                height: `${imgH}px`,
+                left: `${-cropLeft}px`,
+                top: `${imageTop - cropTop}px`,
                 maxWidth: "none",
               }}
             />
@@ -333,7 +352,7 @@ export default function ImageCropPreview({
         )}
 
         {/* No crop needed badge */}
-        {!needsCrop && scaledCropW > 0 && (
+        {!needsCrop && cropW > 0 && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 text-green-400 text-[10px] font-medium px-2 py-1 bg-black/60 rounded-full">
             <Maximize2 className="h-2.5 w-2.5" />
             Image fits perfectly
@@ -398,7 +417,7 @@ export default function ImageCropPreview({
           }}
         >
           <img
-            src={imageUrl}
+            src={displayUrl}
             alt="Result"
             className="absolute inset-0 w-full h-full"
             style={{
