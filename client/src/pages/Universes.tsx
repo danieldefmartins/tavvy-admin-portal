@@ -247,11 +247,12 @@ export default function Universes() {
             id="name"
             value={formData.name}
             onChange={(e) => {
-              setFormData({ 
-                ...formData, 
-                name: e.target.value,
-                slug: isEdit ? formData.slug : generateSlug(e.target.value)
-              });
+              const val = e.target.value;
+              setFormData(prev => ({ 
+                ...prev, 
+                name: val,
+                slug: isEdit ? prev.slug : generateSlug(val)
+              }));
             }}
             placeholder="Disney World"
             className="h-12"
@@ -262,7 +263,7 @@ export default function Universes() {
           <Input
             id="slug"
             value={formData.slug}
-            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+            onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
             placeholder="disney-world"
             className="h-12"
           />
@@ -274,7 +275,7 @@ export default function Universes() {
         <Textarea
           id="description"
           value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
           placeholder="A brief description of this universe..."
           rows={3}
         />
@@ -283,7 +284,7 @@ export default function Universes() {
       {/* Thumbnail Image with Upload */}
       <ImageUpload
         value={formData.thumbnail_image_url}
-        onChange={(url) => setFormData({ ...formData, thumbnail_image_url: url })}
+        onChange={(url) => setFormData(prev => ({ ...prev, thumbnail_image_url: url }))}
         bucket="universe-images"
         folder="thumbnails"
         label="Thumbnail Image"
@@ -306,7 +307,7 @@ export default function Universes() {
       {/* Banner Image with Upload */}
       <ImageUpload
         value={formData.banner_image_url}
-        onChange={(url) => setFormData({ ...formData, banner_image_url: url })}
+        onChange={(url) => setFormData(prev => ({ ...prev, banner_image_url: url }))}
         bucket="universe-images"
         folder="banners"
         label="Banner Image"
@@ -332,7 +333,7 @@ export default function Universes() {
           <Input
             id="location"
             value={formData.location}
-            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
             placeholder="e.g., Orlando, FL"
             className="h-12"
           />
@@ -341,7 +342,7 @@ export default function Universes() {
           <Label htmlFor="category">Category</Label>
           <Select 
             value={formData.category_id || "none"} 
-            onValueChange={(v) => setFormData({ ...formData, category_id: v === "none" ? "" : v })}
+            onValueChange={(v) => setFormData(prev => ({ ...prev, category_id: v === "none" ? "" : v }))}
           >
             <SelectTrigger className="h-12">
               <SelectValue placeholder="Select category" />
@@ -365,7 +366,7 @@ export default function Universes() {
             <input
               type="checkbox"
               checked={formData.is_featured}
-              onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+              onChange={(e) => setFormData(prev => ({ ...prev, is_featured: e.target.checked }))}
               className="h-5 w-5 rounded border-gray-300"
             />
             <span className="ml-2 text-sm">Featured universe</span>
@@ -376,7 +377,7 @@ export default function Universes() {
           <select
             id="status"
             value={formData.status}
-            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+            onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
             className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
             <option value="active">Active</option>
