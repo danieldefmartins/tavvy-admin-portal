@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -235,7 +235,10 @@ export default function Universes() {
 
   // Image position presets for quick selection
 
-  const UniverseForm = ({ isEdit = false }: { isEdit?: boolean }) => (
+  // IMPORTANT: This is a render function, NOT a component.
+  // Defining it as a component inside the parent caused React to unmount/remount
+  // on every state change, which made inputs lose focus and crop drag reset.
+  const renderUniverseForm = (isEdit = false) => (
     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
       <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
         <div className="space-y-2">
@@ -510,7 +513,7 @@ export default function Universes() {
                 Add a new universe to the platform. Fill in the details below.
               </DialogDescription>
             </DialogHeader>
-            <UniverseForm />
+            {renderUniverseForm(false)}
             <DialogFooter className={isMobile ? 'flex-col gap-2' : ''}>
               <Button 
                 variant="outline" 
@@ -774,7 +777,7 @@ export default function Universes() {
               Update the universe details below.
             </DialogDescription>
           </DialogHeader>
-          <UniverseForm isEdit />
+          {renderUniverseForm(true)}
           <DialogFooter className={isMobile ? 'flex-col gap-2' : ''}>
             <Button 
               variant="outline" 
