@@ -34,6 +34,7 @@ import Reviews from "@/pages/Reviews";
 import PlaceEdit from "@/pages/PlaceEdit";
 import CreatePlace from "@/pages/CreatePlace";
 import Drafts from "@/pages/Drafts";
+import Rides from "@/pages/Rides";
 
 // Loading component
 function LoadingScreen() {
@@ -142,6 +143,12 @@ function App() {
         <Route path="/universes/:id">
           <ProtectedRoute>
             <UniverseDetail />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/rides">
+          <ProtectedRoute>
+            <Rides />
           </ProtectedRoute>
         </Route>
 

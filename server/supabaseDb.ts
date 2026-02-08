@@ -5671,3 +5671,364 @@ export async function getUniverseCategories() {
   if (error) throw error;
   return data;
 }
+
+
+// ============ RIDES ============
+
+export async function getAllRides(filters?: {
+  status?: string;
+  rideType?: string;
+  thrillLevel?: string;
+}) {
+  let query = supabase
+    .from("atlas_rides")
+    .select("*");
+
+  if (filters?.status && filters.status !== 'all') {
+    query = query.eq("status", filters.status);
+  }
+  if (filters?.rideType && filters.rideType !== 'all') {
+    query = query.eq("ride_type", filters.rideType);
+  }
+  if (filters?.thrillLevel && filters.thrillLevel !== 'all') {
+    query = query.eq("thrill_level", filters.thrillLevel);
+  }
+
+  const { data, error } = await query.order("name", { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
+export async function getRideById(id: string) {
+  const { data, error } = await supabase
+    .from("atlas_rides")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function createRide(ride: {
+  name: string;
+  slug: string;
+  description?: string | null;
+  thumbnail_image_url?: string | null;
+  banner_image_url?: string | null;
+  thumbnail_fit?: string;
+  thumbnail_position?: string;
+  banner_fit?: string;
+  banner_position?: string;
+  location?: string | null;
+  ride_type?: string | null;
+  thrill_level?: string | null;
+  duration_minutes?: number | null;
+  height_requirement_inches?: number | null;
+  is_featured?: boolean;
+  status?: string;
+}) {
+  const { data, error } = await supabase
+    .from("atlas_rides")
+    .insert(ride)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data?.id || null;
+}
+
+export async function updateRide(id: string, updates: any): Promise<boolean> {
+  const { error } = await supabase
+    .from("atlas_rides")
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] Update ride error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteRide(id: string): Promise<boolean> {
+  // First delete any universe links
+  await supabase
+    .from("atlas_universe_rides")
+    .delete()
+    .eq("ride_id", id);
+
+  const { error } = await supabase
+    .from("atlas_rides")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] Delete ride error:", error);
+    return false;
+  }
+  return true;
+}
+
+// ============ UNIVERSE RIDES (Linking) ============
+
+export async function getUniverseRides(universeId: string) {
+  const { data, error } = await supabase
+    .from("atlas_universe_rides")
+    .select(`
+      *,
+      ride:atlas_rides(*)
+    `)
+    .eq("universe_id", universeId)
+    .order("display_order", { ascending: true });
+
+  if (error) {
+    console.error("[Supabase] Get universe rides error:", error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function linkRideToUniverse(universeId: string, rideId: string, options?: {
+  display_order?: number;
+  is_featured?: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase
+    .from("atlas_universe_rides")
+    .insert({
+      universe_id: universeId,
+      ride_id: rideId,
+      display_order: options?.display_order || 0,
+      is_featured: options?.is_featured || false,
+    });
+
+  if (error) {
+    console.error("[Supabase] Link ride to universe error:", error);
+    return { success: false, error: error.message };
+  }
+  return { success: true };
+}
+
+export async function unlinkRideFromUniverse(universeId: string, rideId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("atlas_universe_rides")
+    .delete()
+    .eq("universe_id", universeId)
+    .eq("ride_id", rideId);
+
+  if (error) {
+    console.error("[Supabase] Unlink ride from universe error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function toggleUniverseRideFeatured(universeId: string, rideId: string, isFeatured: boolean): Promise<boolean> {
+  const { error } = await supabase
+    .from("atlas_universe_rides")
+    .update({ is_featured: isFeatured })
+    .eq("universe_id", universeId)
+    .eq("ride_id", rideId);
+
+  if (error) {
+    console.error("[Supabase] Toggle ride featured error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function searchRidesForLinking(query: string, limit: number = 20, excludeUniverseId?: string) {
+  let queryBuilder = supabase
+    .from("atlas_rides")
+    .select("id, name, slug, thumbnail_image_url, ride_type, thrill_level, location, status")
+    .ilike("name", `%${query}%`)
+    .eq("status", "active")
+    .limit(limit);
+
+  const { data, error } = await queryBuilder;
+
+  if (error) {
+    console.error("[Supabase] Search rides error:", error);
+    return [];
+  }
+
+  // If excludeUniverseId is provided, filter out already linked rides
+  if (excludeUniverseId && data) {
+    const { data: linkedRides } = await supabase
+      .from("atlas_universe_rides")
+      .select("ride_id")
+      .eq("universe_id", excludeUniverseId);
+
+    const linkedIds = new Set(linkedRides?.map(r => r.ride_id) || []);
+    return data.filter(r => !linkedIds.has(r.id));
+  }
+
+  return data || [];
+}
+
+// ============ PROS MANAGEMENT ============
+export interface Pro {
+  id: string;
+  user_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  cover_image_url: string | null;
+  business_name: string | null;
+  license_number: string | null;
+  years_experience: number | null;
+  service_areas: string[] | null;
+  specialties: string[] | null;
+  is_verified: boolean;
+  verification_status: string | null;
+  rating: number | null;
+  review_count: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getPros(filters?: {
+  search?: string;
+  status?: string;
+  verified?: boolean;
+  limit?: number;
+  offset?: number;
+}) {
+  const limit = filters?.limit || 50;
+  const offset = filters?.offset || 0;
+
+  let query = supabase
+    .from("consumer_profiles")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  // Apply search filter
+  if (filters?.search) {
+    const searchTerm = `%${filters.search}%`;
+    query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},email.ilike.${searchTerm},business_name.ilike.${searchTerm}`);
+  }
+
+  // Apply verification filter
+  if (filters?.verified !== undefined) {
+    query = query.eq("is_verified", filters.verified);
+  }
+
+  // Apply status filter
+  if (filters?.status && filters.status !== "all") {
+    query = query.eq("verification_status", filters.status);
+  }
+
+  const { data, error, count } = await query;
+
+  if (error) throw error;
+  return { data: data || [], total: count || 0 };
+}
+
+export async function getProById(id: string) {
+  const { data, error } = await supabase
+    .from("consumer_profiles")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePro(id: string, updates: Partial<Pro>) {
+  const { data, error } = await supabase
+    .from("consumer_profiles")
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function createPro(pro: Partial<Pro>) {
+  const { data, error } = await supabase
+    .from("consumer_profiles")
+    .insert({
+      ...pro,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deletePro(id: string) {
+  const { error } = await supabase
+    .from("consumer_profiles")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+  return true;
+}
+
+export async function verifyPro(id: string, verified: boolean) {
+  const { data, error } = await supabase
+    .from("consumer_profiles")
+    .update({
+      is_verified: verified,
+      verification_status: verified ? "verified" : "pending",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+// Get Pro services
+export async function getProServices(proId: string) {
+  const { data, error } = await supabase
+    .from("pro_services")
+    .select("*")
+    .eq("pro_id", proId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    // Table might not exist, return empty array
+    console.log("pro_services table not found or error:", error.message);
+    return [];
+  }
+  return data || [];
+}
+
+// Get Pro reviews
+export async function getProReviews(proId: string) {
+  const { data, error } = await supabase
+    .from("pro_reviews")
+    .select("*")
+    .eq("pro_id", proId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    // Table might not exist, return empty array
+    console.log("pro_reviews table not found or error:", error.message);
+    return [];
+  }
+  return data || [];
+}

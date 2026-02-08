@@ -188,6 +188,17 @@ import {
   deleteTavvyPlace,
   getTavvyCategories,
   type TavvyPlaceInput,
+  // Rides
+  getAllRides,
+  getRideById,
+  createRide,
+  updateRide,
+  deleteRide,
+  getUniverseRides,
+  linkRideToUniverse,
+  unlinkRideFromUniverse,
+  toggleUniverseRideFeatured,
+  searchRidesForLinking,
 } from "./supabaseDb";
 import { getDb } from "./db";
 import { repActivityLog, batchImportJobs } from "../drizzle/schema";
@@ -1619,6 +1630,204 @@ export const appRouter = router({
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: "Failed to toggle place featured status",
+          });
+        }
+        return { success: true };
+      }),
+
+    // ============ UNIVERSE RIDES ============
+    getRides: protectedProcedure
+      .input(z.object({ universeId: z.string() }))
+      .query(async ({ input }) => {
+        return getUniverseRides(input.universeId);
+      }),
+
+    linkRide: protectedProcedure
+      .input(
+        z.object({
+          universeId: z.string(),
+          rideId: z.string(),
+          display_order: z.number().optional(),
+          is_featured: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const result = await linkRideToUniverse(
+          input.universeId,
+          input.rideId,
+          {
+            display_order: input.display_order,
+            is_featured: input.is_featured,
+          }
+        );
+        return result;
+      }),
+
+    unlinkRide: protectedProcedure
+      .input(
+        z.object({
+          universeId: z.string(),
+          rideId: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const success = await unlinkRideFromUniverse(input.universeId, input.rideId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to unlink ride from universe",
+          });
+        }
+        return { success: true };
+      }),
+
+    searchRides: protectedProcedure
+      .input(
+        z.object({
+          query: z.string().min(1),
+          limit: z.number().optional().default(20),
+          excludeUniverseId: z.string().optional(),
+        })
+      )
+      .query(async ({ input }) => {
+        return searchRidesForLinking(input.query, input.limit, input.excludeUniverseId);
+      }),
+
+    toggleRideFeatured: protectedProcedure
+      .input(
+        z.object({
+          universeId: z.string(),
+          rideId: z.string(),
+          isFeatured: z.boolean(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const success = await toggleUniverseRideFeatured(
+          input.universeId,
+          input.rideId,
+          input.isFeatured
+        );
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to toggle ride featured status",
+          });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ RIDES ROUTER ============
+  rides: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          status: z.string().optional(),
+          rideType: z.string().optional(),
+          thrillLevel: z.string().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getAllRides(input);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        const ride = await getRideById(input.id);
+        if (!ride) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Ride not found",
+          });
+        }
+        return ride;
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().min(1),
+          slug: z.string().min(1),
+          description: z.string().optional(),
+          thumbnail_image_url: z.string().optional(),
+          banner_image_url: z.string().optional(),
+          thumbnail_fit: z.string().optional().default("cover"),
+          thumbnail_position: z.string().optional().default("center"),
+          banner_fit: z.string().optional().default("cover"),
+          banner_position: z.string().optional().default("center"),
+          location: z.string().optional(),
+          ride_type: z.string().optional(),
+          thrill_level: z.string().optional(),
+          duration_minutes: z.number().optional(),
+          height_requirement_inches: z.number().optional(),
+          is_featured: z.boolean().default(false),
+          status: z.string().default("active"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const id = await createRide({
+          ...input,
+          description: input.description || null,
+          thumbnail_image_url: input.thumbnail_image_url || null,
+          banner_image_url: input.banner_image_url || null,
+          location: input.location || null,
+          ride_type: input.ride_type || null,
+          thrill_level: input.thrill_level || null,
+          duration_minutes: input.duration_minutes || null,
+          height_requirement_inches: input.height_requirement_inches || null,
+        });
+        if (!id) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create ride",
+          });
+        }
+        return { id };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          name: z.string().optional(),
+          slug: z.string().optional(),
+          description: z.string().optional(),
+          thumbnail_image_url: z.string().optional(),
+          banner_image_url: z.string().optional(),
+          thumbnail_fit: z.string().optional(),
+          thumbnail_position: z.string().optional(),
+          banner_fit: z.string().optional(),
+          banner_position: z.string().optional(),
+          location: z.string().optional(),
+          ride_type: z.string().optional(),
+          thrill_level: z.string().optional(),
+          duration_minutes: z.number().optional(),
+          height_requirement_inches: z.number().optional(),
+          is_featured: z.boolean().optional(),
+          status: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        const success = await updateRide(id, data);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update ride",
+          });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        const success = await deleteRide(input.id);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete ride",
           });
         }
         return { success: true };

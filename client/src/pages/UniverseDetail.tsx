@@ -39,6 +39,7 @@ import {
   Star,
   StarOff,
   ChevronRight,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -87,6 +88,37 @@ interface SearchPlace {
   thumbnail_url: string | null;
 }
 
+interface LinkedRide {
+  id: string;
+  universe_id: string;
+  ride_id: string;
+  display_order: number;
+  is_featured: boolean;
+  created_at: string;
+  ride: {
+    id: string;
+    name: string;
+    slug: string;
+    thumbnail_image_url: string | null;
+    ride_type: string | null;
+    thrill_level: string | null;
+    location: string | null;
+    duration_minutes: number | null;
+    status: string;
+  } | null;
+}
+
+interface SearchRide {
+  id: string;
+  name: string;
+  slug: string;
+  thumbnail_image_url: string | null;
+  ride_type: string | null;
+  thrill_level: string | null;
+  location: string | null;
+  status: string;
+}
+
 export default function UniverseDetail() {
   const [, params] = useRoute("/universes/:id");
   const id = params?.id;
@@ -111,6 +143,11 @@ export default function UniverseDetail() {
   const [placeSearchQuery, setPlaceSearchQuery] = useState("");
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
 
+  // Ride linking state
+  const [isLinkRideDialogOpen, setIsLinkRideDialogOpen] = useState(false);
+  const [rideSearchQuery, setRideSearchQuery] = useState("");
+  const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
+
   // Queries
   const { data: universe, isLoading: universeLoading } = trpc.universes.getById.useQuery(
     { id: id! },
@@ -130,6 +167,17 @@ export default function UniverseDetail() {
   const { data: searchResults, isLoading: searchLoading } = trpc.universes.searchPlaces.useQuery(
     { query: placeSearchQuery, excludeUniverseId: id! },
     { enabled: placeSearchQuery.length >= 2 && !!id }
+  );
+
+  // Ride queries
+  const { data: linkedRides, isLoading: ridesLoading, refetch: refetchRides } = trpc.universes.getRides.useQuery(
+    { universeId: id! },
+    { enabled: !!id }
+  );
+
+  const { data: rideSearchResults, isLoading: rideSearchLoading } = trpc.universes.searchRides.useQuery(
+    { query: rideSearchQuery, excludeUniverseId: id! },
+    { enabled: rideSearchQuery.length >= 2 && !!id }
   );
 
   // Mutations
@@ -185,6 +233,34 @@ export default function UniverseDetail() {
     onSuccess: () => {
       toast.success("Featured status updated!");
       refetchPlaces();
+    },
+    onError: (error) => toast.error(`Error: ${error.message}`),
+  });
+
+  // Ride mutations
+  const linkRideMutation = trpc.universes.linkRide.useMutation({
+    onSuccess: () => {
+      toast.success("Ride linked successfully!");
+      setIsLinkRideDialogOpen(false);
+      setRideSearchQuery("");
+      setSelectedRideId(null);
+      refetchRides();
+    },
+    onError: (error) => toast.error(`Error: ${error.message}`),
+  });
+
+  const unlinkRideMutation = trpc.universes.unlinkRide.useMutation({
+    onSuccess: () => {
+      toast.success("Ride unlinked successfully!");
+      refetchRides();
+    },
+    onError: (error) => toast.error(`Error: ${error.message}`),
+  });
+
+  const toggleRideFeaturedMutation = trpc.universes.toggleRideFeatured.useMutation({
+    onSuccess: () => {
+      toast.success("Ride featured status updated!");
+      refetchRides();
     },
     onError: (error) => toast.error(`Error: ${error.message}`),
   });
@@ -268,6 +344,49 @@ export default function UniverseDetail() {
       placeId,
       isFeatured: !currentStatus,
     });
+  };
+
+  // Ride handlers
+  const handleLinkRide = () => {
+    if (!selectedRideId) return;
+    linkRideMutation.mutate({
+      universeId: id!,
+      rideId: selectedRideId,
+    });
+  };
+
+  const handleUnlinkRide = (rideId: string) => {
+    if (confirm("Are you sure you want to unlink this ride?")) {
+      unlinkRideMutation.mutate({
+        universeId: id!,
+        rideId,
+      });
+    }
+  };
+
+  const handleToggleRideFeatured = (rideId: string, currentStatus: boolean) => {
+    toggleRideFeaturedMutation.mutate({
+      universeId: id!,
+      rideId,
+      isFeatured: !currentStatus,
+    });
+  };
+
+  const getRideTypeLabel = (type: string | null) => {
+    const types: Record<string, string> = {
+      roller_coaster: "Roller Coaster",
+      dark_ride: "Dark Ride",
+      water_ride: "Water Ride",
+      flat_ride: "Flat Ride",
+      simulator: "Simulator",
+      show: "Show",
+      transport: "Transport",
+      walk_through: "Walk-Through",
+      spinning: "Spinning",
+      drop_tower: "Drop Tower",
+      other: "Other",
+    };
+    return types[type || ""] || type || "-";
   };
 
   // Mobile Card Components
@@ -424,6 +543,78 @@ export default function UniverseDetail() {
     </Card>
   );
 
+  // Mobile Ride Card
+  const RideCard = ({ link }: { link: LinkedRide }) => (
+    <Card className="mb-3 border-border/50 bg-card/50">
+      <CardContent className="p-4">
+        <div className="flex gap-3">
+          {link.ride?.thumbnail_image_url ? (
+            <img 
+              src={link.ride.thumbnail_image_url} 
+              alt={link.ride.name}
+              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+              <Zap className="h-6 w-6 text-muted-foreground" />
+            </div>
+          )}
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="font-semibold truncate">{link.ride?.name || "Unknown"}</h3>
+                <p className="text-sm text-muted-foreground truncate">
+                  {link.ride?.ride_type ? getRideTypeLabel(link.ride.ride_type) : "No type"}
+                </p>
+              </div>
+              {link.is_featured && (
+                <Star className="h-5 w-5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+              )}
+            </div>
+            
+            {link.ride?.location && (
+              <p className="text-xs text-muted-foreground mt-1 truncate">
+                {link.ride.location}
+              </p>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="flex-1 h-11"
+            onClick={() => handleToggleRideFeatured(link.ride_id, link.is_featured)}
+            disabled={toggleRideFeaturedMutation.isPending}
+          >
+            {link.is_featured ? (
+              <>
+                <StarOff className="h-4 w-4 mr-2" />
+                Unfeature
+              </>
+            ) : (
+              <>
+                <Star className="h-4 w-4 mr-2" />
+                Feature
+              </>
+            )}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="h-11 px-4"
+            onClick={() => handleUnlinkRide(link.ride_id)}
+            disabled={unlinkRideMutation.isPending}
+          >
+            <Unlink className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   if (universeLoading) {
     return (
       <div className="space-y-4 p-4">
@@ -505,16 +696,20 @@ export default function UniverseDetail() {
         </CardContent>
       </Card>
 
-      {/* Tabs for Planets and Places */}
+      {/* Tabs for Planets, Places, and Rides */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={`w-full ${isMobile ? 'grid grid-cols-2 h-12' : ''}`}>
-          <TabsTrigger value="planets" className={isMobile ? 'h-10' : ''}>
+        <TabsList className={`w-full ${isMobile ? 'grid grid-cols-3 h-12' : ''}`}>
+          <TabsTrigger value="planets" className={isMobile ? 'h-10 text-xs px-2' : ''}>
             <Globe className="h-4 w-4 mr-2" />
             Planets ({planets?.length || 0})
           </TabsTrigger>
-          <TabsTrigger value="places" className={isMobile ? 'h-10' : ''}>
+          <TabsTrigger value="places" className={isMobile ? 'h-10 text-xs px-2' : ''}>
             <MapPin className="h-4 w-4 mr-2" />
             Places ({linkedPlaces?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="rides" className={isMobile ? 'h-10 text-xs px-2' : ''}>
+            <Zap className="h-4 w-4 mr-2" />
+            Rides ({linkedRides?.length || 0})
           </TabsTrigger>
         </TabsList>
 
@@ -765,6 +960,119 @@ export default function UniverseDetail() {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* Rides Tab */}
+        <TabsContent value="rides" className="space-y-4 mt-4">
+          <Card className="border-border/50 bg-card/50">
+            <CardHeader className={`${isMobile ? 'pb-3' : ''} flex ${isMobile ? 'flex-col gap-3' : 'flex-row items-center justify-between'}`}>
+              <div>
+                <CardTitle className={isMobile ? 'text-lg' : ''}>Linked Rides</CardTitle>
+                <CardDescription>
+                  Rides & attractions in this universe
+                </CardDescription>
+              </div>
+              <Button 
+                onClick={() => setIsLinkRideDialogOpen(true)}
+                className={`h-11 ${isMobile ? 'w-full' : ''}`}
+              >
+                <LinkIcon className="h-4 w-4 mr-2" />
+                Link Ride
+              </Button>
+            </CardHeader>
+            <CardContent className={isMobile ? 'px-3' : ''}>
+              {ridesLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className={isMobile ? 'h-28' : 'h-16'} />
+                  ))}
+                </div>
+              ) : linkedRides?.length === 0 ? (
+                <div className="text-center py-8">
+                  <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No rides linked</h3>
+                  <p className="text-muted-foreground mb-4 text-sm">
+                    Link rides to this universe to organize them
+                  </p>
+                  <Button onClick={() => setIsLinkRideDialogOpen(true)} className="h-11">
+                    <LinkIcon className="h-4 w-4 mr-2" />
+                    Link First Ride
+                  </Button>
+                </div>
+              ) : isMobile ? (
+                <div className="space-y-0">
+                  {linkedRides?.map((link: any) => (
+                    <RideCard key={link.id} link={link} />
+                  ))}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[60px]">Image</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Featured</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {linkedRides?.map((link: any) => (
+                      <TableRow key={link.id}>
+                        <TableCell>
+                          {link.ride?.thumbnail_image_url ? (
+                            <img 
+                              src={link.ride.thumbnail_image_url} 
+                              alt={link.ride.name}
+                              className="w-10 h-10 rounded object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                              <Zap className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {link.ride?.name || "Unknown"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {link.ride?.ride_type ? getRideTypeLabel(link.ride.ride_type) : "-"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {link.ride?.location || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleRideFeatured(link.ride_id, link.is_featured)}
+                            disabled={toggleRideFeaturedMutation.isPending}
+                          >
+                            {link.is_featured ? (
+                              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                            ) : (
+                              <StarOff className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleUnlinkRide(link.ride_id)}
+                            disabled={unlinkRideMutation.isPending}
+                            title="Unlink ride"
+                          >
+                            <Unlink className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Planet Dialog */}
@@ -973,6 +1281,112 @@ export default function UniverseDetail() {
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
               Link Place
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Ride Dialog */}
+      <Dialog open={isLinkRideDialogOpen} onOpenChange={setIsLinkRideDialogOpen}>
+        <DialogContent className={isMobile ? 'max-w-[95vw] max-h-[90vh]' : 'max-w-2xl'}>
+          <DialogHeader>
+            <DialogTitle>Link Ride to Universe</DialogTitle>
+            <DialogDescription>
+              Search for a ride and link it to {universe.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search rides by name..."
+                value={rideSearchQuery}
+                onChange={(e) => setRideSearchQuery(e.target.value)}
+                className="pl-10 h-12"
+              />
+            </div>
+            
+            {rideSearchLoading && (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            )}
+            
+            {rideSearchQuery.length >= 2 && !rideSearchLoading && rideSearchResults?.length === 0 && (
+              <div className="text-center py-4 text-muted-foreground">
+                No rides found matching "{rideSearchQuery}"
+              </div>
+            )}
+            
+            {rideSearchResults && rideSearchResults.length > 0 && (
+              <div className="max-h-[300px] overflow-y-auto space-y-2">
+                {rideSearchResults.map((ride: any) => (
+                  <div
+                    key={ride.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedRideId === ride.id 
+                        ? "border-primary bg-primary/10" 
+                        : "border-border/50 hover:bg-muted/50"
+                    }`}
+                    onClick={() => setSelectedRideId(ride.id)}
+                  >
+                    {ride.thumbnail_image_url ? (
+                      <img 
+                        src={ride.thumbnail_image_url} 
+                        alt={ride.name}
+                        className="w-12 h-12 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+                        <Zap className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{ride.name}</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {ride.location || "No location"}
+                      </p>
+                      {ride.ride_type && (
+                        <Badge variant="secondary" className="mt-1 text-xs">
+                          {getRideTypeLabel(ride.ride_type)}
+                        </Badge>
+                      )}
+                    </div>
+                    {selectedRideId === ride.id && (
+                      <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter className={isMobile ? 'flex-col gap-2' : ''}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsLinkRideDialogOpen(false);
+                setRideSearchQuery("");
+                setSelectedRideId(null);
+              }}
+              className={isMobile ? 'w-full h-11' : ''}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleLinkRide}
+              disabled={!selectedRideId || linkRideMutation.isPending}
+              className={isMobile ? 'w-full h-11' : ''}
+            >
+              {linkRideMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              Link Ride
             </Button>
           </DialogFooter>
         </DialogContent>

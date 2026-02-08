@@ -82,6 +82,7 @@ const atlasItems = [
 const otherItems = [
   { icon: Building2, label: "Cities", path: "/cities" },
   { icon: Globe, label: "Universes", path: "/universes" },
+  { icon: Zap, label: "Rides", path: "/rides" },
 ];
 
 // Content Moderation items
