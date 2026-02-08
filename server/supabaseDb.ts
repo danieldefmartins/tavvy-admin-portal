@@ -5779,7 +5779,6 @@ export async function createRide(ride: {
     .from("places")
     .insert({
       name: ride.name,
-      slug: ride.slug,
       description: ride.description || null,
       cover_image_url: ride.thumbnail_image_url || null,
       tavvy_category: 'attraction',
@@ -5801,7 +5800,6 @@ export async function updateRide(id: string, updates: any): Promise<boolean> {
   };
 
   if (updates.name !== undefined) placeUpdates.name = updates.name;
-  if (updates.slug !== undefined) placeUpdates.slug = updates.slug;
   if (updates.description !== undefined) placeUpdates.description = updates.description;
   if (updates.thumbnail_image_url !== undefined) placeUpdates.cover_image_url = updates.thumbnail_image_url;
   if (updates.ride_type !== undefined) placeUpdates.tavvy_subcategory = updates.ride_type;
