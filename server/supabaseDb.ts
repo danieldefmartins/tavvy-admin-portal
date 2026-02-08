@@ -6017,18 +6017,3 @@ export async function getProServices(proId: string) {
   return data || [];
 }
 
-// Get Pro reviews
-export async function getProReviews(proId: string) {
-  const { data, error } = await supabase
-    .from("pro_reviews")
-    .select("*")
-    .eq("pro_id", proId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    // Table might not exist, return empty array
-    console.log("pro_reviews table not found or error:", error.message);
-    return [];
-  }
-  return data || [];
-}
