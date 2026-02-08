@@ -5675,39 +5675,86 @@ export async function getUniverseCategories() {
 
 // ============ RIDES ============
 
+// Helper to derive thrill level from subcategory (matching mobile app logic)
+function getThrillLevelFromSubcategory(subcategory: string | null | undefined): string {
+  if (!subcategory) return 'moderate';
+  const lower = subcategory.toLowerCase();
+  if (lower.includes('thrill') || lower === 'roller_coaster') return 'extreme';
+  if (lower.includes('water') || lower === 'simulator') return 'thrilling';
+  if (lower === 'dark_ride' || lower === 'boat_ride') return 'moderate';
+  if (lower === 'carousel' || lower === 'train' || lower === 'playground' || lower === 'show' || lower === 'meet_greet') return 'mild';
+  return 'moderate';
+}
+
+// Map a places row to a ride-like object for the admin UI
+function mapPlaceToRide(p: any) {
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug || p.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || '',
+    description: p.description || null,
+    thumbnail_image_url: p.cover_image_url || null,
+    banner_image_url: null,
+    thumbnail_fit: 'cover',
+    thumbnail_position: 'center',
+    banner_fit: 'cover',
+    banner_position: 'center',
+    location: [p.city, p.region].filter(Boolean).join(', ') || null,
+    ride_type: p.tavvy_subcategory || null,
+    thrill_level: getThrillLevelFromSubcategory(p.tavvy_subcategory),
+    duration_minutes: null,
+    height_requirement_inches: null,
+    is_featured: p.is_featured || false,
+    status: p.status || (p.is_active ? 'active' : 'inactive'),
+    photos: p.photos || [],
+    city: p.city,
+    region: p.region,
+    country: p.country,
+    created_at: p.created_at,
+    updated_at: p.updated_at,
+  };
+}
+
 export async function getAllRides(filters?: {
   status?: string;
   rideType?: string;
   thrillLevel?: string;
 }) {
   let query = supabase
-    .from("atlas_rides")
-    .select("*");
+    .from("places")
+    .select("*")
+    .eq("tavvy_category", "attraction");
 
   if (filters?.status && filters.status !== 'all') {
     query = query.eq("status", filters.status);
   }
   if (filters?.rideType && filters.rideType !== 'all') {
-    query = query.eq("ride_type", filters.rideType);
-  }
-  if (filters?.thrillLevel && filters.thrillLevel !== 'all') {
-    query = query.eq("thrill_level", filters.thrillLevel);
+    query = query.eq("tavvy_subcategory", filters.rideType);
   }
 
   const { data, error } = await query.order("name", { ascending: true });
   if (error) throw error;
-  return data;
+
+  let rides = (data || []).map(mapPlaceToRide);
+
+  // Filter by thrill level client-side since it's derived
+  if (filters?.thrillLevel && filters.thrillLevel !== 'all') {
+    rides = rides.filter(r => r.thrill_level === filters.thrillLevel);
+  }
+
+  return rides;
 }
 
 export async function getRideById(id: string) {
   const { data, error } = await supabase
-    .from("atlas_rides")
+    .from("places")
     .select("*")
     .eq("id", id)
+    .eq("tavvy_category", "attraction")
     .single();
 
   if (error) throw error;
-  return data;
+  return data ? mapPlaceToRide(data) : null;
 }
 
 export async function createRide(ride: {
@@ -5729,8 +5776,18 @@ export async function createRide(ride: {
   status?: string;
 }) {
   const { data, error } = await supabase
-    .from("atlas_rides")
-    .insert(ride)
+    .from("places")
+    .insert({
+      name: ride.name,
+      slug: ride.slug,
+      description: ride.description || null,
+      cover_image_url: ride.thumbnail_image_url || null,
+      tavvy_category: 'attraction',
+      tavvy_subcategory: ride.ride_type || null,
+      status: ride.status || 'active',
+      is_active: ride.status !== 'inactive',
+      source_type: 'tavvy',
+    })
     .select()
     .single();
 
@@ -5739,12 +5796,23 @@ export async function createRide(ride: {
 }
 
 export async function updateRide(id: string, updates: any): Promise<boolean> {
+  const placeUpdates: any = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (updates.name !== undefined) placeUpdates.name = updates.name;
+  if (updates.slug !== undefined) placeUpdates.slug = updates.slug;
+  if (updates.description !== undefined) placeUpdates.description = updates.description;
+  if (updates.thumbnail_image_url !== undefined) placeUpdates.cover_image_url = updates.thumbnail_image_url;
+  if (updates.ride_type !== undefined) placeUpdates.tavvy_subcategory = updates.ride_type;
+  if (updates.status !== undefined) {
+    placeUpdates.status = updates.status;
+    placeUpdates.is_active = updates.status !== 'inactive';
+  }
+
   const { error } = await supabase
-    .from("atlas_rides")
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
+    .from("places")
+    .update(placeUpdates)
     .eq("id", id);
 
   if (error) {
@@ -5762,9 +5830,10 @@ export async function deleteRide(id: string): Promise<boolean> {
     .eq("ride_id", id);
 
   const { error } = await supabase
-    .from("atlas_rides")
+    .from("places")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("tavvy_category", "attraction");
 
   if (error) {
     console.error("[Supabase] Delete ride error:", error);
@@ -5778,10 +5847,7 @@ export async function deleteRide(id: string): Promise<boolean> {
 export async function getUniverseRides(universeId: string) {
   const { data, error } = await supabase
     .from("atlas_universe_rides")
-    .select(`
-      *,
-      ride:atlas_rides(*)
-    `)
+    .select("*")
     .eq("universe_id", universeId)
     .order("display_order", { ascending: true });
 
@@ -5789,7 +5855,26 @@ export async function getUniverseRides(universeId: string) {
     console.error("[Supabase] Get universe rides error:", error);
     return [];
   }
-  return data || [];
+
+  if (!data || data.length === 0) return [];
+
+  // Fetch the actual place data for each linked ride
+  const rideIds = data.map(d => d.ride_id);
+  const { data: placesData, error: placesError } = await supabase
+    .from("places")
+    .select("*")
+    .in("id", rideIds);
+
+  if (placesError) {
+    console.error("[Supabase] Get ride places error:", placesError);
+  }
+
+  const placesMap = new Map((placesData || []).map(p => [p.id, p]));
+
+  return data.map(link => ({
+    ...link,
+    ride: placesMap.has(link.ride_id) ? mapPlaceToRide(placesMap.get(link.ride_id)) : null,
+  }));
 }
 
 export async function linkRideToUniverse(universeId: string, rideId: string, options?: {
@@ -5841,32 +5926,41 @@ export async function toggleUniverseRideFeatured(universeId: string, rideId: str
 }
 
 export async function searchRidesForLinking(query: string, limit: number = 20, excludeUniverseId?: string) {
-  let queryBuilder = supabase
-    .from("atlas_rides")
-    .select("id, name, slug, thumbnail_image_url, ride_type, thrill_level, location, status")
+  const { data, error } = await supabase
+    .from("places")
+    .select("id, name, tavvy_subcategory, cover_image_url, city, region, status")
+    .eq("tavvy_category", "attraction")
     .ilike("name", `%${query}%`)
-    .eq("status", "active")
     .limit(limit);
-
-  const { data, error } = await queryBuilder;
 
   if (error) {
     console.error("[Supabase] Search rides error:", error);
     return [];
   }
 
+  let results = (data || []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || '',
+    thumbnail_image_url: p.cover_image_url || null,
+    ride_type: p.tavvy_subcategory || null,
+    thrill_level: getThrillLevelFromSubcategory(p.tavvy_subcategory),
+    location: [p.city, p.region].filter(Boolean).join(', ') || null,
+    status: p.status || 'active',
+  }));
+
   // If excludeUniverseId is provided, filter out already linked rides
-  if (excludeUniverseId && data) {
+  if (excludeUniverseId && results.length > 0) {
     const { data: linkedRides } = await supabase
       .from("atlas_universe_rides")
       .select("ride_id")
       .eq("universe_id", excludeUniverseId);
 
     const linkedIds = new Set(linkedRides?.map(r => r.ride_id) || []);
-    return data.filter(r => !linkedIds.has(r.id));
+    results = results.filter(r => !linkedIds.has(r.id));
   }
 
-  return data || [];
+  return results;
 }
 
 // ============ PROS MANAGEMENT ============
