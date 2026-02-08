@@ -5679,10 +5679,10 @@ export async function getUniverseCategories() {
 function getThrillLevelFromSubcategory(subcategory: string | null | undefined): string {
   if (!subcategory) return 'moderate';
   const lower = subcategory.toLowerCase();
-  if (lower.includes('thrill') || lower === 'roller_coaster') return 'extreme';
-  if (lower.includes('water') || lower === 'simulator') return 'thrilling';
-  if (lower === 'dark_ride' || lower === 'boat_ride') return 'moderate';
-  if (lower === 'carousel' || lower === 'train' || lower === 'playground' || lower === 'show' || lower === 'meet_greet') return 'mild';
+  if (lower === 'thrill_rides') return 'extreme';
+  if (lower === 'simulators' || lower === 'water_rides') return 'thrilling';
+  if (lower === 'dark_rides') return 'moderate';
+  if (lower === 'family_rides' || lower === 'shows' || lower === 'characters' || lower === 'explore' || lower === 'animals' || lower === 'interactive') return 'mild';
   return 'moderate';
 }
 

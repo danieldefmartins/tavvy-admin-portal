@@ -374,23 +374,16 @@ export default function UniverseDetail() {
 
   const getRideTypeLabel = (type: string | null) => {
     const types: Record<string, string> = {
-      roller_coaster: "Roller Coaster",
-      dark_ride: "Dark Ride",
-      water_ride: "Water Ride",
-      boat_ride: "Boat Ride",
-      flat_ride: "Flat Ride",
-      simulator: "Simulator",
-      show: "Show",
-      meet_greet: "Meet & Greet",
-      transport: "Transport",
-      walk_through: "Walk-Through",
-      carousel: "Carousel",
-      spinner: "Spinner",
-      train: "Train",
-      playground: "Playground",
-      thrill_ride: "Thrill Ride",
-      drop_tower: "Drop Tower",
-      other: "Other",
+      thrill_rides: "Thrill Rides",
+      family_rides: "Family Rides",
+      dark_rides: "Dark Rides",
+      shows: "Shows & Entertainment",
+      characters: "Characters",
+      explore: "Explore",
+      animals: "Animals & Nature",
+      water_rides: "Water Rides",
+      simulators: "Simulators",
+      interactive: "Interactive",
     };
     return types[type || ""] || type || "-";
   };

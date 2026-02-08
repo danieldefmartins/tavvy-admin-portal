@@ -73,23 +73,16 @@ interface Ride {
 }
 
 const RIDE_TYPES = [
-  { value: "roller_coaster", label: "Roller Coaster" },
-  { value: "dark_ride", label: "Dark Ride" },
-  { value: "water_ride", label: "Water Ride" },
-  { value: "boat_ride", label: "Boat Ride" },
-  { value: "flat_ride", label: "Flat Ride" },
-  { value: "simulator", label: "Simulator" },
-  { value: "show", label: "Show / Experience" },
-  { value: "meet_greet", label: "Meet & Greet" },
-  { value: "transport", label: "Transport Ride" },
-  { value: "walk_through", label: "Walk-Through" },
-  { value: "carousel", label: "Carousel" },
-  { value: "spinner", label: "Spinner" },
-  { value: "train", label: "Train" },
-  { value: "playground", label: "Playground" },
-  { value: "thrill_ride", label: "Thrill Ride" },
-  { value: "drop_tower", label: "Drop Tower" },
-  { value: "other", label: "Other" },
+  { value: "thrill_rides", label: "Thrill Rides" },
+  { value: "family_rides", label: "Family Rides" },
+  { value: "dark_rides", label: "Dark Rides" },
+  { value: "shows", label: "Shows & Entertainment" },
+  { value: "characters", label: "Characters" },
+  { value: "explore", label: "Explore" },
+  { value: "animals", label: "Animals & Nature" },
+  { value: "water_rides", label: "Water Rides" },
+  { value: "simulators", label: "Simulators" },
+  { value: "interactive", label: "Interactive" },
 ];
 
 const THRILL_LEVELS = [
