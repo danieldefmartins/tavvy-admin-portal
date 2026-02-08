@@ -5718,6 +5718,7 @@ function mapPlaceToRide(p: any) {
     city: p.city,
     region: p.region,
     country: p.country,
+    park_name: p.park_name || null,
     created_at: p.created_at,
     updated_at: p.updated_at,
   };
@@ -5788,6 +5789,7 @@ export async function createRide(ride: {
   accessibility?: string | null;
   age_recommendation?: string | null;
   motion_sickness?: string | null;
+  park_name?: string | null;
   is_featured?: boolean;
   status?: string;
 }) {
@@ -5813,8 +5815,8 @@ export async function createRide(ride: {
   if (ride.accessibility) insertData.accessibility = ride.accessibility;
   if (ride.age_recommendation) insertData.age_recommendation = ride.age_recommendation;
   if (ride.motion_sickness) insertData.motion_sickness = ride.motion_sickness;
-
-  const { data, error } = await supabase
+  if (ride.park_name) insertData.park_name = ride.park_name;
+  const { data, error } = await supabasee
     .from("places")
     .insert(insertData)
     .select()
@@ -5844,6 +5846,7 @@ export async function updateRide(id: string, updates: any): Promise<boolean> {
   if (updates.accessibility !== undefined) placeUpdates.accessibility = updates.accessibility;
   if (updates.age_recommendation !== undefined) placeUpdates.age_recommendation = updates.age_recommendation;
   if (updates.motion_sickness !== undefined) placeUpdates.motion_sickness = updates.motion_sickness;
+  if (updates.park_name !== undefined) placeUpdates.park_name = updates.park_name;
   if (updates.status !== undefined) {
     placeUpdates.status = updates.status;
     placeUpdates.is_active = updates.status !== 'inactive';

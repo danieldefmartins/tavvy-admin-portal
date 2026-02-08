@@ -82,6 +82,7 @@ interface Ride {
   accessibility: string | null;
   age_recommendation: string | null;
   motion_sickness: string | null;
+  park_name: string | null;
   is_featured: boolean;
   status: string;
   created_at: string;
@@ -186,6 +187,7 @@ export default function Rides() {
     accessibility: "",
     age_recommendation: "all_ages",
     motion_sickness: "none",
+    park_name: "",
     is_featured: false,
     status: "active",
   });
@@ -262,6 +264,7 @@ export default function Rides() {
       accessibility: "",
       age_recommendation: "all_ages",
       motion_sickness: "none",
+      park_name: "",
       is_featured: false,
       status: "active",
     });
@@ -286,6 +289,7 @@ export default function Rides() {
       accessibility: formData.accessibility || undefined,
       age_recommendation: formData.age_recommendation || undefined,
       motion_sickness: formData.motion_sickness || undefined,
+      park_name: formData.park_name || undefined,
     });
   };
 
@@ -306,6 +310,7 @@ export default function Rides() {
       accessibility: formData.accessibility || undefined,
       age_recommendation: formData.age_recommendation || undefined,
       motion_sickness: formData.motion_sickness || undefined,
+      park_name: formData.park_name || undefined,
     });
   };
 
@@ -340,6 +345,7 @@ export default function Rides() {
       accessibility: ride.accessibility || "",
       age_recommendation: ride.age_recommendation || "all_ages",
       motion_sickness: ride.motion_sickness || "none",
+      park_name: ride.park_name || "",
       is_featured: ride.is_featured,
       status: ride.status || "active",
     });
@@ -364,7 +370,8 @@ export default function Rides() {
   const filteredRides = rides?.filter(
     (ride) =>
       ride.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ride.slug.toLowerCase().includes(searchQuery.toLowerCase())
+      ride.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (ride.park_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getThrillColor = (level: string | null) => {
@@ -470,14 +477,35 @@ export default function Rides() {
         </div>
       )}
 
-      <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+      <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
+        <div className="space-y-2">
+          <Label htmlFor="park_name">Theme Park</Label>
+          <Select
+            value={formData.park_name || "none"}
+            onValueChange={(v) => setFormData({ ...formData, park_name: v === "none" ? "" : v })}
+          >
+            <SelectTrigger className="h-12">
+              <SelectValue placeholder="Select park" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No Park</SelectItem>
+              <SelectItem value="Magic Kingdom">Magic Kingdom</SelectItem>
+              <SelectItem value="EPCOT">EPCOT</SelectItem>
+              <SelectItem value="Hollywood Studios">Hollywood Studios</SelectItem>
+              <SelectItem value="Animal Kingdom">Animal Kingdom</SelectItem>
+              <SelectItem value="Disney Springs">Disney Springs</SelectItem>
+              <SelectItem value="Typhoon Lagoon">Typhoon Lagoon</SelectItem>
+              <SelectItem value="Blizzard Beach">Blizzard Beach</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-2">
           <Label htmlFor="location">Location</Label>
           <Input
             id="location"
             value={formData.location}
             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-            placeholder="e.g., Magic Kingdom, Orlando"
+            placeholder="e.g., Orlando, Florida"
             className="h-12"
           />
         </div>
@@ -741,10 +769,10 @@ export default function Rides() {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="font-semibold truncate">{ride.name}</h3>
-                {ride.location && (
+                {ride.park_name && (
                   <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
                     <MapPin className="h-3 w-3" />
-                    {ride.location}
+                    {ride.park_name}
                   </p>
                 )}
               </div>
@@ -990,6 +1018,7 @@ export default function Rides() {
                 <TableRow>
                   <TableHead className="w-[60px]">Image</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead>Park</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Thrill</TableHead>
                   <TableHead>Duration</TableHead>
@@ -1024,6 +1053,9 @@ export default function Rides() {
                           </Badge>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {ride.park_name || '-'}
                     </TableCell>
                     <TableCell>
                       {ride.ride_type ? (

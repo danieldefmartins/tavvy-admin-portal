@@ -1769,6 +1769,7 @@ export const appRouter = router({
           accessibility: z.string().optional(),
           age_recommendation: z.string().optional(),
           motion_sickness: z.string().optional(),
+          park_name: z.string().optional(),
           is_featured: z.boolean().default(false),
           status: z.string().default("active"),
         })
@@ -1792,6 +1793,7 @@ export const appRouter = router({
           accessibility: input.accessibility || null,
           age_recommendation: input.age_recommendation || null,
           motion_sickness: input.motion_sickness || null,
+          park_name: input.park_name || null,
         });
         if (!id) {
           throw new TRPCError({
@@ -1828,6 +1830,7 @@ export const appRouter = router({
           accessibility: z.string().optional(),
           age_recommendation: z.string().optional(),
           motion_sickness: z.string().optional(),
+          park_name: z.string().optional(),
           is_featured: z.boolean().optional(),
           status: z.string().optional(),
         })
