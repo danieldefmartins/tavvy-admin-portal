@@ -44,6 +44,13 @@ import {
   Zap,
   Clock,
   Ruler,
+  Droplets,
+  Shield,
+  Users,
+  Baby,
+  Accessibility,
+  Sun,
+  TicketCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,10 +74,62 @@ interface Ride {
   thrill_level: string | null;
   duration_minutes: number | null;
   height_requirement_inches: number | null;
+  gets_wet: string | null;
+  single_rider: boolean;
+  child_swap: boolean;
+  lightning_lane: string | null;
+  indoor_outdoor: string | null;
+  accessibility: string | null;
+  age_recommendation: string | null;
+  motion_sickness: string | null;
   is_featured: boolean;
   status: string;
   created_at: string;
 }
+
+const GETS_WET_OPTIONS = [
+  { value: "dry", label: "Dry" },
+  { value: "light_splash", label: "Light Splash" },
+  { value: "soaked", label: "Soaked" },
+];
+
+const LIGHTNING_LANE_OPTIONS = [
+  { value: "individual_ll", label: "Individual LL" },
+  { value: "multi_pass", label: "Multi Pass" },
+  { value: "virtual_queue", label: "Virtual Queue" },
+  { value: "standby_only", label: "Standby Only" },
+  { value: "not_applicable", label: "N/A" },
+];
+
+const INDOOR_OUTDOOR_OPTIONS = [
+  { value: "indoor", label: "Indoor" },
+  { value: "outdoor", label: "Outdoor" },
+  { value: "both", label: "Both" },
+];
+
+const ACCESSIBILITY_OPTIONS = [
+  { value: "fully_accessible", label: "Fully Accessible" },
+  { value: "wheelchair_accessible", label: "Wheelchair Accessible" },
+  { value: "ecv_to_wheelchair", label: "ECV to Wheelchair" },
+  { value: "must_transfer", label: "Must Transfer" },
+];
+
+const AGE_OPTIONS = [
+  { value: "all_ages", label: "All Ages" },
+  { value: "3+", label: "3+" },
+  { value: "4+", label: "4+" },
+  { value: "6+", label: "6+" },
+  { value: "8+", label: "8+" },
+  { value: "10+", label: "10+" },
+  { value: "teens+", label: "Teens+" },
+];
+
+const MOTION_SICKNESS_OPTIONS = [
+  { value: "none", label: "None" },
+  { value: "mild", label: "Mild" },
+  { value: "moderate", label: "Moderate" },
+  { value: "intense", label: "Intense" },
+];
 
 const RIDE_TYPES = [
   { value: "thrill_rides", label: "Thrill Rides" },
@@ -119,6 +178,14 @@ export default function Rides() {
     thrill_level: "moderate",
     duration_minutes: undefined as number | undefined,
     height_requirement_inches: undefined as number | undefined,
+    gets_wet: "dry",
+    single_rider: false,
+    child_swap: false,
+    lightning_lane: "standby_only",
+    indoor_outdoor: "",
+    accessibility: "",
+    age_recommendation: "all_ages",
+    motion_sickness: "none",
     is_featured: false,
     status: "active",
   });
@@ -187,6 +254,14 @@ export default function Rides() {
       thrill_level: "moderate",
       duration_minutes: undefined,
       height_requirement_inches: undefined,
+      gets_wet: "dry",
+      single_rider: false,
+      child_swap: false,
+      lightning_lane: "standby_only",
+      indoor_outdoor: "",
+      accessibility: "",
+      age_recommendation: "all_ages",
+      motion_sickness: "none",
       is_featured: false,
       status: "active",
     });
@@ -203,6 +278,14 @@ export default function Rides() {
       thrill_level: formData.thrill_level || undefined,
       duration_minutes: formData.duration_minutes || undefined,
       height_requirement_inches: formData.height_requirement_inches || undefined,
+      gets_wet: formData.gets_wet || undefined,
+      single_rider: formData.single_rider,
+      child_swap: formData.child_swap,
+      lightning_lane: formData.lightning_lane || undefined,
+      indoor_outdoor: formData.indoor_outdoor || undefined,
+      accessibility: formData.accessibility || undefined,
+      age_recommendation: formData.age_recommendation || undefined,
+      motion_sickness: formData.motion_sickness || undefined,
     });
   };
 
@@ -215,6 +298,14 @@ export default function Rides() {
       thrill_level: formData.thrill_level || undefined,
       duration_minutes: formData.duration_minutes || undefined,
       height_requirement_inches: formData.height_requirement_inches || undefined,
+      gets_wet: formData.gets_wet || undefined,
+      single_rider: formData.single_rider,
+      child_swap: formData.child_swap,
+      lightning_lane: formData.lightning_lane || undefined,
+      indoor_outdoor: formData.indoor_outdoor || undefined,
+      accessibility: formData.accessibility || undefined,
+      age_recommendation: formData.age_recommendation || undefined,
+      motion_sickness: formData.motion_sickness || undefined,
     });
   };
 
@@ -241,6 +332,14 @@ export default function Rides() {
       thrill_level: ride.thrill_level || "moderate",
       duration_minutes: ride.duration_minutes || undefined,
       height_requirement_inches: ride.height_requirement_inches || undefined,
+      gets_wet: ride.gets_wet || "dry",
+      single_rider: ride.single_rider || false,
+      child_swap: ride.child_swap || false,
+      lightning_lane: ride.lightning_lane || "standby_only",
+      indoor_outdoor: ride.indoor_outdoor || "",
+      accessibility: ride.accessibility || "",
+      age_recommendation: ride.age_recommendation || "all_ages",
+      motion_sickness: ride.motion_sickness || "none",
       is_featured: ride.is_featured,
       status: ride.status || "active",
     });
@@ -446,33 +545,174 @@ export default function Rides() {
         </div>
       </div>
 
+      {/* Gets Wet, Lightning Lane, Indoor/Outdoor */}
+      <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
+        <div className="space-y-2">
+          <Label htmlFor="gets_wet">Gets You Wet</Label>
+          <Select 
+            value={formData.gets_wet || "dry"} 
+            onValueChange={(v) => setFormData({ ...formData, gets_wet: v })}
+          >
+            <SelectTrigger className="h-12">
+              <SelectValue placeholder="Select" />
+            </SelectTrigger>
+            <SelectContent>
+              {GETS_WET_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="lightning_lane">Lightning Lane</Label>
+          <Select 
+            value={formData.lightning_lane || "standby_only"} 
+            onValueChange={(v) => setFormData({ ...formData, lightning_lane: v })}
+          >
+            <SelectTrigger className="h-12">
+              <SelectValue placeholder="Select" />
+            </SelectTrigger>
+            <SelectContent>
+              {LIGHTNING_LANE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="indoor_outdoor">Indoor / Outdoor</Label>
+          <Select 
+            value={formData.indoor_outdoor || "none"} 
+            onValueChange={(v) => setFormData({ ...formData, indoor_outdoor: v === "none" ? "" : v })}
+          >
+            <SelectTrigger className="h-12">
+              <SelectValue placeholder="Select" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Not Set</SelectItem>
+              {INDOOR_OUTDOOR_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Accessibility, Age, Motion Sickness */}
+      <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
+        <div className="space-y-2">
+          <Label htmlFor="accessibility">Accessibility</Label>
+          <Select 
+            value={formData.accessibility || "none"} 
+            onValueChange={(v) => setFormData({ ...formData, accessibility: v === "none" ? "" : v })}
+          >
+            <SelectTrigger className="h-12">
+              <SelectValue placeholder="Select" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Not Set</SelectItem>
+              {ACCESSIBILITY_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="age_recommendation">Age Recommendation</Label>
+          <Select 
+            value={formData.age_recommendation || "all_ages"} 
+            onValueChange={(v) => setFormData({ ...formData, age_recommendation: v })}
+          >
+            <SelectTrigger className="h-12">
+              <SelectValue placeholder="Select" />
+            </SelectTrigger>
+            <SelectContent>
+              {AGE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="motion_sickness">Motion Sickness</Label>
+          <Select 
+            value={formData.motion_sickness || "none"} 
+            onValueChange={(v) => setFormData({ ...formData, motion_sickness: v })}
+          >
+            <SelectTrigger className="h-12">
+              <SelectValue placeholder="Select" />
+            </SelectTrigger>
+            <SelectContent>
+              {MOTION_SICKNESS_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Single Rider, Child Swap, Featured, Status */}
       <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
         <div className="space-y-2">
-          <Label>Featured</Label>
-          <div className="flex items-center h-12">
-            <input
-              type="checkbox"
-              checked={formData.is_featured}
-              onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
-              className="h-5 w-5 rounded border-gray-300"
-            />
-            <span className="ml-2 text-sm">Featured ride</span>
+          <Label>Rider Options</Label>
+          <div className="flex flex-col gap-3 pt-1">
+            <div className="flex items-center h-8">
+              <input
+                type="checkbox"
+                checked={formData.single_rider}
+                onChange={(e) => setFormData({ ...formData, single_rider: e.target.checked })}
+                className="h-5 w-5 rounded border-gray-300"
+              />
+              <span className="ml-2 text-sm">Single Rider available</span>
+            </div>
+            <div className="flex items-center h-8">
+              <input
+                type="checkbox"
+                checked={formData.child_swap}
+                onChange={(e) => setFormData({ ...formData, child_swap: e.target.checked })}
+                className="h-5 w-5 rounded border-gray-300"
+              />
+              <span className="ml-2 text-sm">Child Swap (Rider Switch) available</span>
+            </div>
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="status">Status</Label>
-          <select
-            id="status"
-            value={formData.status}
-            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-            className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            <option value="active">Active</option>
-            <option value="draft">Draft</option>
-            <option value="closed">Closed</option>
-            <option value="seasonal">Seasonal</option>
-            <option value="archived">Archived</option>
-          </select>
+          <Label>Featured & Status</Label>
+          <div className="flex flex-col gap-3 pt-1">
+            <div className="flex items-center h-8">
+              <input
+                type="checkbox"
+                checked={formData.is_featured}
+                onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+                className="h-5 w-5 rounded border-gray-300"
+              />
+              <span className="ml-2 text-sm">Featured ride</span>
+            </div>
+            <select
+              id="status"
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="active">Active</option>
+              <option value="draft">Draft</option>
+              <option value="closed">Closed</option>
+              <option value="seasonal">Seasonal</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>

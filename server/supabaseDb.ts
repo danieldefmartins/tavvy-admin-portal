@@ -5701,9 +5701,17 @@ function mapPlaceToRide(p: any) {
     banner_position: 'center',
     location: [p.city, p.region].filter(Boolean).join(', ') || null,
     ride_type: p.tavvy_subcategory || null,
-    thrill_level: getThrillLevelFromSubcategory(p.tavvy_subcategory),
-    duration_minutes: null,
-    height_requirement_inches: null,
+    thrill_level: p.thrill_level || getThrillLevelFromSubcategory(p.tavvy_subcategory),
+    duration_minutes: p.duration_minutes || null,
+    height_requirement_inches: p.min_height_inches || null,
+    gets_wet: p.gets_wet || 'dry',
+    single_rider: p.single_rider || false,
+    child_swap: p.child_swap || false,
+    lightning_lane: p.lightning_lane || 'not_applicable',
+    indoor_outdoor: p.indoor_outdoor || null,
+    accessibility: p.accessibility || null,
+    age_recommendation: p.age_recommendation || null,
+    motion_sickness: p.motion_sickness || 'none',
     is_featured: p.is_featured || false,
     status: p.status || (p.is_active ? 'active' : 'inactive'),
     photos: p.photos || [],
@@ -5772,21 +5780,43 @@ export async function createRide(ride: {
   thrill_level?: string | null;
   duration_minutes?: number | null;
   height_requirement_inches?: number | null;
+  gets_wet?: string | null;
+  single_rider?: boolean;
+  child_swap?: boolean;
+  lightning_lane?: string | null;
+  indoor_outdoor?: string | null;
+  accessibility?: string | null;
+  age_recommendation?: string | null;
+  motion_sickness?: string | null;
   is_featured?: boolean;
   status?: string;
 }) {
+  const insertData: any = {
+    name: ride.name,
+    description: ride.description || null,
+    cover_image_url: ride.thumbnail_image_url || null,
+    tavvy_category: 'attraction',
+    tavvy_subcategory: ride.ride_type || null,
+    status: ride.status || 'active',
+    is_active: ride.status !== 'inactive',
+    source_type: 'tavvy',
+  };
+
+  if (ride.duration_minutes) insertData.duration_minutes = ride.duration_minutes;
+  if (ride.height_requirement_inches) insertData.min_height_inches = ride.height_requirement_inches;
+  if (ride.thrill_level) insertData.thrill_level = ride.thrill_level;
+  if (ride.gets_wet) insertData.gets_wet = ride.gets_wet;
+  if (ride.single_rider !== undefined) insertData.single_rider = ride.single_rider;
+  if (ride.child_swap !== undefined) insertData.child_swap = ride.child_swap;
+  if (ride.lightning_lane) insertData.lightning_lane = ride.lightning_lane;
+  if (ride.indoor_outdoor) insertData.indoor_outdoor = ride.indoor_outdoor;
+  if (ride.accessibility) insertData.accessibility = ride.accessibility;
+  if (ride.age_recommendation) insertData.age_recommendation = ride.age_recommendation;
+  if (ride.motion_sickness) insertData.motion_sickness = ride.motion_sickness;
+
   const { data, error } = await supabase
     .from("places")
-    .insert({
-      name: ride.name,
-      description: ride.description || null,
-      cover_image_url: ride.thumbnail_image_url || null,
-      tavvy_category: 'attraction',
-      tavvy_subcategory: ride.ride_type || null,
-      status: ride.status || 'active',
-      is_active: ride.status !== 'inactive',
-      source_type: 'tavvy',
-    })
+    .insert(insertData)
     .select()
     .single();
 
@@ -5803,6 +5833,17 @@ export async function updateRide(id: string, updates: any): Promise<boolean> {
   if (updates.description !== undefined) placeUpdates.description = updates.description;
   if (updates.thumbnail_image_url !== undefined) placeUpdates.cover_image_url = updates.thumbnail_image_url;
   if (updates.ride_type !== undefined) placeUpdates.tavvy_subcategory = updates.ride_type;
+  if (updates.thrill_level !== undefined) placeUpdates.thrill_level = updates.thrill_level;
+  if (updates.duration_minutes !== undefined) placeUpdates.duration_minutes = updates.duration_minutes;
+  if (updates.height_requirement_inches !== undefined) placeUpdates.min_height_inches = updates.height_requirement_inches;
+  if (updates.gets_wet !== undefined) placeUpdates.gets_wet = updates.gets_wet;
+  if (updates.single_rider !== undefined) placeUpdates.single_rider = updates.single_rider;
+  if (updates.child_swap !== undefined) placeUpdates.child_swap = updates.child_swap;
+  if (updates.lightning_lane !== undefined) placeUpdates.lightning_lane = updates.lightning_lane;
+  if (updates.indoor_outdoor !== undefined) placeUpdates.indoor_outdoor = updates.indoor_outdoor;
+  if (updates.accessibility !== undefined) placeUpdates.accessibility = updates.accessibility;
+  if (updates.age_recommendation !== undefined) placeUpdates.age_recommendation = updates.age_recommendation;
+  if (updates.motion_sickness !== undefined) placeUpdates.motion_sickness = updates.motion_sickness;
   if (updates.status !== undefined) {
     placeUpdates.status = updates.status;
     placeUpdates.is_active = updates.status !== 'inactive';
