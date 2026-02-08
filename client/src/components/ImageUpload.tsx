@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -90,6 +90,13 @@ export default function ImageUpload({
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [inputMode, setInputMode] = useState<"url" | "upload">("url");
+
+  // Generate a unique ID per instance so multiple ImageUpload components
+  // on the same page don't share the same file input ID.
+  // This fixes the bug where clicking "Select Image" on the banner
+  // would sometimes trigger the thumbnail's file input instead.
+  const instanceId = useId();
+  const fileInputId = `image-upload-${instanceId}`;
 
   const uploadImage = async (file: File) => {
     setUploading(true);
@@ -249,9 +256,9 @@ export default function ImageUpload({
                 accept="image/*"
                 onChange={handleFileSelect}
                 className="hidden"
-                id="image-upload"
+                id={fileInputId}
               />
-              <label htmlFor="image-upload">
+              <label htmlFor={fileInputId}>
                 <Button type="button" variant="outline" size="sm" asChild>
                   <span>Select Image</span>
                 </Button>

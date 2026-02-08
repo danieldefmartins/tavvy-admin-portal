@@ -22,6 +22,9 @@ interface ImageCropPreviewProps {
  *
  * The container uses overflow:hidden so tall portrait images are clipped,
  * but the image still fills the full width (no black side bars).
+ *
+ * FIX: Drag handlers use refs instead of closure-captured values to prevent
+ * the crop from snapping back when React re-renders during drag.
  */
 export default function ImageCropPreview({
   imageUrl,
@@ -34,6 +37,20 @@ export default function ImageCropPreview({
   const [isDragging, setIsDragging] = useState(false);
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 0, height: 0 });
   const [containerWidth, setContainerWidth] = useState(0);
+
+  // Use refs to store the latest values so drag handlers always see current data.
+  // This prevents the snap-back bug where stale closure values caused the crop
+  // to jump to an old position during drag.
+  const positionRef = useRef(position);
+  const onPositionChangeRef = useRef(onPositionChange);
+
+  useEffect(() => {
+    positionRef.current = position;
+  }, [position]);
+
+  useEffect(() => {
+    onPositionChangeRef.current = onPositionChange;
+  }, [onPositionChange]);
 
   // Parse position string like "50% 50%" into x, y percentages
   const parsePosition = (pos: string): { x: number; y: number } => {
@@ -114,25 +131,23 @@ export default function ImageCropPreview({
     }
   }
 
+  // Store dimension refs for drag handlers
+  const dimsRef = useRef({ imgW: 0, imgH: 0, cropW: 0, cropH: 0 });
+  dimsRef.current = { imgW, imgH, cropW, cropH };
+
   // Does the image need cropping?
   const needsCrop = cropW > 0 && cropH > 0 && (Math.abs(cropW - imgW) > 2 || Math.abs(cropH - imgH) > 2);
 
   // Container height: cap at reasonable max, but image still fills width
-  // For landscape: imgH is small, no capping needed
-  // For portrait: imgH is large, we cap the container but image stays full width
   const maxContainerHeight = 400;
   const containerHeight = imgH > 0 ? Math.min(imgH, maxContainerHeight) : 200;
 
   // The image position within the container (for portrait images, we scroll the image)
-  // The image top position is calculated so the crop window is visible
   const getImageTop = () => {
-    if (imgH <= containerHeight) return 0; // Image fits in container
-    // For tall images, position the image so the crop area is centered in the container
+    if (imgH <= containerHeight) return 0;
     const maxTop = imgH - cropH;
-    const cropTop = (posY / 100) * maxTop;
-    // Center the crop window in the container
-    const idealTop = cropTop - (containerHeight - cropH) / 2;
-    // Clamp so image doesn't go past edges
+    const cropTopPos = (posY / 100) * maxTop;
+    const idealTop = cropTopPos - (containerHeight - cropH) / 2;
     return -Math.max(0, Math.min(imgH - containerHeight, idealTop));
   };
 
@@ -148,12 +163,12 @@ export default function ImageCropPreview({
     const left = (posX / 100) * maxLeft;
     const top = (posY / 100) * maxTop;
 
-    return { left, top: top + imageTop }; // Adjust for image scroll
+    return { left, top: top + imageTop };
   };
 
   const { left: cropLeft, top: cropTop } = getCropPosition();
 
-  // Handle drag
+  // Handle mouse drag — uses refs to avoid stale closure values
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -162,15 +177,17 @@ export default function ImageCropPreview({
 
       const startX = e.clientX;
       const startY = e.clientY;
-      const startPosX = posX;
-      const startPosY = posY;
 
-      const maxLeft = imgW - cropW;
-      const maxTop = imgH - cropH;
+      // Capture the starting position at the moment of mousedown
+      const { x: startPosX, y: startPosY } = parsePosition(positionRef.current);
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         moveEvent.preventDefault();
         moveEvent.stopPropagation();
+
+        const { imgW: iW, imgH: iH, cropW: cW, cropH: cH } = dimsRef.current;
+        const maxLeft = iW - cW;
+        const maxTop = iH - cH;
 
         const deltaX = moveEvent.clientX - startX;
         const deltaY = moveEvent.clientY - startY;
@@ -181,7 +198,7 @@ export default function ImageCropPreview({
         const newX = Math.max(0, Math.min(100, startPosX + pctDeltaX));
         const newY = Math.max(0, Math.min(100, startPosY + pctDeltaY));
 
-        onPositionChange(`${Math.round(newX)}% ${Math.round(newY)}%`);
+        onPositionChangeRef.current(`${Math.round(newX)}% ${Math.round(newY)}%`);
       };
 
       const handleMouseUp = () => {
@@ -197,10 +214,10 @@ export default function ImageCropPreview({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [posX, posY, imgW, imgH, cropW, cropH, onPositionChange]
+    [] // No dependencies — we read everything from refs
   );
 
-  // Handle touch
+  // Handle touch drag — uses refs to avoid stale closure values
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       e.stopPropagation();
@@ -209,14 +226,17 @@ export default function ImageCropPreview({
       const touch = e.touches[0];
       const startX = touch.clientX;
       const startY = touch.clientY;
-      const startPosX = posX;
-      const startPosY = posY;
 
-      const maxLeft = imgW - cropW;
-      const maxTop = imgH - cropH;
+      // Capture the starting position at the moment of touchstart
+      const { x: startPosX, y: startPosY } = parsePosition(positionRef.current);
 
       const handleTouchMove = (moveEvent: TouchEvent) => {
         moveEvent.preventDefault();
+
+        const { imgW: iW, imgH: iH, cropW: cW, cropH: cH } = dimsRef.current;
+        const maxLeft = iW - cW;
+        const maxTop = iH - cH;
+
         const moveTouch = moveEvent.touches[0];
         const deltaX = moveTouch.clientX - startX;
         const deltaY = moveTouch.clientY - startY;
@@ -227,7 +247,7 @@ export default function ImageCropPreview({
         const newX = Math.max(0, Math.min(100, startPosX + pctDeltaX));
         const newY = Math.max(0, Math.min(100, startPosY + pctDeltaY));
 
-        onPositionChange(`${Math.round(newX)}% ${Math.round(newY)}%`);
+        onPositionChangeRef.current(`${Math.round(newX)}% ${Math.round(newY)}%`);
       };
 
       const handleTouchEnd = () => {
@@ -239,7 +259,7 @@ export default function ImageCropPreview({
       document.addEventListener("touchmove", handleTouchMove, { passive: false });
       document.addEventListener("touchend", handleTouchEnd);
     },
-    [posX, posY, imgW, imgH, cropW, cropH, onPositionChange]
+    [] // No dependencies — we read everything from refs
   );
 
   // Quick presets
@@ -303,6 +323,7 @@ export default function ImageCropPreview({
               top: `${cropTop}px`,
               width: `${cropW}px`,
               height: `${Math.min(cropH, containerHeight)}px`,
+              // Disable transition entirely during drag to prevent any visual lag/snap
               transition: isDragging ? "none" : "left 0.15s ease, top 0.15s ease",
               boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
             }}
