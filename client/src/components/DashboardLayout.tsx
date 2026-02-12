@@ -48,7 +48,7 @@ import {
   FileUp,
   FileCode,
   BadgeCheck,
-Home,
+  Home,
   Users,
   Briefcase,
   Film,
@@ -75,7 +75,7 @@ const menuItems = [
 const atlasItems = [
   { icon: FileText, label: "Articles", path: "/articles" },
   { icon: FileUp, label: "CSV Import", path: "/atlas-import" },
-  { icon: FileCode, label: "Markdown Import", path: "/markdown-import" },
+  { icon: FileCode, label: "MD Import", path: "/markdown-import" },
 ];
 
 // Other menu items
@@ -95,9 +95,9 @@ const moderationItems = [
 
 // Providers items
 const providerItems = [
-  { icon: Briefcase, label: "All Providers", path: "/providers" },
+  { icon: Briefcase, label: "Providers", path: "/providers" },
   { icon: BadgeCheck, label: "Verifications", path: "/verifications" },
-  { icon: Shield, label: "Business Claims", path: "/business-claims" },
+  { icon: Shield, label: "Claims", path: "/business-claims" },
 ];
 
 // Users & Access items
@@ -109,7 +109,29 @@ const usersItems = [
 // System items
 const systemItems = [
   { icon: Edit3, label: "Overrides", path: "/overrides" },
-  { icon: BarChart3, label: "Strategic Audit", path: "/strategic-audit" },
+  { icon: BarChart3, label: "Audit", path: "/strategic-audit" },
+];
+
+// All mobile nav items flattened for the scrollable bar
+const mobileNavItems = [
+  ...menuItems,
+  { icon: BookOpen, label: "Atlas", path: "/articles" },
+  ...otherItems,
+  // Moderation section
+  { icon: Film, label: "Stories", path: "/stories" },
+  { icon: ImageIcon, label: "Photos", path: "/photos" },
+  { icon: MessageSquare, label: "Reviews", path: "/reviews" },
+  { icon: Flag, label: "Flags", path: "/moderation" },
+  // Providers section
+  { icon: Briefcase, label: "Providers", path: "/providers" },
+  { icon: BadgeCheck, label: "Verify", path: "/verifications" },
+  { icon: Shield, label: "Claims", path: "/business-claims" },
+  // Users section
+  { icon: Users, label: "Users", path: "/users" },
+  { icon: History, label: "Audit Log", path: "/audit-log" },
+  // System section
+  { icon: Edit3, label: "Overrides", path: "/overrides" },
+  { icon: BarChart3, label: "Str. Audit", path: "/strategic-audit" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -166,6 +188,7 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const scrollNavRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   
   // Check if current path is in Atlas section
@@ -189,6 +212,16 @@ function DashboardLayoutContent({
       setAtlasOpen(true);
     }
   }, [isAtlasActive]);
+
+  // Auto-scroll the active mobile nav item into view
+  useEffect(() => {
+    if (isMobile && scrollNavRef.current) {
+      const activeEl = scrollNavRef.current.querySelector('[data-active="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    }
+  }, [location, isMobile]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -248,6 +281,81 @@ function DashboardLayoutContent({
     );
   };
 
+  // Mobile layout: header + scrollable nav + content (no sidebar)
+  if (isMobile) {
+    return (
+      <div className="flex flex-col min-h-screen bg-black">
+        {/* Mobile Header */}
+        <div className="flex border-b border-white/10 h-14 items-center justify-between bg-black px-3 sticky top-0 z-50">
+          <div className="flex items-center gap-3">
+            <img 
+              src="/tavvy-logo-horizontal.jpg" 
+              alt="Tavvy" 
+              className="h-6 w-auto object-contain"
+            />
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">
+                <Avatar className="h-7 w-7 shrink-0 border-2 border-orange-500/50">
+                  <AvatarFallback className="text-xs font-semibold text-white bg-gradient-to-br from-orange-500 to-orange-600">
+                    {userInitial}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                {userEmail}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className="cursor-pointer text-destructive focus:text-destructive"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Sign out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Horizontal Scrollable Nav Bar */}
+        <div 
+          ref={scrollNavRef}
+          className="flex items-center gap-1 px-2 py-2 border-b border-white/10 bg-black/95 backdrop-blur sticky top-14 z-40 overflow-x-auto scrollbar-hide"
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            msOverflowStyle: 'none',
+            scrollbarWidth: 'none',
+          }}
+        >
+          {mobileNavItems.map((item) => {
+            const isActive = location === item.path;
+            return (
+              <button
+                key={item.path + item.label}
+                data-active={isActive}
+                onClick={() => setLocation(item.path)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${
+                  isActive
+                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40'
+                    : 'text-white/60 hover:text-white hover:bg-white/8 border border-transparent'
+                }`}
+              >
+                <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-orange-400' : 'text-white/40'}`} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 min-h-0">{children}</main>
+      </div>
+    );
+  }
+
+  // Desktop layout: sidebar + content (unchanged)
   return (
     <>
       <div className="relative" ref={sidebarRef}>
@@ -321,7 +429,7 @@ function DashboardLayoutContent({
                                   : 'text-white/60 hover:text-white hover:bg-white/5'
                               }`}
                             >
-                              <item.icon className={`h-4 w-4 mr-2 ${isActive ? 'text-green-400' : 'text-white/40'}`} />
+                              <item.icon className={`h-4 w-4 ${isActive ? 'text-green-400' : 'text-white/40'}`} />
                               <span>{item.label}</span>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
@@ -405,18 +513,6 @@ function DashboardLayoutContent({
 
       {/* Main Content Area */}
       <SidebarInset className="bg-black">
-        {isMobile && (
-          <div className="flex border-b border-white/10 h-14 items-center justify-between bg-black px-3 backdrop-blur sticky top-0 z-40">
-            <div className="flex items-center gap-3">
-              <SidebarTrigger className="h-9 w-9 rounded-lg bg-white/5 text-orange-400 hover:bg-white/10" />
-              <img 
-                src="/tavvy-logo-horizontal.jpg" 
-                alt="Tavvy" 
-                className="h-6 w-auto object-contain"
-              />
-            </div>
-          </div>
-        )}
         <main className="flex-1 p-6 min-h-screen">{children}</main>
       </SidebarInset>
     </>
