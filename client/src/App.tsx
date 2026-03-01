@@ -35,6 +35,7 @@ import PlaceEdit from "@/pages/PlaceEdit";
 import CreatePlace from "@/pages/CreatePlace";
 import Drafts from "@/pages/Drafts";
 import Rides from "@/pages/Rides";
+import Credentials from "@/pages/Credentials";
 
 // Loading component
 function LoadingScreen() {
@@ -225,6 +226,12 @@ function App() {
         <Route path="/verifications">
           <ProtectedRoute>
             <Verifications />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/credentials">
+          <ProtectedRoute>
+            <Credentials />
           </ProtectedRoute>
         </Route>
 

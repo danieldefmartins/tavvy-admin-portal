@@ -54,7 +54,8 @@ import {
   Film,
   ImageIcon,
   MessageSquare,
-  PlusCircle
+  PlusCircle,
+  Award,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -97,6 +98,7 @@ const moderationItems = [
 const providerItems = [
   { icon: Briefcase, label: "Providers", path: "/providers" },
   { icon: BadgeCheck, label: "Verifications", path: "/verifications" },
+  { icon: Award, label: "Badge Credentials", path: "/credentials" },
   { icon: Shield, label: "Claims", path: "/business-claims" },
 ];
 
@@ -125,6 +127,7 @@ const mobileNavItems = [
   // Providers section
   { icon: Briefcase, label: "Providers", path: "/providers" },
   { icon: BadgeCheck, label: "Verify", path: "/verifications" },
+  { icon: Award, label: "Badges", path: "/credentials" },
   { icon: Shield, label: "Claims", path: "/business-claims" },
   // Users section
   { icon: Users, label: "Users", path: "/users" },

@@ -199,6 +199,10 @@ import {
   unlinkRideFromUniverse,
   toggleUniverseRideFeatured,
   searchRidesForLinking,
+  // Badge Credentials
+  getBadgeCredentials,
+  getBadgeCredentialStats,
+  updateBadgeApprovalStatus,
 } from "./supabaseDb";
 import { getDb } from "./db";
 import { repActivityLog, batchImportJobs } from "../drizzle/schema";
@@ -1909,6 +1913,57 @@ export const appRouter = router({
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: "Failed to reject business claim",
+          });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ BADGE CREDENTIALS ROUTER ============
+  badgeCredentials: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          status: z.string().optional(),
+          page: z.number().optional(),
+          limit: z.number().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getBadgeCredentials(
+          input?.status || "pending",
+          input?.page || 1,
+          input?.limit || 20
+        );
+      }),
+
+    getStats: protectedProcedure.query(async () => {
+      return getBadgeCredentialStats();
+    }),
+
+    approve: protectedProcedure
+      .input(z.object({ cardId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await updateBadgeApprovalStatus(input.cardId, "approve", adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to approve badge credentials",
+          });
+        }
+        return { success: true };
+      }),
+
+    reject: protectedProcedure
+      .input(z.object({ cardId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const success = await updateBadgeApprovalStatus(input.cardId, "reject", adminId);
+        if (!success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to reject badge credentials",
           });
         }
         return { success: true };

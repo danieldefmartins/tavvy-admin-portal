@@ -6137,6 +6137,171 @@ export async function verifyPro(id: string, verified: boolean) {
   return data;
 }
 
+// ============ BADGE CREDENTIALS ============
+
+export interface BadgeCredentialCard {
+  id: string;
+  slug: string;
+  full_name: string;
+  user_id: string;
+  professional_category: string | null;
+  show_licensed_badge: boolean;
+  show_insured_badge: boolean;
+  show_bonded_badge: boolean;
+  show_tavvy_verified_badge: boolean;
+  pro_credentials: any;
+  badge_approval_status: string;
+  badge_reviewed_by: string | null;
+  badge_reviewed_at: string | null;
+  profile_photo_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getBadgeCredentials(
+  status?: string,
+  page = 1,
+  limit = 20
+): Promise<{ cards: BadgeCredentialCard[]; total: number }> {
+  try {
+    const offset = (page - 1) * limit;
+
+    let query = supabase
+      .from("digital_cards")
+      .select(
+        `id, slug, full_name, user_id, professional_category,
+         show_licensed_badge, show_insured_badge, show_bonded_badge, show_tavvy_verified_badge,
+         pro_credentials, badge_approval_status, badge_reviewed_by, badge_reviewed_at,
+         profile_photo_url, created_at, updated_at`,
+        { count: "exact" }
+      );
+
+    if (status && status !== "all") {
+      query = query.eq("badge_approval_status", status);
+    } else {
+      query = query.neq("badge_approval_status", "none");
+    }
+
+    const { data, error, count } = await query
+      .order("updated_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      console.error("[Supabase] Get badge credentials error:", error);
+      return { cards: [], total: 0 };
+    }
+
+    // Enrich with owner profile info
+    if (data && data.length > 0) {
+      const userIds = [...new Set(data.map((d: any) => d.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, email, full_name")
+        .in("user_id", userIds);
+
+      const profileMap = new Map(
+        (profiles || []).map((p: any) => [p.user_id, p])
+      );
+
+      const enriched = data.map((card: any) => ({
+        ...card,
+        owner_email: (profileMap.get(card.user_id) as any)?.email || null,
+        owner_name:
+          (profileMap.get(card.user_id) as any)?.full_name || card.full_name,
+      }));
+
+      return { cards: enriched, total: count || 0 };
+    }
+
+    return { cards: data || [], total: count || 0 };
+  } catch (error) {
+    console.error("[Supabase] Get badge credentials error:", error);
+    return { cards: [], total: 0 };
+  }
+}
+
+export async function getBadgeCredentialStats(): Promise<{
+  pending: number;
+  approved: number;
+  rejected: number;
+  total: number;
+}> {
+  try {
+    const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
+      supabase
+        .from("digital_cards")
+        .select("id", { count: "exact", head: true })
+        .eq("badge_approval_status", "pending"),
+      supabase
+        .from("digital_cards")
+        .select("id", { count: "exact", head: true })
+        .eq("badge_approval_status", "approved"),
+      supabase
+        .from("digital_cards")
+        .select("id", { count: "exact", head: true })
+        .eq("badge_approval_status", "rejected"),
+    ]);
+
+    return {
+      pending: pendingRes.count || 0,
+      approved: approvedRes.count || 0,
+      rejected: rejectedRes.count || 0,
+      total:
+        (pendingRes.count || 0) +
+        (approvedRes.count || 0) +
+        (rejectedRes.count || 0),
+    };
+  } catch (error) {
+    console.error("[Supabase] Get badge credential stats error:", error);
+    return { pending: 0, approved: 0, rejected: 0, total: 0 };
+  }
+}
+
+export async function updateBadgeApprovalStatus(
+  cardId: string,
+  action: "approve" | "reject",
+  adminId: string
+): Promise<boolean> {
+  try {
+    const updateData: Record<string, any> = {
+      badge_approval_status: action === "approve" ? "approved" : "rejected",
+      badge_reviewed_by: adminId,
+      badge_reviewed_at: new Date().toISOString(),
+    };
+
+    // If rejecting, turn off all badges
+    if (action === "reject") {
+      updateData.show_licensed_badge = false;
+      updateData.show_insured_badge = false;
+      updateData.show_bonded_badge = false;
+      updateData.show_tavvy_verified_badge = false;
+    }
+
+    const { error } = await supabase
+      .from("digital_cards")
+      .update(updateData)
+      .eq("id", cardId);
+
+    if (error) {
+      console.error("[Supabase] Update badge approval status error:", error);
+      return false;
+    }
+
+    // Log admin action
+    await logAdminActivity(
+      adminId,
+      `badge_${action}`,
+      cardId,
+      "digital_card"
+    );
+
+    return true;
+  } catch (error) {
+    console.error("[Supabase] Update badge approval status error:", error);
+    return false;
+  }
+}
+
 // Get Pro services
 export async function getProServices(proId: string) {
   const { data, error } = await supabase
