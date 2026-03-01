@@ -2366,8 +2366,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
-        // @ts-ignore - TypeScript incorrectly infers argument count
-        const success = await updateProWithPlace(input.id, input.updates, {}, adminId);
+        const success = await updateProWithPlace(input.id, input.updates, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",

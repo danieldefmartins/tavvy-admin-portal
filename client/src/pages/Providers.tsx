@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -51,24 +52,21 @@ import {
   Phone,
   Mail,
   Globe,
-  Calendar,
   Eye,
-  CheckCircle,
   Power,
   PowerOff,
   Sparkles,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
-  Building2,
   Home,
   Wrench,
   Clock,
-  TrendingUp,
   Users,
-  MessageSquare,
   UserCheck,
-  AlertCircle,
+  Save,
+  Pencil,
+  MessageSquare,
 } from "lucide-react";
 
 interface MatchRequest {
@@ -95,12 +93,14 @@ export default function Providers() {
   const [page, setPage] = useState(0);
   const [selectedProId, setSelectedProId] = useState<string | null>(null);
   const [showProDialog, setShowProDialog] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
   const [filterType, setFilterType] = useState<string>("all");
   const [filterVerified, setFilterVerified] = useState<string>("all");
   const [filterActive, setFilterActive] = useState<string>("all");
   const limit = 50;
 
-  // Match Requests State (from Realtors.tsx)
+  // Match Requests State
   const [matchRequests, setMatchRequests] = useState<MatchRequest[]>([]);
   const [matchRequestsLoading, setMatchRequestsLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<MatchRequest | null>(null);
@@ -121,7 +121,7 @@ export default function Providers() {
     isVerified: filterVerified !== "all" ? filterVerified === "verified" : undefined,
     isActive: filterActive !== "all" ? filterActive === "active" : undefined,
   });
-  const { data: selectedPro, isLoading: proLoading } = trpc.pros.getById.useQuery(
+  const { data: selectedPro, isLoading: proLoading, refetch: refetchSelectedPro } = trpc.pros.getById.useQuery(
     { id: selectedProId! },
     { enabled: !!selectedProId }
   );
@@ -131,10 +131,21 @@ export default function Providers() {
   );
 
   // Mutations
+  const updateMutation = trpc.pros.update.useMutation({
+    onSuccess: () => {
+      toast.success("Provider updated successfully");
+      setIsEditing(false);
+      refetchSelectedPro();
+      refetchPros();
+    },
+    onError: (error) => toast.error(`Failed to update: ${error.message}`),
+  });
+
   const verifyMutation = trpc.pros.verify.useMutation({
     onSuccess: () => {
       toast.success("Provider verified successfully");
       refetchPros();
+      refetchSelectedPro();
     },
     onError: (error) => toast.error(`Failed to verify: ${error.message}`),
   });
@@ -143,6 +154,7 @@ export default function Providers() {
     onSuccess: () => {
       toast.success("Provider verification removed");
       refetchPros();
+      refetchSelectedPro();
     },
     onError: (error) => toast.error(`Failed to unverify: ${error.message}`),
   });
@@ -151,6 +163,7 @@ export default function Providers() {
     onSuccess: () => {
       toast.success("Provider activated successfully");
       refetchPros();
+      refetchSelectedPro();
     },
     onError: (error) => toast.error(`Failed to activate: ${error.message}`),
   });
@@ -159,6 +172,7 @@ export default function Providers() {
     onSuccess: () => {
       toast.success("Provider deactivated");
       refetchPros();
+      refetchSelectedPro();
     },
     onError: (error) => toast.error(`Failed to deactivate: ${error.message}`),
   });
@@ -167,6 +181,7 @@ export default function Providers() {
     onSuccess: () => {
       toast.success("Provider featured successfully");
       refetchPros();
+      refetchSelectedPro();
     },
     onError: (error) => toast.error(`Failed to feature: ${error.message}`),
   });
@@ -175,11 +190,12 @@ export default function Providers() {
     onSuccess: () => {
       toast.success("Provider unfeatured");
       refetchPros();
+      refetchSelectedPro();
     },
     onError: (error) => toast.error(`Failed to unfeature: ${error.message}`),
   });
 
-  // Fetch Match Requests (from Realtors.tsx)
+  // Fetch Match Requests
   const fetchMatchRequests = async () => {
     setMatchRequestsLoading(true);
     try {
@@ -192,7 +208,7 @@ export default function Providers() {
         .order('created_at', { ascending: false });
 
       if (requestsError) throw requestsError;
-      
+
       const requestsWithCounts = (requestsData || []).map(req => ({
         ...req,
         match_count: req.realtor_matches?.[0]?.count || 0
@@ -209,11 +225,6 @@ export default function Providers() {
 
     } catch (error: any) {
       console.error('Error fetching match requests:', error);
-      toastHook({
-        title: "Error",
-        description: "Failed to fetch match requests.",
-        variant: "destructive",
-      });
     } finally {
       setMatchRequestsLoading(false);
     }
@@ -222,6 +233,36 @@ export default function Providers() {
   useEffect(() => {
     fetchMatchRequests();
   }, []);
+
+  // When selectedPro loads, populate the edit form
+  useEffect(() => {
+    if (selectedPro) {
+      setEditForm({
+        business_name: selectedPro.business_name || "",
+        first_name: selectedPro.first_name || "",
+        last_name: selectedPro.last_name || "",
+        email: selectedPro.email || "",
+        phone: selectedPro.phone || "",
+        website: selectedPro.website || "",
+        whatsapp_number: selectedPro.whatsapp_number || "",
+        description: selectedPro.description || "",
+        short_description: selectedPro.short_description || "",
+        bio: selectedPro.bio || "",
+        address: selectedPro.address || "",
+        city: selectedPro.city || "",
+        state: selectedPro.state || "",
+        zip_code: selectedPro.zip_code || "",
+        provider_type: selectedPro.provider_type || "pro",
+        trade_category: selectedPro.trade_category || "",
+        license_number: selectedPro.license_number || "",
+        service_radius: selectedPro.service_radius || 25,
+        years_in_business: selectedPro.years_in_business || "",
+        years_experience: selectedPro.years_experience || "",
+        brokerage_name: selectedPro.brokerage_name || "",
+        mls_id: selectedPro.mls_id || "",
+      });
+    }
+  }, [selectedPro]);
 
   const handleSearch = () => {
     setDebouncedSearch(searchQuery);
@@ -236,7 +277,28 @@ export default function Providers() {
 
   const handleViewPro = (proId: string) => {
     setSelectedProId(proId);
+    setIsEditing(false);
     setShowProDialog(true);
+  };
+
+  const handleSaveEdits = () => {
+    if (!selectedProId) return;
+    // Only send changed fields
+    const updates: Record<string, any> = {};
+    for (const [key, value] of Object.entries(editForm)) {
+      const original = (selectedPro as any)?.[key];
+      const currentVal = value === "" ? null : value;
+      const originalVal = original === undefined ? null : original;
+      if (currentVal !== originalVal) {
+        updates[key] = currentVal;
+      }
+    }
+    if (Object.keys(updates).length === 0) {
+      toast.info("No changes to save");
+      setIsEditing(false);
+      return;
+    }
+    updateMutation.mutate({ id: selectedProId, updates });
   };
 
   const handleRefresh = () => {
@@ -287,6 +349,40 @@ export default function Providers() {
   const pros = prosData?.providers || [];
   const totalPros = prosData?.total || 0;
   const totalPages = Math.ceil(totalPros / limit);
+
+  const EditField = ({ label, field, type = "text", placeholder }: { label: string; field: string; type?: string; placeholder?: string }) => (
+    <div>
+      <Label className="text-muted-foreground text-xs">{label}</Label>
+      {isEditing ? (
+        <Input
+          type={type}
+          value={editForm[field] || ""}
+          onChange={(e) => setEditForm((f) => ({ ...f, [field]: type === "number" ? (e.target.value ? Number(e.target.value) : "") : e.target.value }))}
+          placeholder={placeholder}
+          className="mt-1"
+        />
+      ) : (
+        <p className="font-medium text-sm mt-0.5">{(selectedPro as any)?.[field] || "Not set"}</p>
+      )}
+    </div>
+  );
+
+  const EditTextarea = ({ label, field, placeholder }: { label: string; field: string; placeholder?: string }) => (
+    <div>
+      <Label className="text-muted-foreground text-xs">{label}</Label>
+      {isEditing ? (
+        <Textarea
+          value={editForm[field] || ""}
+          onChange={(e) => setEditForm((f) => ({ ...f, [field]: e.target.value }))}
+          placeholder={placeholder}
+          className="mt-1"
+          rows={3}
+        />
+      ) : (
+        <p className="text-sm mt-0.5">{(selectedPro as any)?.[field] || "Not set"}</p>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -521,16 +617,16 @@ export default function Providers() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {pros.map((pro) => (
-                        <TableRow key={pro.id}>
+                      {pros.map((pro: any) => (
+                        <TableRow key={pro.id} className="cursor-pointer" onClick={() => handleViewPro(pro.id)}>
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
                                 {pro.logo_url || pro.profile_photo_url ? (
-                                  <img 
-                                    src={pro.logo_url || pro.profile_photo_url || ""} 
-                                    alt="" 
-                                    className="h-10 w-10 rounded-full object-cover" 
+                                  <img
+                                    src={pro.logo_url || pro.profile_photo_url || ""}
+                                    alt=""
+                                    className="h-10 w-10 rounded-full object-cover"
                                   />
                                 ) : (
                                   <Briefcase className="h-5 w-5 text-muted-foreground" />
@@ -610,7 +706,7 @@ export default function Providers() {
                           <TableCell>
                             <span className="text-sm">{formatDate(pro.created_at)}</span>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon">
@@ -621,6 +717,10 @@ export default function Providers() {
                                 <DropdownMenuItem onClick={() => handleViewPro(pro.id)}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { handleViewPro(pro.id); setTimeout(() => setIsEditing(true), 100); }}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit Provider
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 {pro.is_verified ? (
@@ -760,7 +860,7 @@ export default function Providers() {
                           {request.timeline || 'Not specified'}
                         </TableCell>
                         <TableCell>
-                          <Badge 
+                          <Badge
                             variant={
                               request.status === 'matched' ? 'default' :
                               request.status === 'pending' ? 'secondary' :
@@ -784,8 +884,8 @@ export default function Providers() {
                           {formatDate(request.created_at)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => {
                               setSelectedRequest(request);
@@ -805,14 +905,26 @@ export default function Providers() {
         </TabsContent>
       </Tabs>
 
-      {/* Provider Details Dialog */}
-      <Dialog open={showProDialog} onOpenChange={setShowProDialog}>
+      {/* Provider Details / Edit Dialog */}
+      <Dialog open={showProDialog} onOpenChange={(open) => { setShowProDialog(open); if (!open) setIsEditing(false); }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Provider Details</DialogTitle>
-            <DialogDescription>
-              View and manage provider information
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>
+                  {isEditing ? "Edit Provider" : "Provider Details"}
+                </DialogTitle>
+                <DialogDescription>
+                  {isEditing ? "Update provider information and save changes" : "View and manage provider information"}
+                </DialogDescription>
+              </div>
+              {selectedPro && !isEditing && (
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+            </div>
           </DialogHeader>
 
           {proLoading ? (
@@ -830,13 +942,14 @@ export default function Providers() {
               </TabsList>
 
               <TabsContent value="info" className="space-y-4">
+                {/* Header with photo and badges */}
                 <div className="flex items-start gap-4">
                   <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
                     {selectedPro.logo_url || selectedPro.profile_photo_url ? (
-                      <img 
-                        src={selectedPro.logo_url || selectedPro.profile_photo_url || ""} 
-                        alt="" 
-                        className="h-20 w-20 object-cover" 
+                      <img
+                        src={selectedPro.logo_url || selectedPro.profile_photo_url || ""}
+                        alt=""
+                        className="h-20 w-20 object-cover"
                       />
                     ) : (
                       <Briefcase className="h-10 w-10 text-muted-foreground" />
@@ -844,7 +957,7 @@ export default function Providers() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-xl font-semibold">
-                      {selectedPro.business_name || `${selectedPro.first_name || ""} ${selectedPro.last_name || ""}`.trim()}
+                      {selectedPro.business_name || `${selectedPro.first_name || ""} ${selectedPro.last_name || ""}`.trim() || "Unnamed"}
                     </h3>
                     <div className="flex flex-wrap gap-2 mt-2">
                       <Badge variant="outline" className={getProviderTypeColor(selectedPro.provider_type)}>
@@ -863,74 +976,99 @@ export default function Providers() {
                           Featured
                         </Badge>
                       )}
+                      {selectedPro.is_active ? (
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30">Active</Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-500/30">Inactive</Badge>
+                      )}
+                    </div>
+                    {/* Quick action buttons */}
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {selectedPro.is_verified ? (
+                        <Button size="sm" variant="outline" onClick={() => unverifyMutation.mutate({ id: selectedPro.id })} disabled={unverifyMutation.isPending}>
+                          <XCircle className="h-3 w-3 mr-1" /> Unverify
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="text-green-600" onClick={() => verifyMutation.mutate({ id: selectedPro.id })} disabled={verifyMutation.isPending}>
+                          <BadgeCheck className="h-3 w-3 mr-1" /> Verify
+                        </Button>
+                      )}
+                      {selectedPro.is_active ? (
+                        <Button size="sm" variant="outline" onClick={() => deactivateMutation.mutate({ id: selectedPro.id })} disabled={deactivateMutation.isPending}>
+                          <PowerOff className="h-3 w-3 mr-1" /> Deactivate
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="text-blue-600" onClick={() => activateMutation.mutate({ id: selectedPro.id })} disabled={activateMutation.isPending}>
+                          <Power className="h-3 w-3 mr-1" /> Activate
+                        </Button>
+                      )}
+                      {selectedPro.is_featured ? (
+                        <Button size="sm" variant="outline" onClick={() => unfeatureMutation.mutate({ id: selectedPro.id })} disabled={unfeatureMutation.isPending}>
+                          <Sparkles className="h-3 w-3 mr-1" /> Unfeature
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="text-yellow-600" onClick={() => featureMutation.mutate({ id: selectedPro.id })} disabled={featureMutation.isPending}>
+                          <Sparkles className="h-3 w-3 mr-1" /> Feature
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
 
+                {/* Editable fields */}
                 <div className="grid grid-cols-2 gap-4">
+                  <EditField label="Business Name" field="business_name" placeholder="Business name" />
                   <div>
-                    <Label className="text-muted-foreground">Email</Label>
-                    <p className="font-medium">{selectedPro.email || "Not set"}</p>
+                    <Label className="text-muted-foreground text-xs">Provider Type</Label>
+                    {isEditing ? (
+                      <Select value={editForm.provider_type || "pro"} onValueChange={(v) => setEditForm((f) => ({ ...f, provider_type: v }))}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pro">Pro</SelectItem>
+                          <SelectItem value="realtor">Realtor</SelectItem>
+                          <SelectItem value="on_the_go">On The Go</SelectItem>
+                          <SelectItem value="contractor">Contractor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="font-medium text-sm mt-0.5 capitalize">{selectedPro.provider_type || "Not set"}</p>
+                    )}
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Phone</Label>
-                    <p className="font-medium">{selectedPro.phone || "Not set"}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Website</Label>
-                    <p className="font-medium">
-                      {selectedPro.website ? (
-                        <a href={selectedPro.website} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                          {selectedPro.website}
-                        </a>
-                      ) : "Not set"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Location</Label>
-                    <p className="font-medium">
-                      {[selectedPro.city, selectedPro.state, selectedPro.zip_code].filter(Boolean).join(", ") || "Not set"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Joined</Label>
-                    <p className="font-medium">{formatDate(selectedPro.created_at)}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Verified At</Label>
-                    <p className="font-medium">{formatDate(selectedPro.verified_at)}</p>
-                  </div>
+                  <EditField label="First Name" field="first_name" placeholder="First name" />
+                  <EditField label="Last Name" field="last_name" placeholder="Last name" />
+                  <EditField label="Email" field="email" placeholder="email@example.com" />
+                  <EditField label="Phone" field="phone" placeholder="+1 (555) 000-0000" />
+                  <EditField label="Website" field="website" placeholder="https://..." />
+                  <EditField label="WhatsApp" field="whatsapp_number" placeholder="+1..." />
                 </div>
 
-                {selectedPro.bio && (
-                  <div>
-                    <Label className="text-muted-foreground">Bio</Label>
-                    <p className="mt-1">{selectedPro.bio}</p>
-                  </div>
-                )}
+                <EditTextarea label="Short Description" field="short_description" placeholder="Brief tagline or summary..." />
+                <EditTextarea label="Description" field="description" placeholder="Full business description..." />
+                <EditTextarea label="Bio" field="bio" placeholder="Personal bio..." />
 
-                {selectedPro.description && (
+                <div className="grid grid-cols-2 gap-4">
+                  <EditField label="Address" field="address" placeholder="123 Main St" />
+                  <EditField label="City" field="city" placeholder="City" />
+                  <EditField label="State" field="state" placeholder="State" />
+                  <EditField label="ZIP Code" field="zip_code" placeholder="ZIP" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-muted-foreground">Description</Label>
-                    <p className="mt-1">{selectedPro.description}</p>
+                    <Label className="text-muted-foreground text-xs">Joined</Label>
+                    <p className="font-medium text-sm mt-0.5">{formatDate(selectedPro.created_at)}</p>
                   </div>
-                )}
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Last Updated</Label>
+                    <p className="font-medium text-sm mt-0.5">{formatDate(selectedPro.updated_at)}</p>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="business" className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        Years in Business
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-2xl font-bold">{selectedPro.years_in_business || selectedPro.years_experience || "N/A"}</p>
-                    </CardContent>
-                  </Card>
-
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -956,55 +1094,42 @@ export default function Providers() {
                       <p className="text-2xl font-bold">{selectedPro.total_reviews || selectedPro.review_count || 0}</p>
                     </CardContent>
                   </Card>
-
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        Total Leads
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-2xl font-bold">{selectedPro.total_leads || 0}</p>
-                    </CardContent>
-                  </Card>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+                  <EditField label="Trade Category" field="trade_category" placeholder="e.g. Plumber, Electrician" />
+                  <EditField label="License Number" field="license_number" placeholder="License #" />
+                  <EditField label="Years in Business" field="years_in_business" type="number" placeholder="0" />
+                  <EditField label="Years Experience" field="years_experience" type="number" placeholder="0" />
+                  <EditField label="Service Radius (miles)" field="service_radius" type="number" placeholder="25" />
+                  <EditField label="Brokerage Name" field="brokerage_name" placeholder="Brokerage" />
+                  <EditField label="MLS ID" field="mls_id" placeholder="MLS ID" />
                   <div>
-                    <Label className="text-muted-foreground">License Number</Label>
-                    <p className="font-medium">{selectedPro.license_number || "Not provided"}</p>
+                    <Label className="text-muted-foreground text-xs">Licensed</Label>
+                    <p className="font-medium text-sm mt-0.5">{selectedPro.is_licensed ? "Yes" : "No"}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Service Radius</Label>
-                    <p className="font-medium">{selectedPro.service_radius ? `${selectedPro.service_radius} miles` : "Not set"}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Licensed</Label>
-                    <p className="font-medium">{selectedPro.is_licensed ? "Yes" : "No"}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Insured</Label>
-                    <p className="font-medium">{selectedPro.is_insured ? "Yes" : "No"}</p>
+                    <Label className="text-muted-foreground text-xs">Insured</Label>
+                    <p className="font-medium text-sm mt-0.5">{selectedPro.is_insured ? "Yes" : "No"}</p>
                   </div>
                 </div>
 
-                {selectedPro.specialties && selectedPro.specialties.length > 0 && (
+                {selectedPro.specialties && (Array.isArray(selectedPro.specialties) ? selectedPro.specialties : []).length > 0 && (
                   <div>
-                    <Label className="text-muted-foreground">Specialties</Label>
+                    <Label className="text-muted-foreground text-xs">Specialties</Label>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {selectedPro.specialties.map((specialty: string, i: number) => (
+                      {(Array.isArray(selectedPro.specialties) ? selectedPro.specialties : []).map((specialty: string, i: number) => (
                         <Badge key={i} variant="secondary">{specialty}</Badge>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {selectedPro.service_areas && selectedPro.service_areas.length > 0 && (
+                {selectedPro.service_areas && (Array.isArray(selectedPro.service_areas) ? selectedPro.service_areas : []).length > 0 && (
                   <div>
-                    <Label className="text-muted-foreground">Service Areas</Label>
+                    <Label className="text-muted-foreground text-xs">Service Areas</Label>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {selectedPro.service_areas.map((area: string, i: number) => (
+                      {(Array.isArray(selectedPro.service_areas) ? selectedPro.service_areas : []).map((area: string, i: number) => (
                         <Badge key={i} variant="outline">{area}</Badge>
                       ))}
                     </div>
@@ -1015,20 +1140,28 @@ export default function Providers() {
               <TabsContent value="subscription" className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-muted-foreground">Plan</Label>
+                    <Label className="text-muted-foreground text-xs">Plan</Label>
                     <p className="font-medium capitalize">{selectedPro.subscription_plan || "None"}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Status</Label>
+                    <Label className="text-muted-foreground text-xs">Status</Label>
                     <p className="font-medium capitalize">{selectedPro.subscription_status || "N/A"}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Started</Label>
+                    <Label className="text-muted-foreground text-xs">Started</Label>
                     <p className="font-medium">{formatDate(selectedPro.subscription_started_at)}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Expires</Label>
+                    <Label className="text-muted-foreground text-xs">Expires</Label>
                     <p className="font-medium">{formatDate(selectedPro.subscription_expires_at)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Total Leads</Label>
+                    <p className="font-medium">{selectedPro.total_leads || 0}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Active Leads</Label>
+                    <p className="font-medium">{selectedPro.active_leads || 0}</p>
                   </div>
                 </div>
               </TabsContent>
@@ -1056,8 +1189,11 @@ export default function Providers() {
                               {formatDate(review.created_at)}
                             </span>
                           </div>
-                          {review.review_text && (
-                            <p className="mt-2 text-sm">{review.review_text}</p>
+                          {review.title && (
+                            <p className="mt-2 font-medium text-sm">{review.title}</p>
+                          )}
+                          {review.content && (
+                            <p className="mt-1 text-sm text-muted-foreground">{review.content}</p>
                           )}
                         </CardContent>
                       </Card>
@@ -1070,6 +1206,19 @@ export default function Providers() {
             </Tabs>
           ) : (
             <p className="text-muted-foreground">Provider not found</p>
+          )}
+
+          {/* Save / Cancel footer when editing */}
+          {isEditing && (
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdits} disabled={updateMutation.isPending}>
+                <Save className="h-4 w-4 mr-2" />
+                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>
@@ -1120,7 +1269,7 @@ export default function Providers() {
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Status</Label>
-                  <Badge 
+                  <Badge
                     className={
                       selectedRequest.status === 'matched' ? 'bg-green-500' :
                       selectedRequest.status === 'pending' ? 'bg-yellow-500' :

@@ -3463,7 +3463,7 @@ export async function getProReviews(proId: string): Promise<ProReview[]> {
     const { data, error } = await supabase
       .from("pro_reviews")
       .select("*")
-      .eq("pro_id", proId)
+      .eq("provider_id", proId)
       .order("created_at", { ascending: false });
 
     if (error) {
