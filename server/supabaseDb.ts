@@ -5193,6 +5193,70 @@ export async function getPlacePhotosForEdit(placeId: string): Promise<PlacePhoto
 
 
 
+// ============ VERIFICATION QUERIES ============
+
+export async function getVerifications(status?: string): Promise<any[]> {
+  try {
+    let query = supabase
+      .from("user_verifications")
+      .select(`
+        *,
+        profiles:user_id (
+          display_name
+        )
+      `)
+      .order("created_at", { ascending: false });
+
+    if (status && status !== "all") {
+      query = query.eq("verification_status", status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[Supabase] Get verifications error:", error);
+      return [];
+    }
+
+    return (data || []).map((v: any) => ({
+      ...v,
+      user_name: v.profiles?.display_name || "Unknown User",
+    }));
+  } catch (error) {
+    console.error("[Supabase] Get verifications error:", error);
+    return [];
+  }
+}
+
+export async function getVerificationStats(): Promise<{
+  pending: number;
+  approved: number;
+  rejected: number;
+  total: number;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from("user_verifications")
+      .select("verification_status");
+
+    if (error) {
+      console.error("[Supabase] Get verification stats error:", error);
+      return { pending: 0, approved: 0, rejected: 0, total: 0 };
+    }
+
+    const rows = data || [];
+    return {
+      pending: rows.filter(v => v.verification_status === "pending").length,
+      approved: rows.filter(v => v.verification_status === "approved").length,
+      rejected: rows.filter(v => v.verification_status === "rejected").length,
+      total: rows.length,
+    };
+  } catch (error) {
+    console.error("[Supabase] Get verification stats error:", error);
+    return { pending: 0, approved: 0, rejected: 0, total: 0 };
+  }
+}
+
 // ============ VERIFICATION SYNC ============
 // These functions ensure verification status is properly synced across all related tables
 

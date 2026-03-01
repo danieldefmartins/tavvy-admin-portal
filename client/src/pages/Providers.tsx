@@ -350,8 +350,9 @@ export default function Providers() {
   const totalPros = prosData?.total || 0;
   const totalPages = Math.ceil(totalPros / limit);
 
-  const EditField = ({ label, field, type = "text", placeholder }: { label: string; field: string; type?: string; placeholder?: string }) => (
-    <div>
+  // Helper renderers (not components — avoids remount on state change)
+  const renderField = (label: string, field: string, type = "text", placeholder?: string) => (
+    <div key={field}>
       <Label className="text-muted-foreground text-xs">{label}</Label>
       {isEditing ? (
         <Input
@@ -367,8 +368,8 @@ export default function Providers() {
     </div>
   );
 
-  const EditTextarea = ({ label, field, placeholder }: { label: string; field: string; placeholder?: string }) => (
-    <div>
+  const renderTextarea = (label: string, field: string, placeholder?: string) => (
+    <div key={field}>
       <Label className="text-muted-foreground text-xs">{label}</Label>
       {isEditing ? (
         <Textarea
@@ -1017,7 +1018,7 @@ export default function Providers() {
 
                 {/* Editable fields */}
                 <div className="grid grid-cols-2 gap-4">
-                  <EditField label="Business Name" field="business_name" placeholder="Business name" />
+                  {renderField("Business Name", "business_name", "text", "Business name")}
                   <div>
                     <Label className="text-muted-foreground text-xs">Provider Type</Label>
                     {isEditing ? (
@@ -1036,23 +1037,23 @@ export default function Providers() {
                       <p className="font-medium text-sm mt-0.5 capitalize">{selectedPro.provider_type || "Not set"}</p>
                     )}
                   </div>
-                  <EditField label="First Name" field="first_name" placeholder="First name" />
-                  <EditField label="Last Name" field="last_name" placeholder="Last name" />
-                  <EditField label="Email" field="email" placeholder="email@example.com" />
-                  <EditField label="Phone" field="phone" placeholder="+1 (555) 000-0000" />
-                  <EditField label="Website" field="website" placeholder="https://..." />
-                  <EditField label="WhatsApp" field="whatsapp_number" placeholder="+1..." />
+                  {renderField("First Name", "first_name", "text", "First name")}
+                  {renderField("Last Name", "last_name", "text", "Last name")}
+                  {renderField("Email", "email", "text", "email@example.com")}
+                  {renderField("Phone", "phone", "text", "+1 (555) 000-0000")}
+                  {renderField("Website", "website", "text", "https://...")}
+                  {renderField("WhatsApp", "whatsapp_number", "text", "+1...")}
                 </div>
 
-                <EditTextarea label="Short Description" field="short_description" placeholder="Brief tagline or summary..." />
-                <EditTextarea label="Description" field="description" placeholder="Full business description..." />
-                <EditTextarea label="Bio" field="bio" placeholder="Personal bio..." />
+                {renderTextarea("Short Description", "short_description", "Brief tagline or summary...")}
+                {renderTextarea("Description", "description", "Full business description...")}
+                {renderTextarea("Bio", "bio", "Personal bio...")}
 
                 <div className="grid grid-cols-2 gap-4">
-                  <EditField label="Address" field="address" placeholder="123 Main St" />
-                  <EditField label="City" field="city" placeholder="City" />
-                  <EditField label="State" field="state" placeholder="State" />
-                  <EditField label="ZIP Code" field="zip_code" placeholder="ZIP" />
+                  {renderField("Address", "address", "text", "123 Main St")}
+                  {renderField("City", "city", "text", "City")}
+                  {renderField("State", "state", "text", "State")}
+                  {renderField("ZIP Code", "zip_code", "text", "ZIP")}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1097,13 +1098,13 @@ export default function Providers() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <EditField label="Trade Category" field="trade_category" placeholder="e.g. Plumber, Electrician" />
-                  <EditField label="License Number" field="license_number" placeholder="License #" />
-                  <EditField label="Years in Business" field="years_in_business" type="number" placeholder="0" />
-                  <EditField label="Years Experience" field="years_experience" type="number" placeholder="0" />
-                  <EditField label="Service Radius (miles)" field="service_radius" type="number" placeholder="25" />
-                  <EditField label="Brokerage Name" field="brokerage_name" placeholder="Brokerage" />
-                  <EditField label="MLS ID" field="mls_id" placeholder="MLS ID" />
+                  {renderField("Trade Category", "trade_category", "text", "e.g. Plumber, Electrician")}
+                  {renderField("License Number", "license_number", "text", "License #")}
+                  {renderField("Years in Business", "years_in_business", "number", "0")}
+                  {renderField("Years Experience", "years_experience", "number", "0")}
+                  {renderField("Service Radius (miles)", "service_radius", "number", "25")}
+                  {renderField("Brokerage Name", "brokerage_name", "text", "Brokerage")}
+                  {renderField("MLS ID", "mls_id", "text", "MLS ID")}
                   <div>
                     <Label className="text-muted-foreground text-xs">Licensed</Label>
                     <p className="font-medium text-sm mt-0.5">{selectedPro.is_licensed ? "Yes" : "No"}</p>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,22 +27,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Shield, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  FileText, 
+import {
+  Shield,
+  CheckCircle,
+  XCircle,
+  Clock,
+  FileText,
   Search,
   Eye,
-  Download,
   RefreshCw,
   AlertCircle,
   User,
@@ -50,12 +43,7 @@ import {
   Calendar,
   ExternalLink
 } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
-
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://scasgwrikoqdwlwlwcff.supabase.co";
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { trpc } from "@/lib/trpc";
 
 interface VerificationRequest {
   id: string;
@@ -83,15 +71,11 @@ interface VerificationRequest {
   verification_status: string;
   created_at: string;
   updated_at: string;
-  // Joined data
-  user_email?: string;
   user_name?: string;
 }
 
 export default function Verifications() {
   const { toast } = useToast();
-  const [verifications, setVerifications] = useState<VerificationRequest[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedVerification, setSelectedVerification] = useState<VerificationRequest | null>(null);
@@ -99,188 +83,77 @@ export default function Verifications() {
   const [reviewNotes, setReviewNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Stats
-  const [stats, setStats] = useState({
-    pending: 0,
-    approved: 0,
-    rejected: 0,
-    total: 0,
+  const utils = trpc.useUtils();
+
+  const { data: verifications = [], isLoading: loading } = trpc.verificationSync.getAll.useQuery(
+    { status: statusFilter !== "all" ? statusFilter : undefined },
+    { refetchOnWindowFocus: false }
+  );
+
+  const { data: stats = { pending: 0, approved: 0, rejected: 0, total: 0 } } =
+    trpc.verificationSync.getStats.useQuery(undefined, { refetchOnWindowFocus: false });
+
+  const approveMutation = trpc.verificationSync.approve.useMutation({
+    onSuccess: () => {
+      toast({ title: "Verification Approved", description: "The user's badges have been verified successfully." });
+      setIsReviewDialogOpen(false);
+      setSelectedVerification(null);
+      setReviewNotes("");
+      utils.verificationSync.getAll.invalidate();
+      utils.verificationSync.getStats.invalidate();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to approve verification", variant: "destructive" });
+    },
   });
 
-  useEffect(() => {
-    fetchVerifications();
-  }, [statusFilter]);
+  const rejectMutation = trpc.verificationSync.reject.useMutation({
+    onSuccess: () => {
+      toast({ title: "Verification Rejected", description: "The verification request has been rejected." });
+      setIsReviewDialogOpen(false);
+      setSelectedVerification(null);
+      setReviewNotes("");
+      utils.verificationSync.getAll.invalidate();
+      utils.verificationSync.getStats.invalidate();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to reject verification", variant: "destructive" });
+    },
+  });
 
-  const fetchVerifications = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from("user_verifications")
-        .select(`
-          *,
-          profiles:user_id (
-            display_name,
-            user_id
-          )
-        `)
-        .order("created_at", { ascending: false });
-
-      if (statusFilter !== "all") {
-        query = query.eq("verification_status", statusFilter);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Also fetch user emails from auth.users via profiles
-      const enrichedData = data?.map((v: any) => ({
-        ...v,
-        user_name: v.profiles?.display_name || "Unknown User",
-      })) || [];
-
-      setVerifications(enrichedData);
-
-      // Calculate stats
-      const allData = await supabase
-        .from("user_verifications")
-        .select("verification_status");
-      
-      if (allData.data) {
-        const pending = allData.data.filter(v => v.verification_status === "pending").length;
-        const approved = allData.data.filter(v => v.verification_status === "approved").length;
-        const rejected = allData.data.filter(v => v.verification_status === "rejected").length;
-        setStats({
-          pending,
-          approved,
-          rejected,
-          total: allData.data.length,
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching verifications:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load verification requests",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleApprove = async (verification: VerificationRequest, badges: {
+  const handleApprove = (verification: VerificationRequest, badges: {
     licensed: boolean;
     insured: boolean;
     bonded: boolean;
     tavvyVerified: boolean;
   }) => {
     setIsSubmitting(true);
-    try {
-      const { error } = await supabase
-        .from("user_verifications")
-        .update({
-          is_licensed_verified: badges.licensed,
-          is_insured_verified: badges.insured,
-          is_bonded_verified: badges.bonded,
-          is_tavvy_verified: badges.tavvyVerified,
-          verification_status: "approved",
-          review_notes: reviewNotes,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", verification.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Verification Approved",
-        description: "The user's badges have been verified successfully.",
-      });
-
-      setIsReviewDialogOpen(false);
-      setSelectedVerification(null);
-      setReviewNotes("");
-      fetchVerifications();
-    } catch (error) {
-      console.error("Error approving verification:", error);
-      toast({
-        title: "Error",
-        description: "Failed to approve verification",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    approveMutation.mutate(
+      {
+        verificationId: verification.id,
+        userId: verification.user_id,
+        badges,
+        reviewNotes,
+      },
+      { onSettled: () => setIsSubmitting(false) }
+    );
   };
 
-  const handleReject = async (verification: VerificationRequest) => {
+  const handleReject = (verification: VerificationRequest) => {
     setIsSubmitting(true);
-    try {
-      const { error } = await supabase
-        .from("user_verifications")
-        .update({
-          verification_status: "rejected",
-          review_notes: reviewNotes,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", verification.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Verification Rejected",
-        description: "The verification request has been rejected.",
-      });
-
-      setIsReviewDialogOpen(false);
-      setSelectedVerification(null);
-      setReviewNotes("");
-      fetchVerifications();
-    } catch (error) {
-      console.error("Error rejecting verification:", error);
-      toast({
-        title: "Error",
-        description: "Failed to reject verification",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    rejectMutation.mutate(
+      {
+        verificationId: verification.id,
+        userId: verification.user_id,
+        reviewNotes,
+      },
+      { onSettled: () => setIsSubmitting(false) }
+    );
   };
 
-  const handleRequestMoreInfo = async (verification: VerificationRequest) => {
-    setIsSubmitting(true);
-    try {
-      const { error } = await supabase
-        .from("user_verifications")
-        .update({
-          verification_status: "needs_more_info",
-          review_notes: reviewNotes,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", verification.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "More Info Requested",
-        description: "The user will be notified to provide additional documents.",
-      });
-
-      setIsReviewDialogOpen(false);
-      setSelectedVerification(null);
-      setReviewNotes("");
-      fetchVerifications();
-    } catch (error) {
-      console.error("Error updating verification:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update verification",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleRefresh = () => {
+    utils.verificationSync.getAll.invalidate();
+    utils.verificationSync.getStats.invalidate();
   };
 
   const getStatusBadge = (status: string) => {
@@ -298,7 +171,7 @@ export default function Verifications() {
     }
   };
 
-  const filteredVerifications = verifications.filter(v => {
+  const filteredVerifications = (verifications as VerificationRequest[]).filter(v => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -325,7 +198,7 @@ export default function Verifications() {
             Review and approve business verification requests
           </p>
         </div>
-        <Button onClick={fetchVerifications} variant="outline" className="gap-2">
+        <Button onClick={handleRefresh} variant="outline" className="gap-2">
           <RefreshCw className="h-4 w-4" />
           Refresh
         </Button>
@@ -533,7 +406,7 @@ export default function Verifications() {
               {/* Documents */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-white">Submitted Documents</h4>
-                
+
                 <div className="grid gap-3">
                   {/* License Document */}
                   <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
@@ -646,7 +519,7 @@ export default function Verifications() {
                       className="w-5 h-5 rounded border-white/20"
                     />
                     <div>
-                      <p className="font-medium">✅ Licensed</p>
+                      <p className="font-medium">Licensed</p>
                       <p className="text-sm text-white/60">Business license verified</p>
                     </div>
                   </label>
@@ -658,7 +531,7 @@ export default function Verifications() {
                       className="w-5 h-5 rounded border-white/20"
                     />
                     <div>
-                      <p className="font-medium">✅ Insured</p>
+                      <p className="font-medium">Insured</p>
                       <p className="text-sm text-white/60">Insurance verified</p>
                     </div>
                   </label>
@@ -670,7 +543,7 @@ export default function Verifications() {
                       className="w-5 h-5 rounded border-white/20"
                     />
                     <div>
-                      <p className="font-medium">🛡️ Bonded</p>
+                      <p className="font-medium">Bonded</p>
                       <p className="text-sm text-white/60">Bonding verified</p>
                     </div>
                   </label>
@@ -682,7 +555,7 @@ export default function Verifications() {
                       className="w-5 h-5 rounded border-white/20"
                     />
                     <div>
-                      <p className="font-medium">🟢 Tavvy Verified</p>
+                      <p className="font-medium">Tavvy Verified</p>
                       <p className="text-sm text-white/60">Full Tavvy verification</p>
                     </div>
                   </label>
@@ -703,14 +576,6 @@ export default function Verifications() {
           )}
 
           <DialogFooter className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => handleRequestMoreInfo(selectedVerification!)}
-              disabled={isSubmitting}
-            >
-              <AlertCircle className="h-4 w-4 mr-1" />
-              Request More Info
-            </Button>
             <Button
               variant="destructive"
               onClick={() => handleReject(selectedVerification!)}

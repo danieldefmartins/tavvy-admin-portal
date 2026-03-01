@@ -175,6 +175,8 @@ import {
   syncVerificationToProProvider,
   approveVerificationWithSync,
   rejectVerificationWithSync,
+  getVerifications,
+  getVerificationStats,
   // Place Overrides
   getPlaceOverridesAdmin,
   createPlaceOverrideAdmin,
@@ -3036,6 +3038,18 @@ export const appRouter = router({
 
   // ============ VERIFICATION SYNC ============
   verificationSync: router({
+    getAll: protectedProcedure
+      .input(
+        z.object({ status: z.string().optional() }).optional()
+      )
+      .query(async ({ input }) => {
+        return getVerifications(input?.status);
+      }),
+
+    getStats: protectedProcedure.query(async () => {
+      return getVerificationStats();
+    }),
+
     approve: protectedProcedure
       .input(
         z.object({
