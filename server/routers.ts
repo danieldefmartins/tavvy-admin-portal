@@ -205,6 +205,31 @@ import {
   getBadgeCredentials,
   getBadgeCredentialStats,
   updateBadgeApprovalStatus,
+  // Digital Cards (eCards)
+  getDigitalCards,
+  getDigitalCardById,
+  getDigitalCardLinks,
+  updateDigitalCard,
+  deleteDigitalCard,
+  getDigitalCardStats,
+  // Events
+  getEvents,
+  getEventById,
+  updateEvent,
+  deleteEvent,
+  getEventStats,
+  // Live Sessions
+  getLiveSessions,
+  getLiveSessionById,
+  updateLiveSession,
+  endLiveSession,
+  getLiveSessionStats,
+  // Leads / Project Requests
+  getProjectRequests,
+  getProjectRequestById,
+  getProjectBids,
+  updateProjectRequest,
+  getLeadsStats,
 } from "./supabaseDb";
 import { getDb } from "./db";
 import { repActivityLog, batchImportJobs } from "../drizzle/schema";
@@ -3385,6 +3410,224 @@ export const appRouter = router({
             code: "INTERNAL_SERVER_ERROR",
             message: "Failed to mark draft as synced",
           });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ DIGITAL CARDS (eCards) ADMIN ============
+  digitalCards: router({
+    getStats: protectedProcedure.query(async () => {
+      return getDigitalCardStats();
+    }),
+
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().min(1).max(500).default(50),
+          offset: z.number().min(0).default(0),
+          search: z.string().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getDigitalCards(input?.limit || 50, input?.offset || 0, input?.search);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        const card = await getDigitalCardById(input.id);
+        if (!card) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Card not found" });
+        }
+        return card;
+      }),
+
+    getLinks: protectedProcedure
+      .input(z.object({ cardId: z.string() }))
+      .query(async ({ input }) => {
+        return getDigitalCardLinks(input.cardId);
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          updates: z.record(z.string(), z.any()),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const success = await updateDigitalCard(input.id, input.updates);
+        if (!success) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update card" });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        const success = await deleteDigitalCard(input.id);
+        if (!success) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to delete card" });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ EVENTS ADMIN ============
+  events: router({
+    getStats: protectedProcedure.query(async () => {
+      return getEventStats();
+    }),
+
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().min(1).max(500).default(50),
+          offset: z.number().min(0).default(0),
+          status: z.string().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getEvents(input?.limit || 50, input?.offset || 0, input?.status);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        const event = await getEventById(input.id);
+        if (!event) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Event not found" });
+        }
+        return event;
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          updates: z.record(z.string(), z.any()),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const success = await updateEvent(input.id, input.updates);
+        if (!success) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update event" });
+        }
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        const success = await deleteEvent(input.id);
+        if (!success) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to delete event" });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ LIVE SESSIONS ADMIN ============
+  liveSessions: router({
+    getStats: protectedProcedure.query(async () => {
+      return getLiveSessionStats();
+    }),
+
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().min(1).max(500).default(50),
+          offset: z.number().min(0).default(0),
+          status: z.string().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getLiveSessions(input?.limit || 50, input?.offset || 0, input?.status);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        const session = await getLiveSessionById(input.id);
+        if (!session) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+        }
+        return session;
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          updates: z.record(z.string(), z.any()),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const success = await updateLiveSession(input.id, input.updates);
+        if (!success) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update session" });
+        }
+        return { success: true };
+      }),
+
+    end: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        const success = await endLiveSession(input.id);
+        if (!success) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to end session" });
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ============ LEADS / PROJECT REQUESTS ADMIN ============
+  leads: router({
+    getStats: protectedProcedure.query(async () => {
+      return getLeadsStats();
+    }),
+
+    getAll: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().min(1).max(500).default(50),
+          offset: z.number().min(0).default(0),
+          status: z.string().optional(),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        return getProjectRequests(input?.limit || 50, input?.offset || 0, input?.status);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        const request = await getProjectRequestById(input.id);
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
+        }
+        return request;
+      }),
+
+    getBids: protectedProcedure
+      .input(z.object({ requestId: z.string() }))
+      .query(async ({ input }) => {
+        return getProjectBids(input.requestId);
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          updates: z.record(z.string(), z.any()),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const success = await updateProjectRequest(input.id, input.updates);
+        if (!success) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update request" });
         }
         return { success: true };
       }),

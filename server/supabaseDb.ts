@@ -6366,6 +6366,317 @@ export async function updateBadgeApprovalStatus(
   }
 }
 
+// ============ DIGITAL CARDS (eCards) ADMIN ============
+export async function getDigitalCards(limit = 50, offset = 0, search?: string) {
+  let query = supabase
+    .from("digital_cards")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (search) {
+    query = query.or(`full_name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%,slug.ilike.%${search}%`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) {
+    console.error("[Supabase] getDigitalCards error:", error);
+    return { cards: [], total: 0 };
+  }
+  return { cards: data || [], total: count || 0 };
+}
+
+export async function getDigitalCardById(id: string) {
+  const { data, error } = await supabase
+    .from("digital_cards")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    console.error("[Supabase] getDigitalCardById error:", error);
+    return null;
+  }
+  return data;
+}
+
+export async function getDigitalCardLinks(cardId: string) {
+  const { data, error } = await supabase
+    .from("digital_card_links")
+    .select("*")
+    .eq("card_id", cardId)
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    console.error("[Supabase] getDigitalCardLinks error:", error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function updateDigitalCard(id: string, updates: Record<string, any>) {
+  const { error } = await supabase
+    .from("digital_cards")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] updateDigitalCard error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteDigitalCard(id: string) {
+  const { error } = await supabase
+    .from("digital_cards")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] deleteDigitalCard error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function getDigitalCardStats() {
+  const { count: total } = await supabase.from("digital_cards").select("*", { count: "exact", head: true });
+  const { count: active } = await supabase.from("digital_cards").select("*", { count: "exact", head: true }).eq("is_active", true);
+  const { count: published } = await supabase.from("digital_cards").select("*", { count: "exact", head: true }).eq("is_published", true);
+  const { count: totalLinks } = await supabase.from("digital_card_links").select("*", { count: "exact", head: true });
+  const { count: endorsements } = await supabase.from("ecard_endorsements").select("*", { count: "exact", head: true });
+
+  return {
+    total: total || 0,
+    active: active || 0,
+    published: published || 0,
+    totalLinks: totalLinks || 0,
+    endorsements: endorsements || 0,
+  };
+}
+
+// ============ EVENTS ADMIN ============
+export async function getEvents(limit = 50, offset = 0, status?: string) {
+  let query = supabase
+    .from("tavvy_events")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error, count } = await query;
+  if (error) {
+    console.error("[Supabase] getEvents error:", error);
+    return { events: [], total: 0 };
+  }
+  return { events: data || [], total: count || 0 };
+}
+
+export async function getEventById(id: string) {
+  const { data, error } = await supabase
+    .from("tavvy_events")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    console.error("[Supabase] getEventById error:", error);
+    return null;
+  }
+  return data;
+}
+
+export async function updateEvent(id: string, updates: Record<string, any>) {
+  const { error } = await supabase
+    .from("tavvy_events")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] updateEvent error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteEvent(id: string) {
+  const { error } = await supabase
+    .from("tavvy_events")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] deleteEvent error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function getEventStats() {
+  const { count: total } = await supabase.from("tavvy_events").select("*", { count: "exact", head: true });
+  const { count: published } = await supabase.from("tavvy_events").select("*", { count: "exact", head: true }).eq("status", "published");
+  const { count: draft } = await supabase.from("tavvy_events").select("*", { count: "exact", head: true }).eq("status", "draft");
+  const { count: scheduled } = await supabase.from("scheduled_events").select("*", { count: "exact", head: true });
+
+  return {
+    total: total || 0,
+    published: published || 0,
+    draft: draft || 0,
+    scheduled: scheduled || 0,
+  };
+}
+
+// ============ LIVE SESSIONS ADMIN ============
+export async function getLiveSessions(limit = 50, offset = 0, status?: string) {
+  let query = supabase
+    .from("live_sessions")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error, count } = await query;
+  if (error) {
+    console.error("[Supabase] getLiveSessions error:", error);
+    return { sessions: [], total: 0 };
+  }
+  return { sessions: data || [], total: count || 0 };
+}
+
+export async function getLiveSessionById(id: string) {
+  const { data, error } = await supabase
+    .from("live_sessions")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    console.error("[Supabase] getLiveSessionById error:", error);
+    return null;
+  }
+  return data;
+}
+
+export async function updateLiveSession(id: string, updates: Record<string, any>) {
+  const { error } = await supabase
+    .from("live_sessions")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] updateLiveSession error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function endLiveSession(id: string) {
+  const { error } = await supabase
+    .from("live_sessions")
+    .update({ status: "ended", actual_end_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] endLiveSession error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function getLiveSessionStats() {
+  const { count: total } = await supabase.from("live_sessions").select("*", { count: "exact", head: true });
+  const { count: active } = await supabase.from("live_sessions").select("*", { count: "exact", head: true }).eq("status", "active");
+  const { count: ended } = await supabase.from("live_sessions").select("*", { count: "exact", head: true }).eq("status", "ended");
+
+  return {
+    total: total || 0,
+    active: active || 0,
+    ended: ended || 0,
+  };
+}
+
+// ============ LEADS / PROJECT REQUESTS ADMIN ============
+export async function getProjectRequests(limit = 50, offset = 0, status?: string) {
+  let query = supabase
+    .from("project_requests")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error, count } = await query;
+  if (error) {
+    console.error("[Supabase] getProjectRequests error:", error);
+    return { requests: [], total: 0 };
+  }
+  return { requests: data || [], total: count || 0 };
+}
+
+export async function getProjectRequestById(id: string) {
+  const { data, error } = await supabase
+    .from("project_requests")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    console.error("[Supabase] getProjectRequestById error:", error);
+    return null;
+  }
+  return data;
+}
+
+export async function getProjectBids(requestId: string) {
+  const { data, error } = await supabase
+    .from("project_bids")
+    .select("*")
+    .eq("project_request_id", requestId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[Supabase] getProjectBids error:", error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function updateProjectRequest(id: string, updates: Record<string, any>) {
+  const { error } = await supabase
+    .from("project_requests")
+    .update(updates)
+    .eq("id", id);
+
+  if (error) {
+    console.error("[Supabase] updateProjectRequest error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function getLeadsStats() {
+  const { count: totalRequests } = await supabase.from("project_requests").select("*", { count: "exact", head: true });
+  const { count: totalBids } = await supabase.from("project_bids").select("*", { count: "exact", head: true });
+  const { count: totalLeads } = await supabase.from("leads").select("*", { count: "exact", head: true });
+  const { count: openRequests } = await supabase.from("project_requests").select("*", { count: "exact", head: true }).eq("status", "open");
+
+  return {
+    totalRequests: totalRequests || 0,
+    totalBids: totalBids || 0,
+    totalLeads: totalLeads || 0,
+    openRequests: openRequests || 0,
+  };
+}
+
 // Get Pro services
 export async function getProServices(proId: string) {
   const { data, error } = await supabase

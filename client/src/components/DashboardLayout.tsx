@@ -56,6 +56,10 @@ import {
   MessageSquare,
   PlusCircle,
   Award,
+  CreditCard,
+  Calendar,
+  Radio,
+  Inbox,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -84,6 +88,8 @@ const otherItems = [
   { icon: Building2, label: "Cities", path: "/cities" },
   { icon: Globe, label: "Universes", path: "/universes" },
   { icon: Zap, label: "Rides", path: "/rides" },
+  { icon: Calendar, label: "Events", path: "/events" },
+  { icon: Radio, label: "Live Sessions", path: "/live-sessions" },
 ];
 
 // Content Moderation items
@@ -97,9 +103,11 @@ const moderationItems = [
 // Providers items
 const providerItems = [
   { icon: Briefcase, label: "Providers", path: "/providers" },
+  { icon: CreditCard, label: "eCards", path: "/ecards" },
   { icon: BadgeCheck, label: "Verifications", path: "/verifications" },
   { icon: Award, label: "Badge Credentials", path: "/credentials" },
   { icon: Shield, label: "Claims", path: "/business-claims" },
+  { icon: Inbox, label: "Leads", path: "/leads" },
 ];
 
 // Users & Access items
@@ -126,9 +134,11 @@ const mobileNavItems = [
   { icon: Flag, label: "Flags", path: "/moderation" },
   // Providers section
   { icon: Briefcase, label: "Providers", path: "/providers" },
+  { icon: CreditCard, label: "eCards", path: "/ecards" },
   { icon: BadgeCheck, label: "Verify", path: "/verifications" },
   { icon: Award, label: "Badges", path: "/credentials" },
   { icon: Shield, label: "Claims", path: "/business-claims" },
+  { icon: Inbox, label: "Leads", path: "/leads" },
   // Users section
   { icon: Users, label: "Users", path: "/users" },
   { icon: History, label: "Audit Log", path: "/audit-log" },

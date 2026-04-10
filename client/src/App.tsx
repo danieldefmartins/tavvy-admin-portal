@@ -36,6 +36,10 @@ import CreatePlace from "@/pages/CreatePlace";
 import Drafts from "@/pages/Drafts";
 import Rides from "@/pages/Rides";
 import Credentials from "@/pages/Credentials";
+import ECards from "@/pages/ECards";
+import Events from "@/pages/Events";
+import LiveSessions from "@/pages/LiveSessions";
+import Leads from "@/pages/Leads";
 
 // Loading component
 function LoadingScreen() {
@@ -244,6 +248,30 @@ function App() {
         <Route path="/drafts">
           <ProtectedRoute>
             <Drafts />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/ecards">
+          <ProtectedRoute>
+            <ECards />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/events">
+          <ProtectedRoute>
+            <Events />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/live-sessions">
+          <ProtectedRoute>
+            <LiveSessions />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/leads">
+          <ProtectedRoute>
+            <Leads />
           </ProtectedRoute>
         </Route>
 

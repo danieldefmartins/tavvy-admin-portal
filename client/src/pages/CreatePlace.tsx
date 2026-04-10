@@ -102,7 +102,7 @@ export default function CreatePlace() {
   const [showSocials, setShowSocials] = useState(false);
   
   // Create place mutation
-  const createPlace = trpc.places.create.useMutation({
+  const createPlace = trpc.tavvyPlaces.create.useMutation({
     onSuccess: (data) => {
       toast({
         title: "Place created!",
