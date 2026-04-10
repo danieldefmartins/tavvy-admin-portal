@@ -395,6 +395,192 @@ export async function getDistinctProviderTypesNew(): Promise<string[]> {
 }
 
 /**
+ * Create a new pro provider from admin panel.
+ * Also sets profiles.is_pro, creates pro_subscriptions, and optionally creates an eCard.
+ */
+export async function createProProvider(
+  data: {
+    user_id?: string;
+    business_name: string;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+    description?: string;
+    provider_type?: string;
+    trade_category?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+    service_radius?: number;
+    years_in_business?: number;
+    license_number?: string;
+    is_insured?: boolean;
+    is_licensed?: boolean;
+    website?: string;
+    whatsapp_number?: string;
+    specialties?: string[];
+    is_free_pro?: boolean;
+    create_ecard?: boolean;
+  },
+  adminId: string
+): Promise<{ success: boolean; providerId?: string; cardId?: string; error?: string }> {
+  try {
+    // Generate slug from business name
+    const slug = data.business_name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") + "-" + Date.now().toString(36);
+
+    const now = new Date().toISOString();
+    const isFree = data.is_free_pro ?? false;
+
+    // 1. Create pro_providers record
+    const providerRecord: Record<string, any> = {
+      business_name: data.business_name,
+      slug,
+      first_name: data.first_name || null,
+      last_name: data.last_name || null,
+      email: data.email || null,
+      phone: data.phone || null,
+      description: data.description || null,
+      provider_type: data.provider_type || "pro",
+      trade_category: data.trade_category || null,
+      address: data.address || null,
+      city: data.city || null,
+      state: data.state || null,
+      zip_code: data.zip_code || null,
+      location: data.city && data.state ? `${data.city}, ${data.state}` : null,
+      service_radius: data.service_radius || 25,
+      years_in_business: data.years_in_business || null,
+      license_number: data.license_number || null,
+      is_insured: data.is_insured || false,
+      is_licensed: data.is_licensed || false,
+      website: data.website || null,
+      whatsapp_number: data.whatsapp_number || null,
+      specialties: data.specialties || null,
+      is_active: true,
+      is_verified: true,
+      verified_at: now,
+      subscription_plan: isFree ? "free" : "early_adopter",
+      subscription_status: "active",
+      subscription_started_at: now,
+      subscription_expires_at: isFree ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      card_enabled: true,
+      card_slug: slug,
+      created_at: now,
+      updated_at: now,
+    };
+
+    if (data.user_id) {
+      providerRecord.user_id = data.user_id;
+    }
+
+    const { data: provider, error: providerError } = await supabase
+      .from("pro_providers")
+      .insert(providerRecord)
+      .select("id, user_id, slug")
+      .single();
+
+    if (providerError) {
+      console.error("[Supabase] Create pro provider error:", providerError);
+      return { success: false, error: providerError.message };
+    }
+
+    const providerId = provider.id;
+    const userId = provider.user_id;
+
+    // 2. Create pro_subscriptions record
+    const { error: subError } = await supabase
+      .from("pro_subscriptions")
+      .insert({
+        provider_id: providerId,
+        tier: isFree ? "free" : "early_adopter",
+        status: "active",
+        price_per_year: isFree ? 0 : 9900,
+        start_date: now,
+        end_date: isFree ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        early_adopter_number: isFree ? null : undefined,
+        created_at: now,
+        updated_at: now,
+      });
+
+    if (subError) {
+      console.error("[Supabase] Create subscription error (non-fatal):", subError);
+    }
+
+    // 3. Update profiles.is_pro if user_id was provided
+    if (userId) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          is_pro: true,
+          subscription_status: "active",
+          subscription_plan: isFree ? "free" : "early_adopter",
+          updated_at: now,
+        })
+        .eq("user_id", userId);
+
+      if (profileError) {
+        console.error("[Supabase] Update profile is_pro error (non-fatal):", profileError);
+      }
+    }
+
+    // 4. Create eCard (digital_cards) if requested
+    let cardId: string | undefined;
+    if (data.create_ecard !== false) {
+      const cardSlug = slug;
+      const fullName = [data.first_name, data.last_name].filter(Boolean).join(" ") || data.business_name;
+
+      const { data: card, error: cardError } = await supabase
+        .from("digital_cards")
+        .insert({
+          user_id: userId || null,
+          slug: cardSlug,
+          full_name: fullName,
+          company: data.business_name,
+          title: data.trade_category || null,
+          phone: data.phone || null,
+          email: data.email || null,
+          website: data.website || null,
+          city: data.city || null,
+          state: data.state || null,
+          bio: data.description || null,
+          card_type: "business",
+          template_id: "business-card",
+          gradient_color_1: "#EA580C",
+          gradient_color_2: "#F97316",
+          is_active: true,
+          is_published: true,
+          professional_category: data.trade_category || null,
+          show_contact_info: true,
+          show_social_icons: true,
+          created_at: now,
+          updated_at: now,
+        })
+        .select("id")
+        .single();
+
+      if (cardError) {
+        console.error("[Supabase] Create eCard error (non-fatal):", cardError);
+      } else {
+        cardId = card?.id;
+      }
+    }
+
+    // 5. Log admin activity
+    await logAdminActivity(adminId, "create_pro", providerId, "pro_provider",
+      `Created pro: ${data.business_name}${isFree ? ' (free)' : ''}${cardId ? ' + eCard' : ''}`);
+
+    return { success: true, providerId, cardId };
+  } catch (error: any) {
+    console.error("[Supabase] Create pro provider error:", error);
+    return { success: false, error: error.message || String(error) };
+  }
+}
+
+/**
  * Helper function to log admin activity
  */
 async function logAdminActivity(

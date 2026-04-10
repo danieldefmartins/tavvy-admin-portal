@@ -37,6 +37,7 @@ import Drafts from "@/pages/Drafts";
 import Rides from "@/pages/Rides";
 import Credentials from "@/pages/Credentials";
 import ECards from "@/pages/ECards";
+import CreatePro from "@/pages/CreatePro";
 import Events from "@/pages/Events";
 import LiveSessions from "@/pages/LiveSessions";
 import Leads from "@/pages/Leads";
@@ -167,6 +168,12 @@ function App() {
         <Route path="/providers">
           <ProtectedRoute>
             <Providers />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/providers/new">
+          <ProtectedRoute>
+            <CreatePro />
           </ProtectedRoute>
         </Route>
 

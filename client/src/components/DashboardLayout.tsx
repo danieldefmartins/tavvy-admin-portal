@@ -103,6 +103,7 @@ const moderationItems = [
 // Providers items
 const providerItems = [
   { icon: Briefcase, label: "Providers", path: "/providers" },
+  { icon: PlusCircle, label: "Add Pro", path: "/providers/new" },
   { icon: CreditCard, label: "eCards", path: "/ecards" },
   { icon: BadgeCheck, label: "Verifications", path: "/verifications" },
   { icon: Award, label: "Badge Credentials", path: "/credentials" },
@@ -134,6 +135,7 @@ const mobileNavItems = [
   { icon: Flag, label: "Flags", path: "/moderation" },
   // Providers section
   { icon: Briefcase, label: "Providers", path: "/providers" },
+  { icon: PlusCircle, label: "Add Pro", path: "/providers/new" },
   { icon: CreditCard, label: "eCards", path: "/ecards" },
   { icon: BadgeCheck, label: "Verify", path: "/verifications" },
   { icon: Award, label: "Badges", path: "/credentials" },

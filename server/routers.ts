@@ -34,6 +34,7 @@ import {
   unfeaturePro,
   getProStatsNew,
   getDistinctProviderTypesNew,
+  createProProvider,
 } from "./prosDb";
 import { z } from "zod";
 import {
@@ -2362,6 +2363,46 @@ export const appRouter = router({
 
   // ============ PRO PROVIDERS MANAGEMENT ============
   pros: router({
+    create: protectedProcedure
+      .input(
+        z.object({
+          user_id: z.string().optional(),
+          business_name: z.string().min(1, "Business name is required"),
+          first_name: z.string().optional(),
+          last_name: z.string().optional(),
+          email: z.string().optional(),
+          phone: z.string().optional(),
+          description: z.string().optional(),
+          provider_type: z.string().optional(),
+          trade_category: z.string().optional(),
+          address: z.string().optional(),
+          city: z.string().optional(),
+          state: z.string().optional(),
+          zip_code: z.string().optional(),
+          service_radius: z.number().optional(),
+          years_in_business: z.number().optional(),
+          license_number: z.string().optional(),
+          is_insured: z.boolean().optional(),
+          is_licensed: z.boolean().optional(),
+          website: z.string().optional(),
+          whatsapp_number: z.string().optional(),
+          specialties: z.array(z.string()).optional(),
+          is_free_pro: z.boolean().optional(),
+          create_ecard: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const adminId = ctx.user?.id || "unknown";
+        const result = await createProProvider(input, adminId);
+        if (!result.success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: result.error || "Failed to create pro provider",
+          });
+        }
+        return result;
+      }),
+
     getAll: protectedProcedure
       .input(
         z.object({
