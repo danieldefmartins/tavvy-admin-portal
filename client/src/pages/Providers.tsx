@@ -41,6 +41,7 @@ import { trpc } from "@/lib/trpc";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import {
   Briefcase,
   Search,
@@ -58,6 +59,7 @@ import {
   Sparkles,
   RefreshCw,
   ChevronLeft,
+  Plus,
   ChevronRight,
   Home,
   Wrench,
@@ -86,6 +88,7 @@ interface MatchRequest {
 }
 
 export default function Providers() {
+  const [, navigate] = useLocation();
   const { toast: toastHook } = useToast();
   const [activeTab, setActiveTab] = useState("providers");
   const [searchQuery, setSearchQuery] = useState("");
@@ -395,10 +398,16 @@ export default function Providers() {
             Manage professional service providers, verification, and match requests
           </p>
         </div>
-        <Button onClick={handleRefresh} variant="outline">
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => navigate("/providers/new")}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Pro
+          </Button>
+          <Button onClick={handleRefresh} variant="outline">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
