@@ -106,6 +106,7 @@ export default function Providers() {
   // Match Requests State
   const [matchRequests, setMatchRequests] = useState<MatchRequest[]>([]);
   const [matchRequestsLoading, setMatchRequestsLoading] = useState(false);
+  const [matchRequestsError, setMatchRequestsError] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<MatchRequest | null>(null);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [matchStats, setMatchStats] = useState({
@@ -202,6 +203,7 @@ export default function Providers() {
   // Fetch Match Requests
   const fetchMatchRequests = async () => {
     setMatchRequestsLoading(true);
+    setMatchRequestsError(null);
     try {
       const { data: requestsData, error: requestsError } = await supabase
         .from('realtor_match_requests')
@@ -229,6 +231,8 @@ export default function Providers() {
 
     } catch (error: any) {
       console.error('Error fetching match requests:', error);
+      setMatchRequestsError(error?.message || 'Failed to load match requests');
+      toast.error('Failed to load match requests');
     } finally {
       setMatchRequestsLoading(false);
     }
@@ -825,6 +829,15 @@ export default function Providers() {
                   {[1, 2, 3, 4, 5].map((i) => (
                     <Skeleton key={i} className="h-16 w-full" />
                   ))}
+                </div>
+              ) : matchRequestsError ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium">Could not load match requests</p>
+                  <p className="text-sm mb-4">{matchRequestsError}</p>
+                  <Button variant="outline" onClick={() => fetchMatchRequests()}>
+                    Try again
+                  </Button>
                 </div>
               ) : filteredRequests.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">

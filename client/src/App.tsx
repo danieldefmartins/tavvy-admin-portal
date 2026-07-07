@@ -23,7 +23,6 @@ import Moderation from "@/pages/Moderation";
 import Overrides from "@/pages/Overrides";
 import AuditLog from "@/pages/AuditLog";
 import Verifications from "@/pages/Verifications";
-import Realtors from "@/pages/Realtors";
 import StrategicAudit from "@/pages/StrategicAudit";
 import Users from "@/pages/Users";
 import Pros from "@/pages/Pros";
