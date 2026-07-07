@@ -425,7 +425,13 @@ export async function createProProvider(
     create_ecard?: boolean;
   },
   adminId: string
-): Promise<{ success: boolean; providerId?: string; cardId?: string; error?: string }> {
+): Promise<{
+  success: boolean;
+  providerId?: string;
+  cardId?: string;
+  failedStep?: string;
+  error?: string;
+}> {
   try {
     // Generate slug from business name
     const slug = data.business_name
@@ -485,29 +491,65 @@ export async function createProProvider(
 
     if (providerError) {
       console.error("[Supabase] Create pro provider error:", providerError);
-      return { success: false, error: providerError.message };
+      return { success: false, failedStep: "pro_providers", error: providerError.message };
     }
 
     const providerId = provider.id;
     const userId = provider.user_id;
 
+    // Cleanup helper: best-effort rollback of everything created so far.
+    // (No multi-table transaction available through PostgREST; a Postgres RPC
+    // would be the fully atomic option.)
+    const cleanup = async (opts: { subscription?: boolean; profile?: boolean }) => {
+      try {
+        if (opts.subscription) {
+          await supabase.from("pro_subscriptions").delete().eq("provider_id", providerId);
+        }
+        if (opts.profile && userId) {
+          await supabase
+            .from("profiles")
+            .update({
+              is_pro: false,
+              subscription_status: null,
+              subscription_plan: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        }
+        await supabase.from("pro_providers").delete().eq("id", providerId);
+      } catch (cleanupErr) {
+        console.error(
+          `[Supabase] Cleanup after failed pro creation (provider ${providerId}) error:`,
+          cleanupErr
+        );
+      }
+    };
+
     // 2. Create pro_subscriptions record
+    const subscriptionRecord: Record<string, any> = {
+      provider_id: providerId,
+      tier: isFree ? "free" : "early_adopter",
+      status: "active",
+      price_per_year: isFree ? 0 : 9900,
+      start_date: now,
+      end_date: isFree ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      created_at: now,
+      updated_at: now,
+    };
+    // early_adopter_number: only set explicitly for free pros (null);
+    // for paid pros the column is omitted so the DB default applies.
+    if (isFree) {
+      subscriptionRecord.early_adopter_number = null;
+    }
+
     const { error: subError } = await supabase
       .from("pro_subscriptions")
-      .insert({
-        provider_id: providerId,
-        tier: isFree ? "free" : "early_adopter",
-        status: "active",
-        price_per_year: isFree ? 0 : 9900,
-        start_date: now,
-        end_date: isFree ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-        early_adopter_number: isFree ? null : undefined,
-        created_at: now,
-        updated_at: now,
-      });
+      .insert(subscriptionRecord);
 
     if (subError) {
-      console.error("[Supabase] Create subscription error (non-fatal):", subError);
+      console.error("[Supabase] Create subscription error:", subError);
+      await cleanup({});
+      return { success: false, failedStep: "pro_subscriptions", error: subError.message };
     }
 
     // 3. Update profiles.is_pro if user_id was provided
@@ -523,7 +565,9 @@ export async function createProProvider(
         .eq("user_id", userId);
 
       if (profileError) {
-        console.error("[Supabase] Update profile is_pro error (non-fatal):", profileError);
+        console.error("[Supabase] Update profile is_pro error:", profileError);
+        await cleanup({ subscription: true });
+        return { success: false, failedStep: "profiles", error: profileError.message };
       }
     }
 
@@ -563,10 +607,11 @@ export async function createProProvider(
         .single();
 
       if (cardError) {
-        console.error("[Supabase] Create eCard error (non-fatal):", cardError);
-      } else {
-        cardId = card?.id;
+        console.error("[Supabase] Create eCard error:", cardError);
+        await cleanup({ subscription: true, profile: true });
+        return { success: false, failedStep: "digital_cards", error: cardError.message };
       }
+      cardId = card?.id;
     }
 
     // 5. Log admin activity

@@ -2370,9 +2370,12 @@ export const appRouter = router({
         const adminId = ctx.user?.id || "unknown";
         const result = await createProProvider(input, adminId);
         if (!result.success) {
+          const step = result.failedStep
+            ? ` (failed at step: ${result.failedStep}; partial changes were rolled back)`
+            : "";
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: result.error || "Failed to create pro provider",
+            message: (result.error || "Failed to create pro provider") + step,
           });
         }
         return result;
