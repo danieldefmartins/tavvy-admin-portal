@@ -98,9 +98,11 @@ export default function Overrides() {
     createdBy: "",
   });
 
-  const { data: overrides, isLoading, refetch } = trpc.overrides.getAll.useQuery(
-    activeTab === "all" ? undefined : { status: activeTab }
+  const { data: overridesData, isLoading, refetch } = trpc.overrides.getAll.useQuery(
+    activeTab === "all" ? { limit: 100, offset: 0 } : { status: activeTab, limit: 100, offset: 0 }
   );
+  const overrides = overridesData?.items;
+  const overridesTotal = overridesData?.total ?? 0;
 
   // Filter overrides client-side
   const filteredOverrides = useMemo(() => {
@@ -363,7 +365,7 @@ export default function Overrides() {
           ) : filteredOverrides && filteredOverrides.length > 0 ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Showing {filteredOverrides.length} of {overrides?.length || 0} overrides
+                Showing {filteredOverrides.length} of {overridesTotal} overrides
               </p>
               <div className="grid gap-4">
                 {filteredOverrides.map((override) => (

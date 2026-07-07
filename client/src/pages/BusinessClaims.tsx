@@ -64,9 +64,11 @@ export default function BusinessClaims() {
     placeId: "",
   });
 
-  const { data: claims, isLoading, refetch } = trpc.businessClaims.getAll.useQuery(
-    activeTab === "all" ? undefined : { status: activeTab }
+  const { data: claimsData, isLoading, refetch } = trpc.businessClaims.getAll.useQuery(
+    activeTab === "all" ? { limit: 100, offset: 0 } : { status: activeTab, limit: 100, offset: 0 }
   );
+  const claims = claimsData?.items;
+  const claimsTotal = claimsData?.total ?? 0;
 
   // Filter claims client-side
   const filteredClaims = useMemo(() => {
@@ -304,7 +306,7 @@ export default function BusinessClaims() {
           ) : filteredClaims && filteredClaims.length > 0 ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Showing {filteredClaims.length} of {claims?.length || 0} claims
+                Showing {filteredClaims.length} of {claimsTotal} claims
               </p>
               <div className="grid gap-4">
                 {filteredClaims.map((claim) => (

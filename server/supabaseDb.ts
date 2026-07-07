@@ -4,6 +4,19 @@ import { supabaseAdmin } from "./supabaseAuth";
 // This bypasses RLS policies and allows full access to all tables
 export const supabase = supabaseAdmin;
 
+/**
+ * Escape a user-supplied search term for interpolation into a PostgREST
+ * .or(...ilike...) filter string. Commas and parentheses are part of the
+ * .or() grammar and would let user input inject/alter filter conditions,
+ * so they are stripped. LIKE wildcards are escaped.
+ */
+export function escapeOrSearchTerm(term: string): string {
+  return term
+    .replace(/[,()]/g, " ")      // .or() grammar characters -> space
+    .replace(/[%_\\]/g, "\\$&")  // escape LIKE wildcards and backslash
+    .trim();
+}
+
 // ============ CONNECTION TEST ============
 export async function testConnection(): Promise<{ success: boolean; error?: string }> {
   try {
@@ -72,6 +85,7 @@ export async function searchPlaces(
   try {
     // Sanitize query: escape special characters that could break filter parsing
     const sanitizedQuery = query
+      .replace(/[,()]/g, ' ')      // Strip .or() grammar characters (injection)
       .replace(/[%_\\]/g, '\\$&')  // Escape SQL LIKE wildcards
       .trim();
     
@@ -968,7 +982,27 @@ export async function getPlaceById(id: string) {
     return null;
   }
 
-  // Try fsq_places_raw first
+  // Route by id shape (mirrors tavvy-web pages/api/place/[id].ts):
+  // never compare a non-uuid string against a uuid column — Postgres throws
+  // "invalid input syntax for type uuid" and the whole query fails.
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sanitizedId);
+
+  if (isUuid) {
+    // UUID → primary key lookup only (a uuid can never be an fsq id)
+    const { data, error } = await supabase
+      .from("fsq_places_raw")
+      .select("*")
+      .eq("id", sanitizedId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[Supabase] Get place by ID error:", error);
+      return null;
+    }
+    return data;
+  }
+
+  // Non-UUID → only the text fsq id columns; never the uuid `id` column
   const { data, error } = await supabase
     .from("fsq_places_raw")
     .select("*")
@@ -979,22 +1013,8 @@ export async function getPlaceById(id: string) {
     console.error("[Supabase] Get place by ID error:", error);
     return null;
   }
-  
-  if (data) return data;
 
-  // Fallback: try by id column directly
-  const { data: fallbackData, error: fallbackError } = await supabase
-    .from("fsq_places_raw")
-    .select("*")
-    .eq("id", sanitizedId)
-    .maybeSingle();
-
-  if (fallbackError) {
-    console.error("[Supabase] Get place by ID fallback error:", fallbackError);
-    return null;
-  }
-
-  return fallbackData;
+  return data;
 }
 
 export async function getPlacesCount(): Promise<number> {
@@ -1087,14 +1107,20 @@ export async function getSignals() {
   return data;
 }
 
-export async function getAllReviewItems(): Promise<ReviewItem[]> {
+export async function getAllReviewItems(
+  limit: number = 1000,
+  offset: number = 0
+): Promise<ReviewItem[]> {
   try {
+    // Signal catalog: bounded definitions table, consumed whole by the UI.
+    // Capped at 1000 rows per page as a safety limit.
     const { data, error } = await supabase
       .from("review_items")
       .select("*")
       .eq("is_active", true)
       .order("signal_type", { ascending: true })
-      .order("sort_order", { ascending: true });
+      .order("sort_order", { ascending: true })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       console.error("[Supabase] Get all review items error:", error);
@@ -1714,10 +1740,10 @@ export async function getUniverseById(id: string) {
     .from("atlas_universes")
     .select("*")
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
-  return data;
+  return data; // null when not found — callers/UI handle the not-found case
 }
 
 export async function createUniverse(universe: {
@@ -2175,28 +2201,33 @@ export interface BusinessClaim {
   verified_at: string | null;
 }
 
-export async function getBusinessClaims(status?: string): Promise<BusinessClaim[]> {
+export async function getBusinessClaims(
+  status?: string,
+  limit: number = 100,
+  offset: number = 0
+): Promise<{ items: BusinessClaim[]; total: number }> {
   try {
     let query = supabase
       .from("pro_business_claims")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (status) {
       query = query.eq("status", status);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       console.error("[Supabase] Get business claims error:", error);
-      return [];
+      return { items: [], total: 0 };
     }
 
-    return data || [];
+    return { items: data || [], total: count ?? 0 };
   } catch (error) {
     console.error("[Supabase] Get business claims error:", error);
-    return [];
+    return { items: [], total: 0 };
   }
 }
 
@@ -2281,53 +2312,63 @@ export interface ModerationQueueItem {
   created_at: string;
 }
 
-export async function getContentFlags(status?: string): Promise<ContentFlag[]> {
+export async function getContentFlags(
+  status?: string,
+  limit: number = 100,
+  offset: number = 0
+): Promise<{ items: ContentFlag[]; total: number }> {
   try {
     let query = supabase
       .from("content_flags")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (status) {
       query = query.eq("status", status);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       console.error("[Supabase] Get content flags error:", error);
-      return [];
+      return { items: [], total: 0 };
     }
 
-    return data || [];
+    return { items: data || [], total: count ?? 0 };
   } catch (error) {
     console.error("[Supabase] Get content flags error:", error);
-    return [];
+    return { items: [], total: 0 };
   }
 }
 
-export async function getModerationQueue(status?: string): Promise<ModerationQueueItem[]> {
+export async function getModerationQueue(
+  status?: string,
+  limit: number = 100,
+  offset: number = 0
+): Promise<{ items: ModerationQueueItem[]; total: number }> {
   try {
     let query = supabase
       .from("moderation_queue")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (status) {
       query = query.eq("status", status);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       console.error("[Supabase] Get moderation queue error:", error);
-      return [];
+      return { items: [], total: 0 };
     }
 
-    return data || [];
+    return { items: data || [], total: count ?? 0 };
   } catch (error) {
     console.error("[Supabase] Get moderation queue error:", error);
-    return [];
+    return { items: [], total: 0 };
   }
 }
 
@@ -2483,28 +2524,33 @@ export interface PlaceOverride {
   updated_at: string;
 }
 
-export async function getPlaceOverrides(status?: string): Promise<PlaceOverride[]> {
+export async function getPlaceOverrides(
+  status?: string,
+  limit: number = 100,
+  offset: number = 0
+): Promise<{ items: PlaceOverride[]; total: number }> {
   try {
     let query = supabase
       .from("place_overrides")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (status) {
       query = query.eq("status", status);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       console.error("[Supabase] Get place overrides error:", error);
-      return [];
+      return { items: [], total: 0 };
     }
 
-    return data || [];
+    return { items: data || [], total: count ?? 0 };
   } catch (error) {
     console.error("[Supabase] Get place overrides error:", error);
-    return [];
+    return { items: [], total: 0 };
   }
 }
 
@@ -2701,7 +2747,10 @@ export async function getUsers(
       `, { count: "exact" });
 
     if (search) {
-      query = query.or(`display_name.ilike.%${search}%,username.ilike.%${search}%`);
+      const term = escapeOrSearchTerm(search);
+      if (term) {
+        query = query.or(`display_name.ilike.%${term}%,username.ilike.%${term}%`);
+      }
     }
 
     const { data, error, count } = await query
@@ -2893,13 +2942,18 @@ export async function deleteUser(
   }
 }
 
-export async function getUserRoles(userId: string): Promise<UserRole[]> {
+export async function getUserRoles(
+  userId: string,
+  limit: number = 100,
+  offset: number = 0
+): Promise<UserRole[]> {
   try {
     const { data, error } = await supabase
       .from("user_roles")
       .select("*")
       .eq("user_id", userId)
-      .order("granted_at", { ascending: false });
+      .order("granted_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       console.error("[Supabase] Get user roles error:", error);
@@ -2968,13 +3022,18 @@ export async function removeUserRole(
   }
 }
 
-export async function getUserStrikes(userId: string): Promise<UserStrike[]> {
+export async function getUserStrikes(
+  userId: string,
+  limit: number = 100,
+  offset: number = 0
+): Promise<UserStrike[]> {
   try {
     const { data, error } = await supabase
       .from("user_strikes")
       .select("*")
       .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       console.error("[Supabase] Get user strikes error:", error);
@@ -3222,7 +3281,10 @@ export async function getProProviders(
       .select("*", { count: "exact" });
 
     if (search) {
-      query = query.or(`business_name.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
+      const term = escapeOrSearchTerm(search);
+      if (term) {
+        query = query.or(`business_name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`);
+      }
     }
 
     if (providerType) {
@@ -3458,23 +3520,28 @@ export async function unfeatureProProvider(
   }
 }
 
-export async function getProReviews(proId: string): Promise<ProReview[]> {
+export async function getProReviews(
+  proId: string,
+  limit: number = 100,
+  offset: number = 0
+): Promise<{ items: ProReview[]; total: number }> {
   try {
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from("pro_reviews")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("provider_id", proId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       console.error("[Supabase] Get pro reviews error:", error);
-      return [];
+      return { items: [], total: 0 };
     }
 
-    return data || [];
+    return { items: data || [], total: count ?? 0 };
   } catch (error) {
     console.error("[Supabase] Get pro reviews error:", error);
-    return [];
+    return { items: [], total: 0 };
   }
 }
 
@@ -6114,8 +6181,11 @@ export async function getPros(filters?: {
 
   // Apply search filter
   if (filters?.search) {
-    const searchTerm = `%${filters.search}%`;
-    query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},email.ilike.${searchTerm},business_name.ilike.${searchTerm}`);
+    const term = escapeOrSearchTerm(filters.search);
+    if (term) {
+      const searchTerm = `%${term}%`;
+      query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},email.ilike.${searchTerm},business_name.ilike.${searchTerm}`);
+    }
   }
 
   // Apply verification filter
@@ -6375,7 +6445,10 @@ export async function getDigitalCards(limit = 50, offset = 0, search?: string) {
     .range(offset, offset + limit - 1);
 
   if (search) {
-    query = query.or(`full_name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%,slug.ilike.%${search}%`);
+    const term = escapeOrSearchTerm(search);
+    if (term) {
+      query = query.or(`full_name.ilike.%${term}%,company.ilike.%${term}%,email.ilike.%${term}%,slug.ilike.%${term}%`);
+    }
   }
 
   const { data, error, count } = await query;

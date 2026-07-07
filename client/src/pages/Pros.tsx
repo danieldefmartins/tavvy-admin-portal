@@ -92,10 +92,11 @@ export default function Pros() {
     { id: selectedProId! },
     { enabled: !!selectedProId }
   );
-  const { data: proReviews } = trpc.pros.getReviews.useQuery(
+  const { data: proReviewsData } = trpc.pros.getReviews.useQuery(
     { proId: selectedProId! },
     { enabled: !!selectedProId }
   );
+  const proReviews = proReviewsData?.items;
 
   // Mutations
   const verifyMutation = trpc.pros.verify.useMutation({

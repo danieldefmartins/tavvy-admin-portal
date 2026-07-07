@@ -5,6 +5,7 @@
  */
 
 import { supabaseAdmin as supabase } from "./supabaseAuth";
+import { escapeOrSearchTerm } from "./supabaseDb";
 
 // Pro provider interface matching actual pro_providers columns
 export interface ProProvider {
@@ -85,9 +86,12 @@ export async function getProsWithPlaces(
       .select("*", { count: "exact" });
 
     if (search) {
-      query = query.or(
-        `business_name.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,city.ilike.%${search}%`
-      );
+      const term = escapeOrSearchTerm(search);
+      if (term) {
+        query = query.or(
+          `business_name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%,city.ilike.%${term}%`
+        );
+      }
     }
 
     if (providerType) {

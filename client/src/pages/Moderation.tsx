@@ -103,13 +103,17 @@ export default function Moderation() {
 
   const { data: stats } = trpc.moderation.getStats.useQuery();
 
-  const { data: flags, isLoading: flagsLoading, refetch: refetchFlags } = trpc.moderation.getFlags.useQuery(
-    flagFilter === "all" ? undefined : { status: flagFilter }
+  const { data: flagsData, isLoading: flagsLoading, refetch: refetchFlags } = trpc.moderation.getFlags.useQuery(
+    flagFilter === "all" ? { limit: 100, offset: 0 } : { status: flagFilter, limit: 100, offset: 0 }
   );
+  const flags = flagsData?.items;
+  const flagsTotal = flagsData?.total ?? 0;
 
-  const { data: queue, isLoading: queueLoading, refetch: refetchQueue } = trpc.moderation.getQueue.useQuery(
-    queueFilter === "all" ? undefined : { status: queueFilter }
+  const { data: queueData, isLoading: queueLoading, refetch: refetchQueue } = trpc.moderation.getQueue.useQuery(
+    queueFilter === "all" ? { limit: 100, offset: 0 } : { status: queueFilter, limit: 100, offset: 0 }
   );
+  const queue = queueData?.items;
+  const queueTotal = queueData?.total ?? 0;
 
   // Filter flags client-side
   const filteredFlags = useMemo(() => {
@@ -426,7 +430,7 @@ export default function Moderation() {
               </SelectContent>
             </Select>
             <span className="text-sm text-muted-foreground">
-              Showing {filteredFlags.length} of {flags?.length || 0} flags
+              Showing {filteredFlags.length} of {flagsTotal} flags
             </span>
           </div>
 
@@ -553,7 +557,7 @@ export default function Moderation() {
               </SelectContent>
             </Select>
             <span className="text-sm text-muted-foreground">
-              Showing {filteredQueue.length} of {queue?.length || 0} items
+              Showing {filteredQueue.length} of {queueTotal} items
             </span>
           </div>
 

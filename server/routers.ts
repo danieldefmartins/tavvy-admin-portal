@@ -1874,10 +1874,12 @@ export const appRouter = router({
       .input(
         z.object({
           status: z.enum(["pending", "verified", "rejected", "expired"]).optional(),
+          limit: z.number().min(1).max(500).optional().default(100),
+          offset: z.number().min(0).optional().default(0),
         }).optional()
       )
       .query(async ({ input }) => {
-        return getBusinessClaims(input?.status);
+        return getBusinessClaims(input?.status, input?.limit ?? 100, input?.offset ?? 0);
       }),
 
     getById: adminProcedure
@@ -1979,20 +1981,24 @@ export const appRouter = router({
       .input(
         z.object({
           status: z.enum(["pending", "reviewed", "dismissed", "actioned"]).optional(),
+          limit: z.number().min(1).max(500).optional().default(100),
+          offset: z.number().min(0).optional().default(0),
         }).optional()
       )
       .query(async ({ input }) => {
-        return getContentFlags(input?.status);
+        return getContentFlags(input?.status, input?.limit ?? 100, input?.offset ?? 0);
       }),
 
     getQueue: adminProcedure
       .input(
         z.object({
           status: z.enum(["pending", "approved", "rejected"]).optional(),
+          limit: z.number().min(1).max(500).optional().default(100),
+          offset: z.number().min(0).optional().default(0),
         }).optional()
       )
       .query(async ({ input }) => {
-        return getModerationQueue(input?.status);
+        return getModerationQueue(input?.status, input?.limit ?? 100, input?.offset ?? 0);
       }),
 
     reviewFlag: adminProcedure
@@ -2091,10 +2097,12 @@ export const appRouter = router({
       .input(
         z.object({
           status: z.enum(["pending", "approved", "rejected"]).optional(),
+          limit: z.number().min(1).max(500).optional().default(100),
+          offset: z.number().min(0).optional().default(0),
         }).optional()
       )
       .query(async ({ input }) => {
-        return getPlaceOverrides(input?.status);
+        return getPlaceOverrides(input?.status, input?.limit ?? 100, input?.offset ?? 0);
       }),
 
     create: adminProcedure
@@ -2166,9 +2174,13 @@ export const appRouter = router({
       }),
 
     getRoles: adminProcedure
-      .input(z.object({ userId: z.string() }))
+      .input(z.object({
+        userId: z.string(),
+        limit: z.number().min(1).max(500).optional().default(100),
+        offset: z.number().min(0).optional().default(0),
+      }))
       .query(async ({ input }) => {
-        return getUserRoles(input.userId);
+        return getUserRoles(input.userId, input.limit, input.offset);
       }),
 
     addRole: adminProcedure
@@ -2211,9 +2223,13 @@ export const appRouter = router({
       }),
 
     getStrikes: adminProcedure
-      .input(z.object({ userId: z.string() }))
+      .input(z.object({
+        userId: z.string(),
+        limit: z.number().min(1).max(500).optional().default(100),
+        offset: z.number().min(0).optional().default(0),
+      }))
       .query(async ({ input }) => {
-        return getUserStrikes(input.userId);
+        return getUserStrikes(input.userId, input.limit, input.offset);
       }),
 
     addStrike: adminProcedure
@@ -2507,9 +2523,13 @@ export const appRouter = router({
       }),
 
     getReviews: adminProcedure
-      .input(z.object({ proId: z.string() }))
+      .input(z.object({
+        proId: z.string(),
+        limit: z.number().min(1).max(500).optional().default(100),
+        offset: z.number().min(0).optional().default(0),
+      }))
       .query(async ({ input }) => {
-        return getProReviews(input.proId);
+        return getProReviews(input.proId, input.limit, input.offset);
       }),
 
     getStats: adminProcedure.query(async () => {
