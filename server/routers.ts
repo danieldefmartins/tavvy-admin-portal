@@ -1,4 +1,4 @@
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, adminProcedure, router, isUserSuperAdmin } from "./_core/trpc";
 import {
   searchPlacesTypesense,
   getAutocompleteSuggestions,
@@ -271,31 +271,6 @@ import {
 // Cookie name for Supabase auth token
 const AUTH_COOKIE_NAME = "tavvy_auth_token";
 
-// Helper function to check if user has super_admin role via database
-// This replaces the hardcoded SUPER_ADMIN_EMAILS array with RBAC
-async function isUserSuperAdmin(userId: string): Promise<boolean> {
-  if (!userId) return false;
-  
-  try {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('role', 'super_admin')
-      .or('expires_at.is.null,expires_at.gt.now()')
-      .maybeSingle();
-    
-    if (error) {
-      console.error('[Auth] Error checking admin role:', error);
-      return false;
-    }
-    
-    return !!data;
-  } catch (err) {
-    console.error('[Auth] Exception checking admin role:', err);
-    return false;
-  }
-}
 
 // Version for deployment verification
 const BUILD_VERSION = '2026-01-26-fsq-search-fix';
@@ -526,7 +501,7 @@ export const appRouter = router({
     }),
 
     // Get all active sessions for the current user
-    getSessions: protectedProcedure.query(async ({ ctx }) => {
+    getSessions: adminProcedure.query(async ({ ctx }) => {
       if (!ctx.user?.id) return [];
       const sessions = await getUserSessions(ctx.user.id);
       return sessions.map(s => ({
@@ -540,7 +515,7 @@ export const appRouter = router({
     }),
 
     // Logout from all devices
-    logoutAll: protectedProcedure.mutation(async ({ ctx }) => {
+    logoutAll: adminProcedure.mutation(async ({ ctx }) => {
       if (!ctx.user?.id) return { success: false, count: 0 };
       // Revoke all sessions and refresh tokens
       const sessionCount = await revokeAllUserSessions(ctx.user.id, 'user_logout_all');
@@ -552,7 +527,7 @@ export const appRouter = router({
     }),
 
     // Get security anomalies (super admin only)
-    getAnomalies: protectedProcedure
+    getAnomalies: adminProcedure
       .input(z.object({ limit: z.number().min(1).max(100).default(50) }).optional())
       .query(async ({ input }) => {
         const anomalies = await getUnacknowledgedAnomalies(input?.limit || 50);
@@ -560,7 +535,7 @@ export const appRouter = router({
       }),
 
     // Acknowledge a security anomaly
-    acknowledgeAnomaly: protectedProcedure
+    acknowledgeAnomaly: adminProcedure
       .input(z.object({ anomalyId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user?.id) return { success: false };
@@ -571,7 +546,7 @@ export const appRouter = router({
 
   // Debug router - for testing connections
   debug: router({
-    testDbConnection: protectedProcedure.query(async () => {
+    testDbConnection: adminProcedure.query(async () => {
       console.log("[Debug] Testing database connection...");
       const result = await testConnection();
       console.log("[Debug] Connection test result:", result);
@@ -581,7 +556,7 @@ export const appRouter = router({
 
   // Places router - search and manage places from Supabase
   places: router({
-    search: protectedProcedure
+    search: adminProcedure
       .input(
         z.object({
           query: z.string().min(1),
@@ -620,24 +595,24 @@ export const appRouter = router({
         return searchPlaces(input.query, input.limit, input.offset);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         return getPlaceById(input.id);
       }),
 
-    getCount: protectedProcedure.query(async () => {
+    getCount: adminProcedure.query(async () => {
       return getPlacesCount();
     }),
 
-    getSignals: protectedProcedure
+    getSignals: adminProcedure
       .input(z.object({ placeId: z.string() }))
       .query(async ({ input }) => {
         return getPlaceSignalAggregates(input.placeId);
       }),
 
     // Advanced search with filters
-    advancedSearch: protectedProcedure
+    advancedSearch: adminProcedure
       .input(
         z.object({
           filters: z.object({
@@ -657,31 +632,31 @@ export const appRouter = router({
       }),
 
     // Get distinct countries for dropdown
-    getCountries: protectedProcedure.query(async () => {
+    getCountries: adminProcedure.query(async () => {
       return getDistinctCountries();
     }),
 
     // Get distinct regions/states for dropdown
-    getRegions: protectedProcedure
+    getRegions: adminProcedure
       .input(z.object({ country: z.string().optional() }))
       .query(async ({ input }) => {
         return getDistinctRegions(input.country);
       }),
 
     // Get distinct cities for dropdown
-    getCities: protectedProcedure
+    getCities: adminProcedure
       .input(z.object({ country: z.string().optional(), region: z.string().optional() }))
       .query(async ({ input }) => {
         return getDistinctCities(input.country, input.region);
       }),
 
     // Get distinct categories for dropdown
-    getCategories: protectedProcedure.query(async () => {
+    getCategories: adminProcedure.query(async () => {
       return getDistinctCategories();
     }),
 
     // Search fsq_places_raw - name required, location filters optional
-    searchFsq: protectedProcedure
+    searchFsq: adminProcedure
       .input(
         z.object({
           name: z.string().min(2), // Required - at least 2 characters
@@ -706,21 +681,21 @@ export const appRouter = router({
       }),
 
     // Get regions from fsq_places_raw for a specific country
-    getFsqRegions: protectedProcedure
+    getFsqRegions: adminProcedure
       .input(z.object({ country: z.string().min(1) }))
       .query(async ({ input }) => {
         return getFsqRegions(input.country);
       }),
 
     // Get cities from fsq_places_raw for a specific country/region
-    getFsqCities: protectedProcedure
+    getFsqCities: adminProcedure
       .input(z.object({ country: z.string().min(1), region: z.string().optional() }))
       .query(async ({ input }) => {
         return getFsqCities(input.country, input.region);
       }),
 
     // Typesense-specific endpoints
-    autocomplete: protectedProcedure
+    autocomplete: adminProcedure
       .input(
         z.object({
           query: z.string().min(2),
@@ -731,11 +706,11 @@ export const appRouter = router({
         return getAutocompleteSuggestions(input.query, input.limit);
       }),
 
-    typesenseStats: protectedProcedure.query(async () => {
+    typesenseStats: adminProcedure.query(async () => {
       return getTypesenseStats();
     }),
 
-    typesenseHealth: protectedProcedure.query(async () => {
+    typesenseHealth: adminProcedure.query(async () => {
       return typesenseHealthCheck();
     }),
   }),
@@ -744,12 +719,12 @@ export const appRouter = router({
   tavvyPlaces: router({
     
     // Get tavvy categories for dropdown
-    getTavvyCategories: protectedProcedure.query(async () => {
+    getTavvyCategories: adminProcedure.query(async () => {
       return getTavvyCategories();
     }),
 
     // Create a new tavvy place
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           name: z.string().min(1, "Name is required").max(200),
@@ -808,7 +783,7 @@ export const appRouter = router({
       }),
 
     // Get all tavvy places (paginated)
-    getTavvyPlaces: protectedProcedure
+    getTavvyPlaces: adminProcedure
       .input(
         z.object({
           limit: z.number().min(1).max(5000).default(100),
@@ -822,7 +797,7 @@ export const appRouter = router({
       }),
 
     // Get a single tavvy place by ID
-    getTavvyPlace: protectedProcedure
+    getTavvyPlace: adminProcedure
       .input(z.object({ id: z.string().uuid() }))
       .query(async ({ input }) => {
         const place = await getTavvyPlaceById(input.id);
@@ -836,7 +811,7 @@ export const appRouter = router({
       }),
 
     // Update a tavvy place
-    updateTavvyPlace: protectedProcedure
+    updateTavvyPlace: adminProcedure
       .input(
         z.object({
           id: z.string().uuid(),
@@ -888,7 +863,7 @@ export const appRouter = router({
       }),
 
     // Delete a tavvy place (soft delete)
-    deleteTavvyPlace: protectedProcedure
+    deleteTavvyPlace: adminProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const userId = ctx.user?.id;
@@ -913,11 +888,11 @@ export const appRouter = router({
 
   // Signals router - get signal definitions
   signals: router({
-    getAll: protectedProcedure.query(async () => {
+    getAll: adminProcedure.query(async () => {
       return getAllReviewItems();
     }),
 
-    getByType: protectedProcedure
+    getByType: adminProcedure
       .input(z.object({ type: z.enum(["best_for", "vibe", "heads_up"]) }))
       .query(async ({ input }) => {
         return getReviewItemsByType(input.type);
@@ -926,7 +901,7 @@ export const appRouter = router({
 
   // Reviews router - submit reviews
   reviews: router({
-    submitQuick: protectedProcedure
+    submitQuick: adminProcedure
       .input(
         z.object({
           placeId: z.string(),
@@ -970,7 +945,7 @@ export const appRouter = router({
         return result;
       }),
 
-    batchImport: protectedProcedure
+    batchImport: adminProcedure
       .input(
         z.object({
           reviews: z.array(
@@ -1049,7 +1024,7 @@ export const appRouter = router({
 
   // GoHighLevel sync router
   ghl: router({
-    syncContact: publicProcedure
+    syncContact: adminProcedure
       .input(
         z.object({
           email: z.string().email(),
@@ -1080,12 +1055,12 @@ export const appRouter = router({
 
   // Rep stats router
   stats: router({
-    getMyStats: protectedProcedure.query(async ({ ctx }) => {
+    getMyStats: adminProcedure.query(async ({ ctx }) => {
       const userId = ctx.user?.id || ctx.user?.openId || "anonymous";
       return getRepStats(userId);
     }),
 
-    getActivityLog: protectedProcedure
+    getActivityLog: adminProcedure
       .input(
         z
           .object({
@@ -1107,7 +1082,7 @@ export const appRouter = router({
           .limit(50);
       }),
 
-    getBatchJobs: protectedProcedure.query(async ({ ctx }) => {
+    getBatchJobs: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
 
@@ -1124,19 +1099,19 @@ export const appRouter = router({
 
   // ============ ARTICLES ROUTER ============
   articles: router({
-    getAll: protectedProcedure.query(async () => {
+    getAll: adminProcedure.query(async () => {
       return getAllArticles();
     }),
 
-    getCategories: protectedProcedure.query(async () => {
+    getCategories: adminProcedure.query(async () => {
       return getArticleCategories();
     }),
 
-    getUniverses: protectedProcedure.query(async () => {
+    getUniverses: adminProcedure.query(async () => {
       return getAllUniverses();
     }),
 
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           title: z.string().min(1),
@@ -1175,7 +1150,7 @@ export const appRouter = router({
         return { id };
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -1205,7 +1180,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
         const success = await deleteArticle(input.id);
@@ -1218,7 +1193,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    bulkImport: protectedProcedure
+    bulkImport: adminProcedure
       .input(
         z.object({
           articles: z.array(z.object({
@@ -1246,11 +1221,11 @@ export const appRouter = router({
 
   // ============ CITIES ROUTER ============
   cities: router({
-    getAll: protectedProcedure.query(async () => {
+    getAll: adminProcedure.query(async () => {
       return getAllCities();
     }),
 
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -1308,7 +1283,7 @@ export const appRouter = router({
         return { id };
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -1356,7 +1331,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
         const success = await deleteCity(input.id);
@@ -1372,7 +1347,7 @@ export const appRouter = router({
 
   // ============ UNIVERSES ROUTER ============
   universes: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           type: z.enum(['all', 'universes', 'planets']).optional().default('universes'),
@@ -1383,11 +1358,11 @@ export const appRouter = router({
         return getUniverses(input);
       }),
 
-    getCategories: protectedProcedure.query(async () => {
+    getCategories: adminProcedure.query(async () => {
       return getUniverseCategories();
     }),
 
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -1427,7 +1402,7 @@ export const appRouter = router({
         return { id };
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -1463,7 +1438,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
         const success = await deleteUniverse(input.id);
@@ -1477,7 +1452,7 @@ export const appRouter = router({
       }),
 
     // Get a single universe by ID
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         const universe = await getUniverseById(input.id);
@@ -1491,13 +1466,13 @@ export const appRouter = router({
       }),
 
     // ============ PLANETS (Child Universes) ============
-    getPlanets: protectedProcedure
+    getPlanets: adminProcedure
       .input(z.object({ universeId: z.string() }))
       .query(async ({ input }) => {
         return getPlanetsByUniverse(input.universeId);
       }),
 
-    createPlanet: protectedProcedure
+    createPlanet: adminProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -1526,7 +1501,7 @@ export const appRouter = router({
         return { id };
       }),
 
-    updatePlanet: protectedProcedure
+    updatePlanet: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -1550,7 +1525,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    deletePlanet: protectedProcedure
+    deletePlanet: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
         const success = await deletePlanet(input.id);
@@ -1564,13 +1539,13 @@ export const appRouter = router({
       }),
 
     // ============ UNIVERSE PLACES ============
-    getPlaces: protectedProcedure
+    getPlaces: adminProcedure
       .input(z.object({ universeId: z.string() }))
       .query(async ({ input }) => {
         return getUniversePlaces(input.universeId);
       }),
 
-    linkPlace: protectedProcedure
+    linkPlace: adminProcedure
       .input(
         z.object({
           universeId: z.string(),
@@ -1591,7 +1566,7 @@ export const appRouter = router({
         return result;
       }),
 
-    unlinkPlace: protectedProcedure
+    unlinkPlace: adminProcedure
       .input(
         z.object({
           universeId: z.string(),
@@ -1609,7 +1584,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    searchPlaces: protectedProcedure
+    searchPlaces: adminProcedure
       .input(
         z.object({
           query: z.string().min(1),
@@ -1621,7 +1596,7 @@ export const appRouter = router({
         return searchPlacesForLinking(input.query, input.limit, input.excludeUniverseId);
       }),
 
-    updatePlaceOrder: protectedProcedure
+    updatePlaceOrder: adminProcedure
       .input(
         z.object({
           universeId: z.string(),
@@ -1644,7 +1619,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    togglePlaceFeatured: protectedProcedure
+    togglePlaceFeatured: adminProcedure
       .input(
         z.object({
           universeId: z.string(),
@@ -1668,13 +1643,13 @@ export const appRouter = router({
       }),
 
     // ============ UNIVERSE RIDES ============
-    getRides: protectedProcedure
+    getRides: adminProcedure
       .input(z.object({ universeId: z.string() }))
       .query(async ({ input }) => {
         return getUniverseRides(input.universeId);
       }),
 
-    linkRide: protectedProcedure
+    linkRide: adminProcedure
       .input(
         z.object({
           universeId: z.string(),
@@ -1695,7 +1670,7 @@ export const appRouter = router({
         return result;
       }),
 
-    unlinkRide: protectedProcedure
+    unlinkRide: adminProcedure
       .input(
         z.object({
           universeId: z.string(),
@@ -1713,7 +1688,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    searchRides: protectedProcedure
+    searchRides: adminProcedure
       .input(
         z.object({
           query: z.string().min(1),
@@ -1725,7 +1700,7 @@ export const appRouter = router({
         return searchRidesForLinking(input.query, input.limit, input.excludeUniverseId);
       }),
 
-    toggleRideFeatured: protectedProcedure
+    toggleRideFeatured: adminProcedure
       .input(
         z.object({
           universeId: z.string(),
@@ -1751,7 +1726,7 @@ export const appRouter = router({
 
   // ============ RIDES ROUTER ============
   rides: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           status: z.string().optional(),
@@ -1763,7 +1738,7 @@ export const appRouter = router({
         return getAllRides(input);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         const ride = await getRideById(input.id);
@@ -1776,7 +1751,7 @@ export const appRouter = router({
         return ride;
       }),
 
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -1836,7 +1811,7 @@ export const appRouter = router({
         return { id };
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -1879,7 +1854,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
         const success = await deleteRide(input.id);
@@ -1895,7 +1870,7 @@ export const appRouter = router({
 
   // ============ BUSINESS CLAIMS ROUTER ============
   businessClaims: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           status: z.enum(["pending", "verified", "rejected", "expired"]).optional(),
@@ -1905,7 +1880,7 @@ export const appRouter = router({
         return getBusinessClaims(input?.status);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         const claim = await getBusinessClaimById(input.id);
@@ -1918,7 +1893,7 @@ export const appRouter = router({
         return claim;
       }),
 
-    approve: protectedProcedure
+    approve: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -1932,7 +1907,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    reject: protectedProcedure
+    reject: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -1949,7 +1924,7 @@ export const appRouter = router({
 
   // ============ BADGE CREDENTIALS ROUTER ============
   badgeCredentials: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           status: z.string().optional(),
@@ -1965,11 +1940,11 @@ export const appRouter = router({
         );
       }),
 
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getBadgeCredentialStats();
     }),
 
-    approve: protectedProcedure
+    approve: adminProcedure
       .input(z.object({ cardId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -1983,7 +1958,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    reject: protectedProcedure
+    reject: adminProcedure
       .input(z.object({ cardId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2000,7 +1975,7 @@ export const appRouter = router({
 
   // ============ MODERATION ROUTER ============
   moderation: router({
-    getFlags: protectedProcedure
+    getFlags: adminProcedure
       .input(
         z.object({
           status: z.enum(["pending", "reviewed", "dismissed", "actioned"]).optional(),
@@ -2010,7 +1985,7 @@ export const appRouter = router({
         return getContentFlags(input?.status);
       }),
 
-    getQueue: protectedProcedure
+    getQueue: adminProcedure
       .input(
         z.object({
           status: z.enum(["pending", "approved", "rejected"]).optional(),
@@ -2020,7 +1995,7 @@ export const appRouter = router({
         return getModerationQueue(input?.status);
       }),
 
-    reviewFlag: protectedProcedure
+    reviewFlag: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2039,7 +2014,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    reviewQueueItem: protectedProcedure
+    reviewQueueItem: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2064,14 +2039,14 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getModerationStats();
     }),
   }),
 
   // ============ AUDIT LOG ROUTER ============
   auditLog: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().min(1).max(500).default(100),
@@ -2082,7 +2057,7 @@ export const appRouter = router({
         return getAdminActivityLog(input?.limit || 100, input?.adminId);
       }),
 
-    log: protectedProcedure
+    log: adminProcedure
       .input(
         z.object({
           actionType: z.string(),
@@ -2112,7 +2087,7 @@ export const appRouter = router({
 
   // ============ PLACE OVERRIDES ROUTER ============
   overrides: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           status: z.enum(["pending", "approved", "rejected"]).optional(),
@@ -2122,7 +2097,7 @@ export const appRouter = router({
         return getPlaceOverrides(input?.status);
       }),
 
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           placeId: z.string(),
@@ -2149,7 +2124,7 @@ export const appRouter = router({
         return { id };
       }),
 
-    review: protectedProcedure
+    review: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2171,7 +2146,7 @@ export const appRouter = router({
 
   // ============ USER MANAGEMENT ============
   users: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -2184,19 +2159,19 @@ export const appRouter = router({
         return getUsers(limit, offset, search);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         return getUserById(input.id);
       }),
 
-    getRoles: protectedProcedure
+    getRoles: adminProcedure
       .input(z.object({ userId: z.string() }))
       .query(async ({ input }) => {
         return getUserRoles(input.userId);
       }),
 
-    addRole: protectedProcedure
+    addRole: adminProcedure
       .input(
         z.object({
           userId: z.string(),
@@ -2216,7 +2191,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    removeRole: protectedProcedure
+    removeRole: adminProcedure
       .input(
         z.object({
           userId: z.string(),
@@ -2235,13 +2210,13 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    getStrikes: protectedProcedure
+    getStrikes: adminProcedure
       .input(z.object({ userId: z.string() }))
       .query(async ({ input }) => {
         return getUserStrikes(input.userId);
       }),
 
-    addStrike: protectedProcedure
+    addStrike: adminProcedure
       .input(
         z.object({
           userId: z.string(),
@@ -2268,7 +2243,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    removeStrike: protectedProcedure
+    removeStrike: adminProcedure
       .input(z.object({ strikeId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2282,13 +2257,13 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    getGamification: protectedProcedure
+    getGamification: adminProcedure
       .input(z.object({ userId: z.string() }))
       .query(async ({ input }) => {
         return getUserGamification(input.userId);
       }),
 
-    block: protectedProcedure
+    block: adminProcedure
       .input(z.object({ userId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2302,7 +2277,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    unblock: protectedProcedure
+    unblock: adminProcedure
       .input(z.object({ userId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2316,17 +2291,17 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    isBlocked: protectedProcedure
+    isBlocked: adminProcedure
       .input(z.object({ userId: z.string() }))
       .query(async ({ input }) => {
         return isUserBlocked(input.userId);
       }),
 
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getUserStats();
     }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           userId: z.string(),
@@ -2343,7 +2318,7 @@ export const appRouter = router({
         return updateUser(input.userId, input.data);
       }),
 
-    updateEmail: protectedProcedure
+    updateEmail: adminProcedure
       .input(
         z.object({
           userId: z.string(),
@@ -2354,7 +2329,7 @@ export const appRouter = router({
         return updateUserEmail(input.userId, input.email);
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ userId: z.string() }))
       .mutation(async ({ input }) => {
         return deleteUser(input.userId);
@@ -2363,7 +2338,7 @@ export const appRouter = router({
 
   // ============ PRO PROVIDERS MANAGEMENT ============
   pros: router({
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           user_id: z.string().optional(),
@@ -2403,7 +2378,7 @@ export const appRouter = router({
         return result;
       }),
 
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -2419,13 +2394,13 @@ export const appRouter = router({
         return getProsWithPlaces(limit, offset, search, providerType, isVerified, isActive);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         return getProWithPlaceById(input.id);
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2444,7 +2419,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    verify: protectedProcedure
+    verify: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2458,7 +2433,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    unverify: protectedProcedure
+    unverify: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2472,7 +2447,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    activate: protectedProcedure
+    activate: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2486,7 +2461,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    deactivate: protectedProcedure
+    deactivate: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2500,7 +2475,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    feature: protectedProcedure
+    feature: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2514,7 +2489,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    unfeature: protectedProcedure
+    unfeature: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2528,24 +2503,24 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    getReviews: protectedProcedure
+    getReviews: adminProcedure
       .input(z.object({ proId: z.string() }))
       .query(async ({ input }) => {
         return getProReviews(input.proId);
       }),
 
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getProStatsNew();
     }),
 
-    getProviderTypes: protectedProcedure.query(async () => {
+    getProviderTypes: adminProcedure.query(async () => {
       return getDistinctProviderTypesNew();
     }),
   }),
 
   // ============ STORY MODERATION ============
   stories: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -2559,19 +2534,19 @@ export const appRouter = router({
         return getStories(limit, offset, status, hasReports);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         return getStoryById(input.id);
       }),
 
-    getReports: protectedProcedure
+    getReports: adminProcedure
       .input(z.object({ storyId: z.string() }))
       .query(async ({ input }) => {
         return getStoryReports(input.storyId);
       }),
 
-    getReported: protectedProcedure
+    getReported: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -2583,7 +2558,7 @@ export const appRouter = router({
         return getReportedStories(limit, offset);
       }),
 
-    updateStatus: protectedProcedure
+    updateStatus: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2602,7 +2577,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2616,7 +2591,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    dismissReports: protectedProcedure
+    dismissReports: adminProcedure
       .input(z.object({ storyId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2630,14 +2605,14 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getStoryStats();
     }),
   }),
 
   // ============ PHOTO MODERATION ============
   photos: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -2651,19 +2626,19 @@ export const appRouter = router({
         return getPhotos(limit, offset, status, isFlagged);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         return getPhotoById(input.id);
       }),
 
-    getReports: protectedProcedure
+    getReports: adminProcedure
       .input(z.object({ photoId: z.string() }))
       .query(async ({ input }) => {
         return getPhotoReports(input.photoId);
       }),
 
-    getReported: protectedProcedure
+    getReported: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -2675,7 +2650,7 @@ export const appRouter = router({
         return getReportedPhotos(limit, offset);
       }),
 
-    getFlagged: protectedProcedure
+    getFlagged: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -2687,7 +2662,7 @@ export const appRouter = router({
         return getFlaggedPhotos(limit, offset);
       }),
 
-    updateStatus: protectedProcedure
+    updateStatus: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2706,7 +2681,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    approve: protectedProcedure
+    approve: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2720,7 +2695,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    reject: protectedProcedure
+    reject: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2739,7 +2714,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2753,7 +2728,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    setCover: protectedProcedure
+    setCover: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2772,7 +2747,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    dismissReports: protectedProcedure
+    dismissReports: adminProcedure
       .input(z.object({ photoId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2786,14 +2761,14 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getPhotoStats();
     }),
   }),
 
   // ============ REVIEW MODERATION ============
   reviewModeration: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -2808,19 +2783,19 @@ export const appRouter = router({
         return getReviews(limit, offset, status, minRating, maxRating);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         return getReviewById(input.id);
       }),
 
-    getReports: protectedProcedure
+    getReports: adminProcedure
       .input(z.object({ reviewId: z.string() }))
       .query(async ({ input }) => {
         return getReviewReports(input.reviewId);
       }),
 
-    getReported: protectedProcedure
+    getReported: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -2832,7 +2807,7 @@ export const appRouter = router({
         return getReportedReviews(limit, offset);
       }),
 
-    getFlagged: protectedProcedure
+    getFlagged: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -2844,7 +2819,7 @@ export const appRouter = router({
         return getFlaggedReviews(limit, offset);
       }),
 
-    updateStatus: protectedProcedure
+    updateStatus: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2863,7 +2838,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    approve: protectedProcedure
+    approve: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2877,7 +2852,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    reject: protectedProcedure
+    reject: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2896,7 +2871,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2910,7 +2885,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    dismissReports: protectedProcedure
+    dismissReports: adminProcedure
       .input(z.object({ reviewId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -2924,14 +2899,14 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getReviewStats();
     }),
   }),
 
   // ============ PLACE EDITING ============
   placeEdit: router({
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -2967,7 +2942,7 @@ export const appRouter = router({
         return { success: true, placeId: result.placeId };
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -2987,7 +2962,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -3001,13 +2976,13 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    getForEdit: protectedProcedure
+    getForEdit: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         return getPlaceForEdit(input.id);
       }),
 
-    verify: protectedProcedure
+    verify: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -3021,7 +2996,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    unverify: protectedProcedure
+    unverify: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -3035,7 +3010,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    feature: protectedProcedure
+    feature: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -3049,7 +3024,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    unfeature: protectedProcedure
+    unfeature: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -3063,7 +3038,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    activate: protectedProcedure
+    activate: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -3077,7 +3052,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    deactivate: protectedProcedure
+    deactivate: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -3091,20 +3066,20 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    getPhotos: protectedProcedure
+    getPhotos: adminProcedure
       .input(z.object({ placeId: z.string() }))
       .query(async ({ input }) => {
         return getPlacePhotosForEdit(input.placeId);
       }),
 
-    getCategories: protectedProcedure.query(async () => {
+    getCategories: adminProcedure.query(async () => {
       return getDistinctCategories();
     }),
   }),
 
   // ============ VERIFICATION SYNC ============
   verificationSync: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({ status: z.string().optional() }).optional()
       )
@@ -3112,11 +3087,11 @@ export const appRouter = router({
         return getVerifications(input?.status);
       }),
 
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getVerificationStats();
     }),
 
-    approve: protectedProcedure
+    approve: adminProcedure
       .input(
         z.object({
           verificationId: z.string(),
@@ -3148,7 +3123,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    reject: protectedProcedure
+    reject: adminProcedure
       .input(
         z.object({
           verificationId: z.string(),
@@ -3173,7 +3148,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    syncToProvider: protectedProcedure
+    syncToProvider: adminProcedure
       .input(
         z.object({
           userId: z.string(),
@@ -3204,7 +3179,7 @@ export const appRouter = router({
 
   // ============ PLACE OVERRIDES ============
   placeOverrides: router({
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().optional().default(50),
@@ -3217,7 +3192,7 @@ export const appRouter = router({
         return getPlaceOverridesAdmin(limit, offset, placeId);
       }),
 
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           placeId: z.string(),
@@ -3246,7 +3221,7 @@ export const appRouter = router({
         return { success: true, overrideId: result.overrideId };
       }),
 
-    revert: protectedProcedure
+    revert: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -3260,7 +3235,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
@@ -3277,7 +3252,7 @@ export const appRouter = router({
 
   // Drafts router - manage content drafts for Universal Add
   drafts: router({
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           latitude: z.number(),
@@ -3307,7 +3282,7 @@ export const appRouter = router({
         }
         return draft;
       }),
-    get: protectedProcedure
+    get: adminProcedure
       .input(z.object({ id: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
         const userId = ctx.user?.id;
@@ -3320,14 +3295,14 @@ export const appRouter = router({
         }
         return draft;
       }),
-    getActive: protectedProcedure.query(async ({ ctx }) => {
+    getActive: adminProcedure.query(async ({ ctx }) => {
       const userId = ctx.user?.id;
       if (!userId) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
       return await getActiveDraft(userId);
     }),
-    list: protectedProcedure
+    list: adminProcedure
       .input(
         z.object({
           limit: z.number().min(1).max(5000).default(100),
@@ -3341,7 +3316,7 @@ export const appRouter = router({
         }
         return await getUserDrafts(userId, input?.limit || 50, input?.offset || 0);
       }),
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string().uuid(),
@@ -3378,7 +3353,7 @@ export const appRouter = router({
         }
         return draft;
       }),
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const userId = ctx.user?.id;
@@ -3394,7 +3369,7 @@ export const appRouter = router({
         }
         return { success: true };
       }),
-    snooze: protectedProcedure
+    snooze: adminProcedure
       .input(
         z.object({
           id: z.string().uuid(),
@@ -3415,7 +3390,7 @@ export const appRouter = router({
         }
         return draft;
       }),
-    submit: protectedProcedure
+    submit: adminProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const userId = ctx.user?.id;
@@ -3431,14 +3406,14 @@ export const appRouter = router({
         }
         return result;
       }),
-    getPendingOffline: protectedProcedure.query(async ({ ctx }) => {
+    getPendingOffline: adminProcedure.query(async ({ ctx }) => {
       const userId = ctx.user?.id;
       if (!userId) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
       return await getPendingOfflineDrafts(userId);
     }),
-    markSynced: protectedProcedure
+    markSynced: adminProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const userId = ctx.user?.id;
@@ -3458,11 +3433,11 @@ export const appRouter = router({
 
   // ============ DIGITAL CARDS (eCards) ADMIN ============
   digitalCards: router({
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getDigitalCardStats();
     }),
 
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().min(1).max(500).default(50),
@@ -3474,7 +3449,7 @@ export const appRouter = router({
         return getDigitalCards(input?.limit || 50, input?.offset || 0, input?.search);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         const card = await getDigitalCardById(input.id);
@@ -3484,13 +3459,13 @@ export const appRouter = router({
         return card;
       }),
 
-    getLinks: protectedProcedure
+    getLinks: adminProcedure
       .input(z.object({ cardId: z.string() }))
       .query(async ({ input }) => {
         return getDigitalCardLinks(input.cardId);
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -3505,7 +3480,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
         const success = await deleteDigitalCard(input.id);
@@ -3518,11 +3493,11 @@ export const appRouter = router({
 
   // ============ EVENTS ADMIN ============
   events: router({
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getEventStats();
     }),
 
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().min(1).max(500).default(50),
@@ -3534,7 +3509,7 @@ export const appRouter = router({
         return getEvents(input?.limit || 50, input?.offset || 0, input?.status);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         const event = await getEventById(input.id);
@@ -3544,7 +3519,7 @@ export const appRouter = router({
         return event;
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -3559,7 +3534,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
         const success = await deleteEvent(input.id);
@@ -3572,11 +3547,11 @@ export const appRouter = router({
 
   // ============ LIVE SESSIONS ADMIN ============
   liveSessions: router({
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getLiveSessionStats();
     }),
 
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().min(1).max(500).default(50),
@@ -3588,7 +3563,7 @@ export const appRouter = router({
         return getLiveSessions(input?.limit || 50, input?.offset || 0, input?.status);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         const session = await getLiveSessionById(input.id);
@@ -3598,7 +3573,7 @@ export const appRouter = router({
         return session;
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string(),
@@ -3613,7 +3588,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    end: protectedProcedure
+    end: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
         const success = await endLiveSession(input.id);
@@ -3626,11 +3601,11 @@ export const appRouter = router({
 
   // ============ LEADS / PROJECT REQUESTS ADMIN ============
   leads: router({
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
       return getLeadsStats();
     }),
 
-    getAll: protectedProcedure
+    getAll: adminProcedure
       .input(
         z.object({
           limit: z.number().min(1).max(500).default(50),
@@ -3642,7 +3617,7 @@ export const appRouter = router({
         return getProjectRequests(input?.limit || 50, input?.offset || 0, input?.status);
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         const request = await getProjectRequestById(input.id);
@@ -3652,13 +3627,13 @@ export const appRouter = router({
         return request;
       }),
 
-    getBids: protectedProcedure
+    getBids: adminProcedure
       .input(z.object({ requestId: z.string() }))
       .query(async ({ input }) => {
         return getProjectBids(input.requestId);
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.string(),

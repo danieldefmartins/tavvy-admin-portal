@@ -40,28 +40,6 @@ export async function signInWithEmail(email: string, password: string) {
   return { user: data.user, session: data.session, error: null };
 }
 
-export async function signUpWithEmail(
-  email: string,
-  password: string,
-  fullName: string
-) {
-  const { data, error } = await supabaseAuth.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName,
-      },
-    },
-  });
-
-  if (error) {
-    return { user: null, session: null, error: error.message };
-  }
-
-  return { user: data.user, session: data.session, error: null };
-}
-
 export async function verifySupabaseToken(token: string) {
   const {
     data: { user },

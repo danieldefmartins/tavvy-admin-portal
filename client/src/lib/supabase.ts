@@ -41,22 +41,6 @@ export async function signInWithEmail(email: string, password: string) {
   return { data, error };
 }
 
-export async function signUpWithEmail(
-  email: string,
-  password: string,
-  metadata?: Record<string, any>
-) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: metadata,
-      emailRedirectTo: `${window.location.origin}/dashboard`,
-    },
-  });
-  return { data, error };
-}
-
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   return { error };

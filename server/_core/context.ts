@@ -32,6 +32,8 @@ export async function createContext({
     req,
     res,
     user,
+    // Per-request cache for the super_admin role check (set by adminProcedure)
+    isSuperAdmin: undefined as boolean | undefined,
   };
 }
 

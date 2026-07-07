@@ -77,35 +77,7 @@ describe("Auth Helper Functions", () => {
     expect(result.error.message).toBe("Invalid login credentials");
   });
 
-  it("should export signUpWithEmail function", async () => {
-    const mockSignUp = vi.fn().mockResolvedValue({
-      data: { 
-        user: { id: "456", email: "new@example.com" },
-        session: null 
-      },
-      error: null,
-    });
 
-    const result = await mockSignUp("new@example.com", "password123", { full_name: "New User" });
-    
-    expect(result.data).toBeDefined();
-    expect(result.data.user).toBeDefined();
-    expect(result.data.user.email).toBe("new@example.com");
-    expect(result.error).toBeNull();
-  });
-
-  it("should handle sign up with existing email", async () => {
-    const mockSignUp = vi.fn().mockResolvedValue({
-      data: { user: null, session: null },
-      error: { message: "User already registered" },
-    });
-
-    const result = await mockSignUp("existing@example.com", "password123");
-    
-    expect(result.data.user).toBeNull();
-    expect(result.error).toBeDefined();
-    expect(result.error.message).toBe("User already registered");
-  });
 
   it("should export signOut function", async () => {
     const mockSignOut = vi.fn().mockResolvedValue({

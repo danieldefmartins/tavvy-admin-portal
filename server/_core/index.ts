@@ -130,10 +130,12 @@ app.set('trust proxy', 1);
 // Middleware
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, Postman, etc.)
-    // These requests are authenticated via JWT in Authorization header, not cookies
+    // Requests with no Origin header (curl, health checks, server-to-server)
+    // are NOT granted any CORS headers. The request itself still proceeds
+    // (CORS only gates browser cross-origin access), and every data endpoint
+    // independently enforces super_admin auth, so nothing is bypassed here.
     if (!origin) {
-      return callback(null, true);
+      return callback(null, false);
     }
     
     // Check if origin is in allowlist
