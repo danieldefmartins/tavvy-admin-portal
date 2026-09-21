@@ -82,9 +82,10 @@ export default function Login() {
   // Forgot Password View
   if (showForgotPassword) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-        <Card className="w-full max-w-md bg-slate-800/50 border-slate-700">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#120D1C] via-[#21172E] to-[#120D1C] p-4">
+        <Card className="w-full max-w-md bg-card/80 border-border backdrop-blur">
           <CardHeader className="text-center">
+            <img src="/tavvy-logo-horizontal-white.png" alt="Tavvy" className="h-8 w-auto object-contain mx-auto mb-6" />
             <div className="mx-auto mb-4 p-3 bg-brand-500/10 rounded-full w-fit">
               <Mail className="h-8 w-8 text-brand-500" />
             </div>
@@ -174,13 +175,11 @@ export default function Login() {
 
   // Login View
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-      <Card className="w-full max-w-md bg-slate-800/50 border-slate-700">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#120D1C] via-[#21172E] to-[#120D1C] p-4">
+      <Card className="w-full max-w-md bg-card/80 border-border backdrop-blur">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 p-3 bg-brand-500/10 rounded-full w-fit">
-            <img src="/tavvy-icon.png" alt="Tavvy" className="h-8 w-8 object-contain" />
-          </div>
-          <CardTitle className="text-2xl text-white">Tavvy Admin</CardTitle>
+          <img src="/tavvy-logo-horizontal-white.png" alt="Tavvy" className="h-9 w-auto object-contain mx-auto mb-6" />
+          <CardTitle className="text-xl text-white">Admin Portal</CardTitle>
           <CardDescription className="text-slate-400">
             Restricted access - Authorized administrators only
           </CardDescription>
