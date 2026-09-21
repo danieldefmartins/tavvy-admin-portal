@@ -831,7 +831,7 @@ export default function Users() {
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
-                          <Flame className="h-4 w-4 text-orange-500" />
+                          <Flame className="h-4 w-4 text-brand-500" />
                           Current Streak
                         </CardTitle>
                       </CardHeader>

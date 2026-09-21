@@ -281,12 +281,12 @@ function DashboardLayoutContent({
           tooltip={item.label}
           className={`h-11 transition-all font-medium rounded-lg mb-1 ${
             isActive 
-              ? 'bg-gradient-to-r from-orange-500/25 to-orange-500/10 text-orange-400 border border-orange-500/30 hover:from-orange-500/30 hover:to-orange-500/15' 
+              ? 'bg-gradient-to-r from-brand-500/25 to-brand-500/10 text-brand-400 border border-brand-500/30 hover:from-brand-500/30 hover:to-brand-500/15' 
               : 'text-white/70 hover:bg-white/8 hover:text-white border border-transparent'
           }`}
         >
           <item.icon
-            className={`h-5 w-5 shrink-0 ${isActive ? "text-orange-400" : "text-white/50"}`}
+            className={`h-5 w-5 shrink-0 ${isActive ? "text-brand-400" : "text-white/50"}`}
           />
           <span className="truncate">{item.label}</span>
         </SidebarMenuButton>
@@ -297,21 +297,21 @@ function DashboardLayoutContent({
   // Mobile layout: header + scrollable nav + content (no sidebar)
   if (isMobile) {
     return (
-      <div className="flex flex-col min-h-screen bg-black">
+      <div className="flex flex-col min-h-screen bg-background">
         {/* Mobile Header */}
-        <div className="flex border-b border-white/10 h-14 items-center justify-between bg-black px-3 sticky top-0 z-50">
+        <div className="flex border-b border-white/10 h-14 items-center justify-between bg-background px-3 sticky top-0 z-50">
           <div className="flex items-center gap-3">
             <img 
-              src="/tavvy-logo-horizontal.jpg" 
+              src="/tavvy-logo-horizontal-white.png" 
               alt="Tavvy" 
               className="h-6 w-auto object-contain"
             />
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">
-                <Avatar className="h-7 w-7 shrink-0 border-2 border-orange-500/50">
-                  <AvatarFallback className="text-xs font-semibold text-white bg-gradient-to-br from-orange-500 to-orange-600">
+              <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+                <Avatar className="h-7 w-7 shrink-0 border-2 border-brand-500/50">
+                  <AvatarFallback className="text-xs font-semibold text-white bg-gradient-to-br from-brand-500 to-brand-600">
                     {userInitial}
                   </AvatarFallback>
                 </Avatar>
@@ -335,7 +335,7 @@ function DashboardLayoutContent({
         {/* Horizontal Scrollable Nav Bar */}
         <div 
           ref={scrollNavRef}
-          className="flex items-center gap-1 px-2 py-2 border-b border-white/10 bg-black/95 backdrop-blur sticky top-14 z-40 overflow-x-auto scrollbar-hide"
+          className="flex items-center gap-1 px-2 py-2 border-b border-white/10 bg-background/95 backdrop-blur sticky top-14 z-40 overflow-x-auto scrollbar-hide"
           style={{
             WebkitOverflowScrolling: 'touch',
             msOverflowStyle: 'none',
@@ -351,11 +351,11 @@ function DashboardLayoutContent({
                 onClick={() => setLocation(item.path)}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${
                   isActive
-                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40'
+                    ? 'bg-brand-500/20 text-brand-400 border border-brand-500/40'
                     : 'text-white/60 hover:text-white hover:bg-white/8 border border-transparent'
                 }`}
               >
-                <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-orange-400' : 'text-white/40'}`} />
+                <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-brand-400' : 'text-white/40'}`} />
                 <span>{item.label}</span>
               </button>
             );
@@ -374,23 +374,23 @@ function DashboardLayoutContent({
       <div className="relative" ref={sidebarRef}>
         <Sidebar
           collapsible="icon"
-          className="border-r border-white/10 bg-black"
+          className="border-r border-white/10 bg-background"
           disableTransition={isResizing}
         >
           {/* Header with Logo */}
-          <SidebarHeader className="h-20 justify-center border-b border-white/10 bg-black">
+          <SidebarHeader className="h-20 justify-center border-b border-white/10 bg-background">
             <div className="flex items-center gap-3 px-3 transition-all w-full">
               <button
                 onClick={toggleSidebar}
-                className="h-8 w-8 flex items-center justify-center hover:bg-white/10 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 shrink-0"
+                className="h-8 w-8 flex items-center justify-center hover:bg-white/10 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 shrink-0"
                 aria-label="Toggle navigation"
               >
-                <PanelLeft className="h-4 w-4 text-orange-400/80" />
+                <PanelLeft className="h-4 w-4 text-brand-400/80" />
               </button>
               {!isCollapsed && (
                 <div className="flex items-center min-w-0 flex-1">
                   <img 
-                    src="/tavvy-logo-horizontal.jpg" 
+                    src="/tavvy-logo-horizontal-white.png" 
                     alt="Tavvy" 
                     className="h-8 w-auto object-contain"
                   />
@@ -479,12 +479,12 @@ function DashboardLayoutContent({
           </SidebarContent>
 
           {/* User Footer */}
-          <SidebarFooter className="p-3 border-t border-orange-500/20 bg-gradient-to-r from-orange-500/5 to-transparent">
+          <SidebarFooter className="p-3 border-t border-brand-500/20 bg-gradient-to-r from-brand-500/5 to-transparent">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-white/10 transition-colors w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">
-                  <Avatar className="h-9 w-9 shrink-0 border-2 border-orange-500/50">
-                    <AvatarFallback className="text-sm font-semibold text-white bg-gradient-to-br from-orange-500 to-orange-600">
+                <button className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-white/10 transition-colors w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+                  <Avatar className="h-9 w-9 shrink-0 border-2 border-brand-500/50">
+                    <AvatarFallback className="text-sm font-semibold text-white bg-gradient-to-br from-brand-500 to-brand-600">
                       {userInitial}
                     </AvatarFallback>
                   </Avatar>
@@ -515,7 +515,7 @@ function DashboardLayoutContent({
         
         {/* Resize Handle */}
         <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-orange-500/40 transition-colors ${isCollapsed ? "hidden" : ""}`}
+          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-brand-500/40 transition-colors ${isCollapsed ? "hidden" : ""}`}
           onMouseDown={() => {
             if (isCollapsed) return;
             setIsResizing(true);
@@ -525,7 +525,7 @@ function DashboardLayoutContent({
       </div>
 
       {/* Main Content Area */}
-      <SidebarInset className="bg-black">
+      <SidebarInset className="bg-background">
         <main className="flex-1 p-6 min-h-screen">{children}</main>
       </SidebarInset>
     </>

@@ -316,7 +316,7 @@ export default function Reviews() {
                       setSelectedReviewId(review.id);
                       setShowRejectDialog(true);
                     }}
-                    className="text-orange-600"
+                    className="text-brand-600"
                   >
                     <ThumbsDown className="h-4 w-4 mr-2" />
                     Reject
@@ -415,13 +415,13 @@ export default function Reviews() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Reported</CardTitle>
-            <Flag className="h-4 w-4 text-orange-500" />
+            <Flag className="h-4 w-4 text-brand-500" />
           </CardHeader>
           <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold text-orange-600">{stats?.reportedReviews?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold text-brand-600">{stats?.reportedReviews?.toLocaleString() || 0}</div>
             )}
           </CardContent>
         </Card>
@@ -550,7 +550,7 @@ export default function Reviews() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Flag className="h-5 w-5 text-orange-500" />
+                <Flag className="h-5 w-5 text-brand-500" />
                 Reported Reviews
               </CardTitle>
               <CardDescription>
@@ -679,7 +679,7 @@ export default function Reviews() {
               {reviewReports && reviewReports.length > 0 && (
                 <div>
                   <Label className="text-muted-foreground flex items-center gap-2">
-                    <Flag className="h-4 w-4 text-orange-500" />
+                    <Flag className="h-4 w-4 text-brand-500" />
                     Reports ({reviewReports.length})
                   </Label>
                   <div className="mt-2 space-y-2">
@@ -717,7 +717,7 @@ export default function Reviews() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="text-orange-600"
+                  className="text-brand-600"
                   onClick={() => {
                     setSelectedReviewId(reviewDetails.id);
                     setShowRejectDialog(true);

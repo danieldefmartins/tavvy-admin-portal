@@ -48,7 +48,7 @@ const actionTypeConfig: Record<string, { label: string; icon: React.ReactNode; c
   claim_rejected: { label: "Claim Rejected", icon: <XCircle className="h-4 w-4" />, color: "text-red-600" },
   flag_reviewed: { label: "Flag Reviewed", icon: <Eye className="h-4 w-4" />, color: "text-blue-600" },
   flag_dismissed: { label: "Flag Dismissed", icon: <XCircle className="h-4 w-4" />, color: "text-gray-600" },
-  flag_actioned: { label: "Flag Actioned", icon: <Shield className="h-4 w-4" />, color: "text-orange-600" },
+  flag_actioned: { label: "Flag Actioned", icon: <Shield className="h-4 w-4" />, color: "text-brand-600" },
   moderation_approved: { label: "Content Approved", icon: <CheckCircle2 className="h-4 w-4" />, color: "text-green-600" },
   moderation_rejected: { label: "Content Rejected", icon: <XCircle className="h-4 w-4" />, color: "text-red-600" },
   override_created: { label: "Override Created", icon: <Edit className="h-4 w-4" />, color: "text-purple-600" },

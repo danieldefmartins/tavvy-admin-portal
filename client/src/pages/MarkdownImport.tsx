@@ -363,8 +363,8 @@ export default function MarkdownImport() {
         );
       case 'tip_box':
         return (
-          <div key={index} className="bg-orange-500/20 border border-orange-500/30 rounded-lg p-3 mb-3">
-            <p className="font-semibold text-orange-400">{block.title}</p>
+          <div key={index} className="bg-brand-500/20 border border-brand-500/30 rounded-lg p-3 mb-3">
+            <p className="font-semibold text-brand-400">{block.title}</p>
             <p className="text-white/80 text-sm">{block.text}</p>
           </div>
         );
@@ -404,10 +404,10 @@ export default function MarkdownImport() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column - Input */}
         <div className="space-y-6">
-          <Card className="bg-[#141842] border-orange-500/20">
+          <Card className="bg-[#141842] border-brand-500/20">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Upload className="h-5 w-5 text-orange-400" />
+                <Upload className="h-5 w-5 text-brand-400" />
                 Upload Markdown
               </CardTitle>
               <CardDescription className="text-white/60">
@@ -419,8 +419,8 @@ export default function MarkdownImport() {
               <div
                 className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                   dragActive 
-                    ? 'border-orange-500 bg-orange-500/10' 
-                    : 'border-white/20 hover:border-orange-500/50'
+                    ? 'border-brand-500 bg-brand-500/10' 
+                    : 'border-white/20 hover:border-brand-500/50'
                 }`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
@@ -431,7 +431,7 @@ export default function MarkdownImport() {
                 <p className="text-white/60 mb-2">Drag & drop your .md file here</p>
                 <p className="text-white/40 text-sm mb-3">or</p>
                 <label className="cursor-pointer">
-                  <span className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors">
+                  <span className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg transition-colors">
                     Browse Files
                   </span>
                   <input
@@ -456,7 +456,7 @@ export default function MarkdownImport() {
                     parseMarkdown(e.target.value);
                   }}
                   placeholder="# Article Title&#10;&#10;Your article content here..."
-                  className="mt-2 h-64 bg-[#0F1233] border-white/20 text-white font-mono text-sm"
+                  className="mt-2 h-64 bg-[#21172E] border-white/20 text-white font-mono text-sm"
                 />
               </div>
             </CardContent>
@@ -464,7 +464,7 @@ export default function MarkdownImport() {
 
           {/* Article Settings */}
           {parsedArticle && (
-            <Card className="bg-[#141842] border-orange-500/20">
+            <Card className="bg-[#141842] border-brand-500/20">
               <CardHeader>
                 <CardTitle className="text-white">Article Settings</CardTitle>
               </CardHeader>
@@ -475,7 +475,7 @@ export default function MarkdownImport() {
                     value={customSlug}
                     onChange={(e) => setCustomSlug(e.target.value)}
                     placeholder="article-slug"
-                    className="mt-1 bg-[#0F1233] border-white/20 text-white"
+                    className="mt-1 bg-[#21172E] border-white/20 text-white"
                   />
                 </div>
 
@@ -489,7 +489,7 @@ export default function MarkdownImport() {
                 <div>
                   <Label className="text-white/80">Category</Label>
                   <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="mt-1 bg-[#0F1233] border-white/20 text-white">
+                    <SelectTrigger className="mt-1 bg-[#21172E] border-white/20 text-white">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -503,7 +503,7 @@ export default function MarkdownImport() {
                 <div>
                   <Label className="text-white/80">Universe</Label>
                   <Select value={selectedUniverse} onValueChange={setSelectedUniverse}>
-                    <SelectTrigger className="mt-1 bg-[#0F1233] border-white/20 text-white">
+                    <SelectTrigger className="mt-1 bg-[#21172E] border-white/20 text-white">
                       <SelectValue placeholder="Select universe" />
                     </SelectTrigger>
                     <SelectContent>
@@ -517,7 +517,7 @@ export default function MarkdownImport() {
                 <Button
                   onClick={handleImport}
                   disabled={importing || !parsedArticle}
-                  className="w-full bg-orange-500 hover:bg-orange-600"
+                  className="w-full bg-brand-500 hover:bg-brand-600"
                 >
                   {importing ? (
                     <>
@@ -538,17 +538,17 @@ export default function MarkdownImport() {
 
         {/* Right Column - Preview */}
         <div>
-          <Card className="bg-[#141842] border-orange-500/20 h-full">
+          <Card className="bg-[#141842] border-brand-500/20 h-full">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Eye className="h-5 w-5 text-orange-400" />
+                <Eye className="h-5 w-5 text-brand-400" />
                 Preview
               </CardTitle>
             </CardHeader>
             <CardContent>
               {parsedArticle ? (
                 <Tabs defaultValue="preview" className="w-full">
-                  <TabsList className="bg-[#0F1233] mb-4">
+                  <TabsList className="bg-[#21172E] mb-4">
                     <TabsTrigger value="preview">Article Preview</TabsTrigger>
                     <TabsTrigger value="blocks">Content Blocks ({parsedArticle.content_blocks.length})</TabsTrigger>
                   </TabsList>
@@ -556,7 +556,7 @@ export default function MarkdownImport() {
                   <TabsContent value="preview" className="space-y-4">
                     {/* Article Stats */}
                     <div className="flex flex-wrap gap-2 mb-4">
-                      <Badge variant="outline" className="border-orange-500/50 text-orange-400">
+                      <Badge variant="outline" className="border-brand-500/50 text-brand-400">
                         <BookOpen className="h-3 w-3 mr-1" />
                         {parsedArticle.content_blocks.length} blocks
                       </Badge>
@@ -571,13 +571,13 @@ export default function MarkdownImport() {
                     </div>
 
                     {/* Article Content Preview */}
-                    <div className="bg-[#0F1233] rounded-lg p-4 max-h-[600px] overflow-y-auto">
+                    <div className="bg-[#21172E] rounded-lg p-4 max-h-[600px] overflow-y-auto">
                       {parsedArticle.content_blocks.map((block, index) => renderBlockPreview(block, index))}
                     </div>
                   </TabsContent>
 
                   <TabsContent value="blocks">
-                    <div className="bg-[#0F1233] rounded-lg p-4 max-h-[600px] overflow-y-auto">
+                    <div className="bg-[#21172E] rounded-lg p-4 max-h-[600px] overflow-y-auto">
                       <pre className="text-xs text-white/80 whitespace-pre-wrap">
                         {JSON.stringify(parsedArticle.content_blocks, null, 2)}
                       </pre>

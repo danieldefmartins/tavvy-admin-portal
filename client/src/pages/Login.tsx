@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, ArrowLeft, Mail, CheckCircle } from "lucide-react";
+import { ArrowLeft, Mail, CheckCircle } from "lucide-react";
 import { resetPassword } from "@/lib/supabase";
 
 export default function Login() {
@@ -85,8 +85,8 @@ export default function Login() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
         <Card className="w-full max-w-md bg-slate-800/50 border-slate-700">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 p-3 bg-orange-500/10 rounded-full w-fit">
-              <Mail className="h-8 w-8 text-orange-500" />
+            <div className="mx-auto mb-4 p-3 bg-brand-500/10 rounded-full w-fit">
+              <Mail className="h-8 w-8 text-brand-500" />
             </div>
             <CardTitle className="text-2xl text-white">
               {resetSent ? "Check your email" : "Forgot Password"}
@@ -118,7 +118,7 @@ export default function Login() {
                 </Button>
                 <Button
                   variant="ghost"
-                  className="w-full text-orange-400 hover:text-orange-300 hover:bg-slate-700/50"
+                  className="w-full text-brand-400 hover:text-brand-300 hover:bg-slate-700/50"
                   onClick={() => {
                     setShowForgotPassword(false);
                     setResetSent(false);
@@ -147,7 +147,7 @@ export default function Login() {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold"
+                  className="w-full bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white font-semibold"
                   disabled={resetLoading}
                 >
                   {resetLoading ? "Sending..." : "Send Reset Link"}
@@ -155,7 +155,7 @@ export default function Login() {
                 <Button
                   type="button"
                   variant="ghost"
-                  className="w-full text-orange-400 hover:text-orange-300 hover:bg-slate-700/50"
+                  className="w-full text-brand-400 hover:text-brand-300 hover:bg-slate-700/50"
                   onClick={() => {
                     setShowForgotPassword(false);
                     setResetEmail("");
@@ -177,8 +177,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <Card className="w-full max-w-md bg-slate-800/50 border-slate-700">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 p-3 bg-orange-500/10 rounded-full w-fit">
-            <Shield className="h-8 w-8 text-orange-500" />
+          <div className="mx-auto mb-4 p-3 bg-brand-500/10 rounded-full w-fit">
+            <img src="/tavvy-icon.png" alt="Tavvy" className="h-8 w-8 object-contain" />
           </div>
           <CardTitle className="text-2xl text-white">Tavvy Admin</CardTitle>
           <CardDescription className="text-slate-400">
@@ -209,7 +209,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowForgotPassword(true)}
-                  className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                  className="text-xs text-brand-400 hover:text-brand-300 transition-colors"
                 >
                   Forgot Password?
                 </button>
@@ -226,7 +226,7 @@ export default function Login() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold"
+              className="w-full bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white font-semibold"
               disabled={loginMutation.isPending}
             >
               {loginMutation.isPending ? "Signing in..." : "Sign In"}

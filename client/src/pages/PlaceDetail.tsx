@@ -73,7 +73,7 @@ export default function PlaceDetail() {
       case "vibe":
         return "bg-blue-500/10 text-blue-500 border-blue-500/20";
       case "heads_up":
-        return "bg-orange-500/10 text-orange-500 border-orange-500/20";
+        return "bg-brand-500/10 text-brand-500 border-brand-500/20";
       default:
         return "bg-muted text-muted-foreground";
     }
@@ -282,7 +282,7 @@ export default function PlaceDetail() {
 
           {/* Heads Up */}
           <div>
-            <h3 className="font-semibold text-orange-500 flex items-center gap-2 mb-3">
+            <h3 className="font-semibold text-brand-500 flex items-center gap-2 mb-3">
               <AlertTriangle className="h-4 w-4" />
               Heads Up
             </h3>
@@ -298,13 +298,13 @@ export default function PlaceDetail() {
                     onClick={() => handleTap(signal.slug)}
                     className={`relative ${
                       tapCount > 0
-                        ? "bg-orange-500/20 border-orange-500 text-orange-500"
+                        ? "bg-brand-500/20 border-brand-500 text-brand-500"
                         : ""
                     }`}
                   >
                     {signal.label}
                     {tapCount > 0 && (
-                      <span className="ml-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                      <span className="ml-2 bg-brand-500 text-white text-xs px-1.5 py-0.5 rounded-full">
                         x{tapCount}
                       </span>
                     )}

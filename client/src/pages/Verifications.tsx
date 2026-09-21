@@ -165,7 +165,7 @@ export default function Verifications() {
       case "rejected":
         return <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/30"><XCircle className="w-3 h-3 mr-1" /> Rejected</Badge>;
       case "needs_more_info":
-        return <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/30"><AlertCircle className="w-3 h-3 mr-1" /> Needs Info</Badge>;
+        return <Badge variant="outline" className="bg-brand-500/10 text-brand-500 border-brand-500/30"><AlertCircle className="w-3 h-3 mr-1" /> Needs Info</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }

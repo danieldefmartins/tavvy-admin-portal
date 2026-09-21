@@ -100,7 +100,7 @@ export default function Leads() {
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-orange-500">{stats.totalLeads}</div>
+              <div className="text-2xl font-bold text-brand-500">{stats.totalLeads}</div>
               <p className="text-xs text-muted-foreground">Total Leads</p>
             </CardContent>
           </Card>

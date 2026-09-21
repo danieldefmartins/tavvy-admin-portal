@@ -316,7 +316,7 @@ export default function ImageCropPreview({
         {cropW > 0 && cropH > 0 && (
           <div
             className={`absolute rounded-sm overflow-hidden ${
-              isDragging ? "ring-2 ring-orange-400" : "ring-1 ring-white/60"
+              isDragging ? "ring-2 ring-brand-400" : "ring-1 ring-white/60"
             } ${needsCrop ? "cursor-grab" : ""} ${isDragging ? "cursor-grabbing" : ""}`}
             style={{
               left: `${cropLeft}px`,

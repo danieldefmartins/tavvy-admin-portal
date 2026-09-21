@@ -29,7 +29,7 @@ export default function Home() {
         </div>
         <div className="flex gap-3">
           <Link href="/quick-entry">
-            <Button className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/20">
+            <Button className="bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white shadow-lg shadow-brand-500/20">
               <Zap className="mr-2 h-4 w-4" />
               Quick Entry
             </Button>
@@ -48,7 +48,7 @@ export default function Home() {
         <Card className="bg-[#1a1f4e]/60 border-white/10 backdrop-blur">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-white/70">Total Places</CardTitle>
-            <MapPin className="h-4 w-4 text-orange-400" />
+            <MapPin className="h-4 w-4 text-brand-400" />
           </CardHeader>
           <CardContent>
             {placesLoading ? (
@@ -78,7 +78,7 @@ export default function Home() {
         <Card className="bg-[#1a1f4e]/60 border-white/10 backdrop-blur">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-white/70">Signals Today</CardTitle>
-            <Zap className="h-4 w-4 text-orange-400" />
+            <Zap className="h-4 w-4 text-brand-400" />
           </CardHeader>
           <CardContent>
             {statsLoading ? (
@@ -118,15 +118,15 @@ export default function Home() {
             <Link href="/quick-entry">
               <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group border border-white/5">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500/20 to-orange-600/20">
-                    <Zap className="h-4 w-4 text-orange-400" />
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-brand-500/20 to-brand-600/20">
+                    <Zap className="h-4 w-4 text-brand-400" />
                   </div>
                   <div>
                     <p className="font-medium text-white">Add Quick Review</p>
                     <p className="text-xs text-white/50">Submit a single place review</p>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-white/30 group-hover:text-orange-400 transition-colors" />
+                <ChevronRight className="h-4 w-4 text-white/30 group-hover:text-brand-400 transition-colors" />
               </div>
             </Link>
 
@@ -148,15 +148,15 @@ export default function Home() {
             <Link href="/places">
               <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group border border-white/5">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500/20 to-blue-500/20">
-                    <MapPin className="h-4 w-4 text-orange-400" />
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-brand-500/20 to-blue-500/20">
+                    <MapPin className="h-4 w-4 text-brand-400" />
                   </div>
                   <div>
                     <p className="font-medium text-white">Browse Places</p>
                     <p className="text-xs text-white/50">View and manage all places</p>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-white/30 group-hover:text-orange-400 transition-colors" />
+                <ChevronRight className="h-4 w-4 text-white/30 group-hover:text-brand-400 transition-colors" />
               </div>
             </Link>
 
@@ -200,8 +200,8 @@ export default function Home() {
               <div className="space-y-3">
                 {activityLog.slice(0, 5).map((activity: any, index: number) => (
                   <div key={index} className="flex items-start gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors">
-                    <div className="p-1.5 rounded-full bg-gradient-to-br from-orange-500/20 to-blue-500/20 mt-0.5">
-                      <CheckCircle2 className="h-3 w-3 text-orange-400" />
+                    <div className="p-1.5 rounded-full bg-gradient-to-br from-brand-500/20 to-blue-500/20 mt-0.5">
+                      <CheckCircle2 className="h-3 w-3 text-brand-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white truncate">{activity.action}</p>

@@ -165,10 +165,10 @@ export default function CreatePro() {
 
       <form onSubmit={handleSubmit}>
         {/* Subscription & eCard Options */}
-        <Card className="mb-6 border-orange-500/30 bg-gradient-to-r from-orange-500/5 to-transparent">
+        <Card className="mb-6 border-brand-500/30 bg-gradient-to-r from-brand-500/5 to-transparent">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-orange-400" />
+              <CreditCard className="h-5 w-5 text-brand-400" />
               Subscription & eCard
             </CardTitle>
             <CardDescription>

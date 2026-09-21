@@ -130,7 +130,7 @@ export default function ECards() {
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-orange-500">{stats.endorsements}</div>
+              <div className="text-2xl font-bold text-brand-500">{stats.endorsements}</div>
               <p className="text-xs text-muted-foreground">Endorsements</p>
             </CardContent>
           </Card>

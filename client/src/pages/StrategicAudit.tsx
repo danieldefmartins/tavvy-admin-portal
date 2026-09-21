@@ -237,7 +237,7 @@ export default function StrategicAudit() {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Strategic Audit</h1>
           <p className="text-white/60">System health, recommendations, and migration risk assessment</p>
         </div>
-        <Badge className="bg-gradient-to-r from-orange-500/20 to-orange-600/20 text-orange-400 border-orange-500/30 w-fit">
+        <Badge className="bg-gradient-to-r from-brand-500/20 to-brand-600/20 text-brand-400 border-brand-500/30 w-fit">
           <Clock className="w-3 h-3 mr-1" />
           Last Updated: January 2026
         </Badge>
@@ -253,7 +253,7 @@ export default function StrategicAudit() {
             size="sm"
             className={
               activeTab === tab.id
-                ? "bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+                ? "bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white"
                 : "border-white/20 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/30"
             }
           >
@@ -290,7 +290,7 @@ export default function StrategicAudit() {
           <Card className="bg-[#1a1f4e]/60 border-white/10 backdrop-blur">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <FileText className="h-5 w-5 text-orange-400" />
+                <FileText className="h-5 w-5 text-brand-400" />
                 Executive Summary
               </CardTitle>
               <CardDescription className="text-white/50">
@@ -324,7 +324,7 @@ export default function StrategicAudit() {
           <Card className="bg-[#1a1f4e]/60 border-white/10 backdrop-blur">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Target className="h-5 w-5 text-orange-400" />
+                <Target className="h-5 w-5 text-brand-400" />
                 Top 3 Recommendations
               </CardTitle>
             </CardHeader>
@@ -335,7 +335,7 @@ export default function StrategicAudit() {
                   className="flex items-center justify-between p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/5"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/20 text-orange-400 font-bold">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-brand-500/20 to-brand-600/20 text-brand-400 font-bold">
                       {i + 1}
                     </div>
                     <div>
@@ -366,7 +366,7 @@ export default function StrategicAudit() {
           <Card className="bg-[#1a1f4e]/60 border-white/10 backdrop-blur">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Database className="h-5 w-5 text-orange-400" />
+                <Database className="h-5 w-5 text-brand-400" />
                 Database Schema Overview
               </CardTitle>
               <CardDescription className="text-white/50">
@@ -401,7 +401,7 @@ export default function StrategicAudit() {
           <Card className="bg-[#1a1f4e]/60 border-white/10 backdrop-blur">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Users className="h-5 w-5 text-orange-400" />
+                <Users className="h-5 w-5 text-brand-400" />
                 User Journey Analysis
               </CardTitle>
               <CardDescription className="text-white/50">
@@ -445,7 +445,7 @@ export default function StrategicAudit() {
                         <ul className="space-y-1">
                           {journey.issues.map((issue, i) => (
                             <li key={i} className="flex items-center gap-2 text-sm text-white/70">
-                              <ChevronRight className="h-3 w-3 text-orange-400" />
+                              <ChevronRight className="h-3 w-3 text-brand-400" />
                               {issue}
                             </li>
                           ))}
@@ -564,7 +564,7 @@ export default function StrategicAudit() {
           <Card className="bg-[#1a1f4e]/60 border-white/10 backdrop-blur">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-orange-400" />
+                <TrendingUp className="h-5 w-5 text-brand-400" />
                 Engagement Features Status
               </CardTitle>
             </CardHeader>
@@ -605,7 +605,7 @@ export default function StrategicAudit() {
           <Card className="bg-[#1a1f4e]/60 border-white/10 backdrop-blur">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Award className="h-5 w-5 text-orange-400" />
+                <Award className="h-5 w-5 text-brand-400" />
                 Badge System
               </CardTitle>
               <CardDescription className="text-white/50">
@@ -644,7 +644,7 @@ export default function StrategicAudit() {
         <div className="space-y-6">
           <Tabs defaultValue="all" className="w-full">
             <TabsList className="bg-white/5 border border-white/10">
-              <TabsTrigger value="all" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+              <TabsTrigger value="all" className="data-[state=active]:bg-brand-500 data-[state=active]:text-white">
                 All
               </TabsTrigger>
               <TabsTrigger value="p0" className="data-[state=active]:bg-red-500 data-[state=active]:text-white">
@@ -712,8 +712,8 @@ export default function StrategicAudit() {
                 ].map((phase, i) => (
                   <div key={phase.phase} className="flex gap-6 mb-8 last:mb-0">
                     <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/20 flex items-center justify-center">
-                        <span className="text-lg font-bold text-orange-400">{i + 1}</span>
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500/20 to-brand-600/20 flex items-center justify-center">
+                        <span className="text-lg font-bold text-brand-400">{i + 1}</span>
                       </div>
                       {i < 2 && <div className="w-0.5 h-full bg-white/10 mt-2" />}
                     </div>
@@ -817,7 +817,7 @@ export default function StrategicAudit() {
                 <div className="space-y-2">
                   {item.details.map((detail, i) => (
                     <div key={i} className="flex items-start gap-2 text-sm text-white/70">
-                      <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 shrink-0" />
+                      <ChevronRight className="h-4 w-4 text-brand-400 mt-0.5 shrink-0" />
                       <span>{detail}</span>
                     </div>
                   ))}

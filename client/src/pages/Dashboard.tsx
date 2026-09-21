@@ -66,16 +66,16 @@ export default function Dashboard() {
 
       {/* Alert Banner for Pending Moderation */}
       {pendingItems > 0 && (
-        <Card className="border-orange-200 bg-orange-50">
+        <Card className="border-brand-200 bg-brand-50">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
+                <AlertTriangle className="h-5 w-5 text-brand-500" />
                 <div>
-                  <p className="font-medium text-orange-800">
+                  <p className="font-medium text-brand-800">
                     {pendingItems} items need moderation
                   </p>
-                  <p className="text-sm text-orange-600">
+                  <p className="text-sm text-brand-600">
                     Review reported content to maintain platform quality
                   </p>
                 </div>
@@ -83,7 +83,7 @@ export default function Dashboard() {
               <div className="flex gap-2">
                 {(storyStats?.reportedStories || 0) > 0 && (
                   <Link href="/stories">
-                    <Button size="sm" variant="outline" className="border-orange-300">
+                    <Button size="sm" variant="outline" className="border-brand-300">
                       <Film className="h-4 w-4 mr-1" />
                       Stories ({storyStats?.reportedStories})
                     </Button>
@@ -91,7 +91,7 @@ export default function Dashboard() {
                 )}
                 {(photoStats?.reportedPhotos || 0) > 0 && (
                   <Link href="/photos">
-                    <Button size="sm" variant="outline" className="border-orange-300">
+                    <Button size="sm" variant="outline" className="border-brand-300">
                       <Image className="h-4 w-4 mr-1" />
                       Photos ({photoStats?.reportedPhotos})
                     </Button>
@@ -99,7 +99,7 @@ export default function Dashboard() {
                 )}
                 {(reviewStats?.reportedReviews || 0) > 0 && (
                   <Link href="/reviews">
-                    <Button size="sm" variant="outline" className="border-orange-300">
+                    <Button size="sm" variant="outline" className="border-brand-300">
                       <MessageSquare className="h-4 w-4 mr-1" />
                       Reviews ({reviewStats?.reportedReviews})
                     </Button>

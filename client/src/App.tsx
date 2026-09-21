@@ -44,8 +44,8 @@ import Leads from "@/pages/Leads";
 // Loading component
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0F1233]">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+    <div className="min-h-screen flex items-center justify-center bg-[#21172E]">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-500"></div>
     </div>
   );
 }

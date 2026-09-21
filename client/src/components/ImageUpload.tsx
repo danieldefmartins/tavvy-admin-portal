@@ -232,7 +232,7 @@ export default function ImageUpload({
         <div
           className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
             dragActive 
-              ? "border-orange-500 bg-orange-500/10" 
+              ? "border-brand-500 bg-brand-500/10" 
               : "border-white/20 hover:border-white/40"
           }`}
           onDragEnter={handleDrag}
@@ -242,7 +242,7 @@ export default function ImageUpload({
         >
           {uploading ? (
             <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+              <Loader2 className="h-8 w-8 animate-spin text-brand-500" />
               <p className="text-sm text-white/60">Uploading...</p>
             </div>
           ) : (

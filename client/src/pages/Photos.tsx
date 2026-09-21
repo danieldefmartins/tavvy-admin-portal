@@ -322,13 +322,13 @@ export default function Photos() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Reported</CardTitle>
-            <Flag className="h-4 w-4 text-orange-500" />
+            <Flag className="h-4 w-4 text-brand-500" />
           </CardHeader>
           <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold text-orange-600">{stats?.reportedPhotos?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold text-brand-600">{stats?.reportedPhotos?.toLocaleString() || 0}</div>
             )}
           </CardContent>
         </Card>
@@ -442,7 +442,7 @@ export default function Photos() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Flag className="h-5 w-5 text-orange-500" />
+                <Flag className="h-5 w-5 text-brand-500" />
                 Reported Photos
               </CardTitle>
               <CardDescription>
@@ -586,7 +586,7 @@ export default function Photos() {
               {photoReports && photoReports.length > 0 && (
                 <div>
                   <Label className="text-muted-foreground flex items-center gap-2">
-                    <Flag className="h-4 w-4 text-orange-500" />
+                    <Flag className="h-4 w-4 text-brand-500" />
                     Reports ({photoReports.length})
                   </Label>
                   <div className="mt-2 space-y-2">

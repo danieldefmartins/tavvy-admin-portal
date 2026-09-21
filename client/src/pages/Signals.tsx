@@ -20,7 +20,7 @@ export default function Signals() {
       case "vibe":
         return "bg-blue-500/10 text-blue-500 border-blue-500/20";
       case "heads_up":
-        return "bg-orange-500/10 text-orange-500 border-orange-500/20";
+        return "bg-brand-500/10 text-brand-500 border-brand-500/20";
       default:
         return "bg-muted text-muted-foreground";
     }
@@ -96,10 +96,10 @@ export default function Signals() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Heads Up</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <AlertTriangle className="h-4 w-4 text-brand-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-500">{headsUpSignals.length}</div>
+            <div className="text-2xl font-bold text-brand-500">{headsUpSignals.length}</div>
             <p className="text-xs text-muted-foreground">Warning signals</p>
           </CardContent>
         </Card>
@@ -115,7 +115,7 @@ export default function Signals() {
           <TabsTrigger value="vibe" className="text-blue-500">
             The Vibe ({vibeSignals.length})
           </TabsTrigger>
-          <TabsTrigger value="heads_up" className="text-orange-500">
+          <TabsTrigger value="heads_up" className="text-brand-500">
             Heads Up ({headsUpSignals.length})
           </TabsTrigger>
         </TabsList>
@@ -171,7 +171,7 @@ export default function Signals() {
         <TabsContent value="heads_up" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-500">
+              <CardTitle className="flex items-center gap-2 text-brand-500">
                 <AlertTriangle className="h-5 w-5" />
                 Heads Up
               </CardTitle>

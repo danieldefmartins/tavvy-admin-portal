@@ -1204,7 +1204,7 @@ export default function QuickEntry() {
           <Collapsible open={!collapsedCategories.headsUp} onOpenChange={() => toggleCategory('headsUp')}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" className="w-full justify-start gap-2 p-0 h-auto hover:bg-transparent">
-                <h3 className="font-semibold text-orange-500 flex items-center gap-2">
+                <h3 className="font-semibold text-brand-500 flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
                   Heads Up
                   <Badge variant="secondary" className="ml-2">
@@ -1226,13 +1226,13 @@ export default function QuickEntry() {
                       onClick={() => handleTap(signal.slug)}
                       className={`relative ${
                         tapCount > 0
-                          ? "bg-orange-500/20 border-orange-500 text-orange-500"
+                          ? "bg-brand-500/20 border-brand-500 text-brand-500"
                           : ""
                       }`}
                     >
                       {signal.label}
                       {tapCount > 0 && (
-                        <span className="ml-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                        <span className="ml-2 bg-brand-500 text-white text-xs px-1.5 py-0.5 rounded-full">
                           x{tapCount}
                         </span>
                       )}
