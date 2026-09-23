@@ -3730,6 +3730,7 @@ export const appRouter = router({
         if (updateError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: updateError.message });
         return { ok: true };
       }),
+  }),
 });
 
 // export type AppRouter = typeof appRouter; // Commented to fix esbuild bundling
