@@ -5,3 +5,6 @@ dist/
 .env.*.local
 *.log
 .DS_Store
+
+# also the symlinked form (a bare "node_modules/" pattern only matches directories)
+node_modules
