@@ -64,7 +64,7 @@ export default function Feedback() {
               <Table>
                 <TableHeader><TableRow><TableHead>When</TableHead><TableHead>Platform</TableHead><TableHead>Would review</TableHead><TableHead>Missing on Tavvy</TableHead><TableHead>Other</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {(wishlist.data?.rows ?? []).map((row) => (
+                  {(wishlist.data?.rows ?? []).map((row: any) => (
                     <TableRow key={row.id}>
                       <TableCell className="whitespace-nowrap">{format(new Date(row.created_at), "MMM d, yyyy HH:mm")}</TableCell>
                       <TableCell><Badge variant="outline">{row.platform}</Badge></TableCell>
