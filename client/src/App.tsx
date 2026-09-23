@@ -33,6 +33,7 @@ import Reviews from "@/pages/Reviews";
 import PlaceEdit from "@/pages/PlaceEdit";
 import CreatePlace from "@/pages/CreatePlace";
 import Drafts from "@/pages/Drafts";
+import Feedback from "@/pages/Feedback";
 import Rides from "@/pages/Rides";
 import Credentials from "@/pages/Credentials";
 import ECards from "@/pages/ECards";
@@ -254,6 +255,12 @@ function App() {
         <Route path="/drafts">
           <ProtectedRoute>
             <Drafts />
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/feedback">
+          <ProtectedRoute>
+            <Feedback />
           </ProtectedRoute>
         </Route>
 

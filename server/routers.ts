@@ -3671,6 +3671,65 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+  // Feedback router - "what do you want to review next?" survey answers + member-suggested place edits
+  feedback: router({
+    wishlist: adminProcedure
+      .input(z.object({ limit: z.number().min(1).max(1000).default(300) }).optional())
+      .query(async ({ input }) => {
+        const { data, error } = await communityAdminClient
+          .from("review_wishlist_responses")
+          .select("id, user_id, platform, missing_places, product_categories, other_text, locale, created_at")
+          .order("created_at", { ascending: false })
+          .limit(input?.limit ?? 300);
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        const rows = data ?? [];
+        const counts: Record<string, number> = {};
+        for (const row of rows) for (const c of (row.product_categories as string[] | null) ?? []) counts[c] = (counts[c] ?? 0) + 1;
+        return { rows, counts, total: rows.length };
+      }),
+    edits: adminProcedure
+      .input(z.object({ status: z.enum(["pending", "approved", "rejected", "all"]).default("pending") }).optional())
+      .query(async ({ input }) => {
+        let query = communityAdminClient
+          .from("edit_suggestions")
+          .select("id, place_id, user_id, suggested_changes, reason, status, review_notes, reviewed_at, created_at, places:place_id(id, name, street, city, region, postcode, phone, website, tavvy_category)")
+          .order("created_at", { ascending: false })
+          .limit(300);
+        if (input?.status && input.status !== "all") query = query.eq("status", input.status);
+        const { data, error } = await query;
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return data ?? [];
+      }),
+    reviewEdit: adminProcedure
+      .input(z.object({ id: z.string().uuid(), decision: z.enum(["approved", "rejected"]), notes: z.string().max(1000).optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const { data: suggestion, error } = await communityAdminClient
+          .from("edit_suggestions").select("id, place_id, suggested_changes, status").eq("id", input.id).maybeSingle();
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        if (!suggestion) throw new TRPCError({ code: "NOT_FOUND", message: "Suggestion not found" });
+        if (suggestion.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Already reviewed" });
+        if (input.decision === "approved") {
+          // Only these columns can be changed by a member suggestion.
+          const allowed = ["name", "tavvy_category", "phone", "website", "street", "city", "region", "postcode"];
+          const patch: Record<string, string> = {};
+          for (const key of allowed) {
+            const value = (suggestion.suggested_changes as Record<string, unknown> | null)?.[key];
+            if (typeof value === "string" && value.trim()) patch[key] = value.trim().slice(0, 300);
+          }
+          if (Object.keys(patch).length > 0) {
+            const { error: placeError } = await communityAdminClient.from("places").update(patch).eq("id", suggestion.place_id);
+            if (placeError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: placeError.message });
+          }
+        }
+        const reviewerId = typeof ctx.user?.id === "string" && /^[0-9a-f-]{36}$/i.test(ctx.user.id) ? ctx.user.id : null;
+        const reviewer = ctx.user ? `${(ctx.user as any).name ?? (ctx.user as any).email ?? ctx.user.id}` : "admin";
+        const { error: updateError } = await communityAdminClient.from("edit_suggestions").update({
+          status: input.decision, reviewed_by: reviewerId, reviewed_at: new Date().toISOString(),
+          review_notes: [input.notes?.trim(), `Reviewed by ${reviewer}`].filter(Boolean).join(" — "), updated_at: new Date().toISOString(),
+        }).eq("id", input.id);
+        if (updateError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: updateError.message });
+        return { ok: true };
+      }),
 });
 
 // export type AppRouter = typeof appRouter; // Commented to fix esbuild bundling

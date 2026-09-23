@@ -60,6 +60,7 @@ import {
   Calendar,
   Radio,
   Inbox,
+  Lightbulb,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -98,6 +99,7 @@ const moderationItems = [
   { icon: ImageIcon, label: "Photos", path: "/photos" },
   { icon: MessageSquare, label: "Reviews", path: "/reviews" },
   { icon: Flag, label: "Flags Queue", path: "/moderation" },
+  { icon: Lightbulb, label: "Feedback", path: "/feedback" },
 ];
 
 // Providers items
@@ -132,6 +134,7 @@ const mobileNavItems = [
   { icon: ImageIcon, label: "Photos", path: "/photos" },
   { icon: MessageSquare, label: "Reviews", path: "/reviews" },
   { icon: Flag, label: "Flags", path: "/moderation" },
+  { icon: Lightbulb, label: "Feedback", path: "/feedback" },
   // Providers section
   { icon: Briefcase, label: "Providers", path: "/providers" },
   { icon: CreditCard, label: "eCards", path: "/ecards" },
