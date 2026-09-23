@@ -1,3 +1,5 @@
+import { createStoryModeration } from './storyModeration';
+import { createReviewModeration } from './reviewModeration';
 import { supabaseAdmin } from "./supabaseAuth";
 
 // Use the admin client with service role key for all database operations
@@ -1747,6 +1749,10 @@ export async function getUniverseById(id: string) {
 }
 
 export async function createUniverse(universe: {
+  thumbnail_fit?: string;
+  thumbnail_position?: string;
+  banner_fit?: string;
+  banner_position?: string;
   name: string;
   slug: string;
   description?: string | null;
@@ -1910,7 +1916,7 @@ export async function getUniversePlaces(universeId: string) {
   const placeIds = data.map(d => d.place_id);
   const { data: placesData, error: placesError } = await supabase
     .from("places")
-    .select("id, name, street, city, region, country, thumbnail_url, category_id")
+    .select("id, name, street, address:street, city, region, country, thumbnail_url, category_id, category_name:tavvy_category")
     .in("id", placeIds);
 
   if (placesError) {
@@ -2013,7 +2019,7 @@ export async function updateUniversePlaceCount(universeId: string): Promise<void
 export async function searchPlacesForLinking(query: string, limit: number = 20, excludeUniverseId?: string) {
   let queryBuilder = supabase
     .from("places")
-    .select("id, name, street, city, region, country, thumbnail_url, category_id")
+    .select("id, name, street, address:street, city, region, country, thumbnail_url, category_id, category_name:tavvy_category")
     .ilike("name", `%${query}%`)
     .limit(limit);
 
@@ -2095,6 +2101,8 @@ export async function getCityById(id: string) {
 }
 
 export async function createCity(city: {
+  thumbnail_position?: string;
+  cover_position?: string;
   name: string;
   slug: string;
   state?: string | null;
@@ -3616,6 +3624,7 @@ export interface PlaceStory {
   // Joined data
   place_name?: string;
   user_email?: string;
+  user_name?: string;
   report_count?: number;
 }
 
@@ -3627,133 +3636,11 @@ export interface StoryReport {
   created_at: string;
   // Joined data
   reporter_email?: string;
+  reporter_name?: string;
 }
 
-export async function getStories(
-  limit: number = 50,
-  offset: number = 0,
-  status?: string,
-  hasReports?: boolean
-): Promise<{ stories: PlaceStory[]; total: number }> {
-  try {
-    let query = supabase
-      .from("place_stories")
-      .select(`
-        *,
-        places:place_id(name),
-        users:user_id(email)
-      `, { count: "exact" });
-
-    if (status) {
-      query = query.eq("status", status);
-    }
-
-    const { data, error, count } = await query
-      .range(offset, offset + limit - 1)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("[Supabase] Get stories error:", error);
-      return { stories: [], total: 0 };
-    }
-
-    // Get report counts for each story
-    const storyIds = (data || []).map((s: any) => s.id);
-    let reportCounts: Record<string, number> = {};
-    
-    if (storyIds.length > 0) {
-      const { data: reports } = await supabase
-        .from("story_reports")
-        .select("story_id")
-        .in("story_id", storyIds);
-      
-      if (reports) {
-        reports.forEach((r: any) => {
-          reportCounts[r.story_id] = (reportCounts[r.story_id] || 0) + 1;
-        });
-      }
-    }
-
-    const stories: PlaceStory[] = (data || []).map((s: any) => ({
-      ...s,
-      place_name: s.places?.name,
-      user_email: s.users?.email,
-      report_count: reportCounts[s.id] || 0,
-    }));
-
-    // Filter by reports if requested
-    if (hasReports === true) {
-      const filtered = stories.filter(s => s.report_count && s.report_count > 0);
-      return { stories: filtered, total: filtered.length };
-    }
-
-    return { stories, total: count || 0 };
-  } catch (error) {
-    console.error("[Supabase] Get stories error:", error);
-    return { stories: [], total: 0 };
-  }
-}
-
-export async function getStoryById(storyId: string): Promise<PlaceStory | null> {
-  try {
-    const { data, error } = await supabase
-      .from("place_stories")
-      .select(`
-        *,
-        places:place_id(name),
-        users:user_id(email)
-      `)
-      .eq("id", storyId)
-      .single();
-
-    if (error) {
-      console.error("[Supabase] Get story by ID error:", error);
-      return null;
-    }
-
-    // Get report count
-    const { count } = await supabase
-      .from("story_reports")
-      .select("*", { count: "exact", head: true })
-      .eq("story_id", storyId);
-
-    return {
-      ...data,
-      place_name: data.places?.name,
-      user_email: data.users?.email,
-      report_count: count || 0,
-    };
-  } catch (error) {
-    console.error("[Supabase] Get story by ID error:", error);
-    return null;
-  }
-}
-
-export async function getStoryReports(storyId: string): Promise<StoryReport[]> {
-  try {
-    const { data, error } = await supabase
-      .from("story_reports")
-      .select(`
-        *,
-        users:reporter_user_id(email)
-      `)
-      .eq("story_id", storyId)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("[Supabase] Get story reports error:", error);
-      return [];
-    }
-
-    return (data || []).map((r: any) => ({
-      ...r,
-      reporter_email: r.users?.email,
-    }));
-  } catch (error) {
-    console.error("[Supabase] Get story reports error:", error);
-    return [];
-  }
-}
+const storyModeration = createStoryModeration(supabase);
+export const {getStories,getStoryById,getStoryReports,getReportedStories,getStoryStats} = storyModeration;
 
 export async function updateStoryStatus(
   storyId: string,
@@ -3761,15 +3648,15 @@ export async function updateStoryStatus(
   adminId: string
 ): Promise<boolean> {
   try {
-    const { error } = await supabase
+    const { data: changed, error } = await supabase
       .from("place_stories")
       .update({
         status,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", storyId);
+      .eq("id", storyId).select("id").maybeSingle();
 
-    if (error) {
+    if (error || !changed) {
       console.error("[Supabase] Update story status error:", error);
       return false;
     }
@@ -3794,12 +3681,12 @@ export async function deleteStory(
       .eq("id", storyId)
       .single();
 
-    const { error } = await supabase
+    const { data: changed, error } = await supabase
       .from("place_stories")
       .delete()
-      .eq("id", storyId);
+      .eq("id", storyId).select("id").maybeSingle();
 
-    if (error) {
+    if (error || !changed) {
       console.error("[Supabase] Delete story error:", error);
       return false;
     }
@@ -3809,58 +3696,6 @@ export async function deleteStory(
   } catch (error) {
     console.error("[Supabase] Delete story error:", error);
     return false;
-  }
-}
-
-export async function getReportedStories(
-  limit: number = 50,
-  offset: number = 0
-): Promise<{ stories: PlaceStory[]; total: number }> {
-  try {
-    // Get all story IDs that have reports
-    const { data: reportedIds } = await supabase
-      .from("story_reports")
-      .select("story_id");
-
-    if (!reportedIds || reportedIds.length === 0) {
-      return { stories: [], total: 0 };
-    }
-
-    const uniqueStoryIds = [...new Set(reportedIds.map((r: any) => r.story_id))];
-
-    const { data, error, count } = await supabase
-      .from("place_stories")
-      .select(`
-        *,
-        places:place_id(name),
-        users:user_id(email)
-      `, { count: "exact" })
-      .in("id", uniqueStoryIds)
-      .range(offset, offset + limit - 1)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("[Supabase] Get reported stories error:", error);
-      return { stories: [], total: 0 };
-    }
-
-    // Get report counts
-    let reportCounts: Record<string, number> = {};
-    reportedIds.forEach((r: any) => {
-      reportCounts[r.story_id] = (reportCounts[r.story_id] || 0) + 1;
-    });
-
-    const stories: PlaceStory[] = (data || []).map((s: any) => ({
-      ...s,
-      place_name: s.places?.name,
-      user_email: s.users?.email,
-      report_count: reportCounts[s.id] || 0,
-    }));
-
-    return { stories, total: count || 0 };
-  } catch (error) {
-    console.error("[Supabase] Get reported stories error:", error);
-    return { stories: [], total: 0 };
   }
 }
 
@@ -3887,39 +3722,6 @@ export async function dismissStoryReports(
   }
 }
 
-export async function getStoryStats(): Promise<{
-  totalStories: number;
-  activeStories: number;
-  reportedStories: number;
-  removedStories: number;
-}> {
-  try {
-    const [totalResult, activeResult, removedResult] = await Promise.all([
-      supabase.from("place_stories").select("*", { count: "exact", head: true }),
-      supabase.from("place_stories").select("*", { count: "exact", head: true }).or("status.is.null,status.eq.active"),
-      supabase.from("place_stories").select("*", { count: "exact", head: true }).eq("status", "removed"),
-    ]);
-
-    // Get count of stories with reports
-    const { data: reportedIds } = await supabase
-      .from("story_reports")
-      .select("story_id");
-    
-    const uniqueReported = reportedIds ? [...new Set(reportedIds.map((r: any) => r.story_id))].length : 0;
-
-    return {
-      totalStories: totalResult.count || 0,
-      activeStories: activeResult.count || 0,
-      reportedStories: uniqueReported,
-      removedStories: removedResult.count || 0,
-    };
-  } catch (error) {
-    console.error("[Supabase] Get story stats error:", error);
-    return { totalStories: 0, activeStories: 0, reportedStories: 0, removedStories: 0 };
-  }
-}
-
-
 // ============ PHOTO MODERATION ============
 export interface PlacePhoto {
   id: string;
@@ -3938,6 +3740,7 @@ export interface PlacePhoto {
   // Joined data
   place_name?: string;
   user_email?: string;
+  user_name?: string;
   report_count?: number;
 }
 
@@ -3949,6 +3752,7 @@ export interface PhotoReport {
   created_at: string;
   // Joined data
   reporter_email?: string;
+  reporter_name?: string;
 }
 
 export async function getPhotos(
@@ -4359,430 +4163,10 @@ export async function getPhotoStats(): Promise<{
 
 
 // ============ REVIEW MODERATION ============
-export interface PlaceReview {
-  id: string;
-  place_id: string;
-  user_id: string;
-  rating: number;
-  review_text: string | null;
-  status: string | null;
-  is_flagged: boolean;
-  flag_reason: string | null;
-  created_at: string;
-  updated_at: string | null;
-  // Joined data
-  place_name?: string;
-  user_email?: string;
-  report_count?: number;
-}
-
-export interface ReviewReport {
-  id: string;
-  review_id: string;
-  reporter_user_id: string;
-  reason: string;
-  created_at: string;
-  // Joined data
-  reporter_email?: string;
-}
-
-export async function getReviews(
-  limit: number = 50,
-  offset: number = 0,
-  status?: string,
-  minRating?: number,
-  maxRating?: number
-): Promise<{ reviews: PlaceReview[]; total: number }> {
-  try {
-    let query = supabase
-      .from("place_reviews")
-      .select(`
-        *,
-        places:place_id(name),
-        users:user_id(email)
-      `, { count: "exact" });
-
-    if (status) {
-      query = query.eq("status", status);
-    }
-
-    if (minRating !== undefined) {
-      query = query.gte("rating", minRating);
-    }
-
-    if (maxRating !== undefined) {
-      query = query.lte("rating", maxRating);
-    }
-
-    const { data, error, count } = await query
-      .range(offset, offset + limit - 1)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("[Supabase] Get reviews error:", error);
-      return { reviews: [], total: 0 };
-    }
-
-    // Get report counts for each review
-    const reviewIds = (data || []).map((r: any) => r.id);
-    let reportCounts: Record<string, number> = {};
-    
-    if (reviewIds.length > 0) {
-      const { data: reports } = await supabase
-        .from("review_reports")
-        .select("review_id")
-        .in("review_id", reviewIds);
-      
-      if (reports) {
-        reports.forEach((r: any) => {
-          reportCounts[r.review_id] = (reportCounts[r.review_id] || 0) + 1;
-        });
-      }
-    }
-
-    const reviews: PlaceReview[] = (data || []).map((r: any) => ({
-      ...r,
-      place_name: r.places?.name,
-      user_email: r.users?.email,
-      report_count: reportCounts[r.id] || 0,
-    }));
-
-    return { reviews, total: count || 0 };
-  } catch (error) {
-    console.error("[Supabase] Get reviews error:", error);
-    return { reviews: [], total: 0 };
-  }
-}
-
-export async function getReviewById(reviewId: string): Promise<PlaceReview | null> {
-  try {
-    const { data, error } = await supabase
-      .from("place_reviews")
-      .select(`
-        *,
-        places:place_id(name),
-        users:user_id(email)
-      `)
-      .eq("id", reviewId)
-      .single();
-
-    if (error) {
-      console.error("[Supabase] Get review by ID error:", error);
-      return null;
-    }
-
-    // Get report count
-    const { count } = await supabase
-      .from("review_reports")
-      .select("*", { count: "exact", head: true })
-      .eq("review_id", reviewId);
-
-    return {
-      ...data,
-      place_name: data.places?.name,
-      user_email: data.users?.email,
-      report_count: count || 0,
-    };
-  } catch (error) {
-    console.error("[Supabase] Get review by ID error:", error);
-    return null;
-  }
-}
-
-export async function getReviewReports(reviewId: string): Promise<ReviewReport[]> {
-  try {
-    const { data, error } = await supabase
-      .from("review_reports")
-      .select(`
-        *,
-        users:reporter_user_id(email)
-      `)
-      .eq("review_id", reviewId)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("[Supabase] Get review reports error:", error);
-      return [];
-    }
-
-    return (data || []).map((r: any) => ({
-      ...r,
-      reporter_email: r.users?.email,
-    }));
-  } catch (error) {
-    console.error("[Supabase] Get review reports error:", error);
-    return [];
-  }
-}
-
-export async function updateReviewStatus(
-  reviewId: string,
-  status: string,
-  adminId: string
-): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from("place_reviews")
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", reviewId);
-
-    if (error) {
-      console.error("[Supabase] Update review status error:", error);
-      return false;
-    }
-
-    await logAdminActivity(adminId, `review_${status}`, reviewId, "review");
-    return true;
-  } catch (error) {
-    console.error("[Supabase] Update review status error:", error);
-    return false;
-  }
-}
-
-export async function approveReview(
-  reviewId: string,
-  adminId: string
-): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from("place_reviews")
-      .update({
-        status: "approved",
-        is_flagged: false,
-        flag_reason: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", reviewId);
-
-    if (error) {
-      console.error("[Supabase] Approve review error:", error);
-      return false;
-    }
-
-    await logAdminActivity(adminId, "review_approved", reviewId, "review");
-    return true;
-  } catch (error) {
-    console.error("[Supabase] Approve review error:", error);
-    return false;
-  }
-}
-
-export async function rejectReview(
-  reviewId: string,
-  reason: string,
-  adminId: string
-): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from("place_reviews")
-      .update({
-        status: "rejected",
-        is_flagged: true,
-        flag_reason: reason,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", reviewId);
-
-    if (error) {
-      console.error("[Supabase] Reject review error:", error);
-      return false;
-    }
-
-    await logAdminActivity(adminId, "review_rejected", reviewId, "review", reason);
-    return true;
-  } catch (error) {
-    console.error("[Supabase] Reject review error:", error);
-    return false;
-  }
-}
-
-export async function deleteReview(
-  reviewId: string,
-  adminId: string
-): Promise<boolean> {
-  try {
-    // First get review info for logging
-    const { data: review } = await supabase
-      .from("place_reviews")
-      .select("user_id, place_id")
-      .eq("id", reviewId)
-      .single();
-
-    const { error } = await supabase
-      .from("place_reviews")
-      .delete()
-      .eq("id", reviewId);
-
-    if (error) {
-      console.error("[Supabase] Delete review error:", error);
-      return false;
-    }
-
-    await logAdminActivity(adminId, "review_deleted", reviewId, "review", review?.user_id);
-    return true;
-  } catch (error) {
-    console.error("[Supabase] Delete review error:", error);
-    return false;
-  }
-}
-
-export async function getReportedReviews(
-  limit: number = 50,
-  offset: number = 0
-): Promise<{ reviews: PlaceReview[]; total: number }> {
-  try {
-    // Get all review IDs that have reports
-    const { data: reportedIds } = await supabase
-      .from("review_reports")
-      .select("review_id");
-
-    if (!reportedIds || reportedIds.length === 0) {
-      return { reviews: [], total: 0 };
-    }
-
-    const uniqueReviewIds = [...new Set(reportedIds.map((r: any) => r.review_id))];
-
-    const { data, error, count } = await supabase
-      .from("place_reviews")
-      .select(`
-        *,
-        places:place_id(name),
-        users:user_id(email)
-      `, { count: "exact" })
-      .in("id", uniqueReviewIds)
-      .range(offset, offset + limit - 1)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("[Supabase] Get reported reviews error:", error);
-      return { reviews: [], total: 0 };
-    }
-
-    // Get report counts
-    let reportCounts: Record<string, number> = {};
-    reportedIds.forEach((r: any) => {
-      reportCounts[r.review_id] = (reportCounts[r.review_id] || 0) + 1;
-    });
-
-    const reviews: PlaceReview[] = (data || []).map((r: any) => ({
-      ...r,
-      place_name: r.places?.name,
-      user_email: r.users?.email,
-      report_count: reportCounts[r.id] || 0,
-    }));
-
-    return { reviews, total: count || 0 };
-  } catch (error) {
-    console.error("[Supabase] Get reported reviews error:", error);
-    return { reviews: [], total: 0 };
-  }
-}
-
-export async function getFlaggedReviews(
-  limit: number = 50,
-  offset: number = 0
-): Promise<{ reviews: PlaceReview[]; total: number }> {
-  try {
-    const { data, error, count } = await supabase
-      .from("place_reviews")
-      .select(`
-        *,
-        places:place_id(name),
-        users:user_id(email)
-      `, { count: "exact" })
-      .eq("is_flagged", true)
-      .range(offset, offset + limit - 1)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("[Supabase] Get flagged reviews error:", error);
-      return { reviews: [], total: 0 };
-    }
-
-    const reviews: PlaceReview[] = (data || []).map((r: any) => ({
-      ...r,
-      place_name: r.places?.name,
-      user_email: r.users?.email,
-    }));
-
-    return { reviews, total: count || 0 };
-  } catch (error) {
-    console.error("[Supabase] Get flagged reviews error:", error);
-    return { reviews: [], total: 0 };
-  }
-}
-
-export async function dismissReviewReports(
-  reviewId: string,
-  adminId: string
-): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from("review_reports")
-      .delete()
-      .eq("review_id", reviewId);
-
-    if (error) {
-      console.error("[Supabase] Dismiss review reports error:", error);
-      return false;
-    }
-
-    await logAdminActivity(adminId, "review_reports_dismissed", reviewId, "review");
-    return true;
-  } catch (error) {
-    console.error("[Supabase] Dismiss review reports error:", error);
-    return false;
-  }
-}
-
-export async function getReviewStats(): Promise<{
-  totalReviews: number;
-  approvedReviews: number;
-  flaggedReviews: number;
-  reportedReviews: number;
-  averageRating: number;
-}> {
-  try {
-    const [totalResult, approvedResult, flaggedResult] = await Promise.all([
-      supabase.from("place_reviews").select("*", { count: "exact", head: true }),
-      supabase.from("place_reviews").select("*", { count: "exact", head: true }).eq("status", "approved"),
-      supabase.from("place_reviews").select("*", { count: "exact", head: true }).eq("is_flagged", true),
-    ]);
-
-    // Get count of reviews with reports
-    const { data: reportedIds } = await supabase
-      .from("review_reports")
-      .select("review_id");
-    
-    const uniqueReported = reportedIds ? [...new Set(reportedIds.map((r: any) => r.review_id))].length : 0;
-
-    // Get average rating
-    const { data: ratingData } = await supabase
-      .from("place_reviews")
-      .select("rating");
-    
-    let averageRating = 0;
-    if (ratingData && ratingData.length > 0) {
-      const sum = ratingData.reduce((acc: number, r: any) => acc + (r.rating || 0), 0);
-      averageRating = sum / ratingData.length;
-    }
-
-    return {
-      totalReviews: totalResult.count || 0,
-      approvedReviews: approvedResult.count || 0,
-      flaggedReviews: flaggedResult.count || 0,
-      reportedReviews: uniqueReported,
-      averageRating,
-    };
-  } catch (error) {
-    console.error("[Supabase] Get review stats error:", error);
-    return { totalReviews: 0, approvedReviews: 0, flaggedReviews: 0, reportedReviews: 0, averageRating: 0 };
-  }
-}
-
+export type { PlaceReview, ReviewReport } from './reviewModeration';
+export const { getReviews, getReviewById, getReviewReports, getReportedReviews, getReviewStats,
+  getFlaggedReviews, updateReviewStatus, approveReview, rejectReview, deleteReview, dismissReviewReports
+} = createReviewModeration(supabase, logAdminActivity);
 
 // ============ PLACE EDITING ============
 export interface PlaceDetails {
@@ -5947,7 +5331,7 @@ export async function createRide(ride: {
   if (ride.age_recommendation) insertData.age_recommendation = ride.age_recommendation;
   if (ride.motion_sickness) insertData.motion_sickness = ride.motion_sickness;
   if (ride.park_name) insertData.park_name = ride.park_name;
-  const { data, error } = await supabasee
+  const { data, error } = await supabase
     .from("places")
     .insert(insertData)
     .select()

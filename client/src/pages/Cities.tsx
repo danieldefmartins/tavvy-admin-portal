@@ -140,7 +140,7 @@ export default function Cities() {
       setIsDialogOpen(false);
       resetForm();
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -154,7 +154,7 @@ export default function Cities() {
       setEditingCity(null);
       resetForm();
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -165,7 +165,7 @@ export default function Cities() {
       refetch();
       toast({ title: "City deleted successfully" });
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -260,7 +260,7 @@ export default function Cities() {
 
   const handleDelete = (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete "${name}"?`)) {
-      deleteMutation.mutate(id);
+      deleteMutation.mutate({ id });
     }
   };
 

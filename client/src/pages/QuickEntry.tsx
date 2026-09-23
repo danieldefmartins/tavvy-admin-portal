@@ -436,7 +436,7 @@ export default function QuickEntry() {
   // OPTIMIZATION: Add staleTime to cache signal definitions
   const { data: allSignalDefs, error: signalsError } = trpc.signals.getAll.useQuery(undefined, {
     staleTime: 60 * 60 * 1000, // 1 hour
-    cacheTime: 24 * 60 * 60 * 1000, // 24 hours
+    gcTime: 24 * 60 * 60 * 1000, // 24 hours
   });
 
   const submitMutation = trpc.reviews.submitQuick.useMutation({
@@ -579,7 +579,9 @@ export default function QuickEntry() {
 
   // Combine results from both fsq and simple search, deduplicated
   const fsqPlaces = fsqPlacesResult?.pages.flatMap(page => page.places) || [];
-  const simplePlacesData = simplePlaces || [];
+  const simplePlacesData = (simplePlaces || []).map(place => 'fsq_place_id' in place ? {
+    ...place, id: place.fsq_place_id, city: place.locality, state: place.region,
+  } : place);
   
   const seenIds = new Set<string>();
   const places = [...fsqPlaces, ...simplePlacesData].filter(p => {

@@ -1,3 +1,5 @@
+import {createCommunityModeration} from './communityModeration';
+import {supabaseAdmin as communityAdminClient} from './supabaseAuth';
 import { publicProcedure, adminProcedure, router, isUserSuperAdmin } from "./_core/trpc";
 import {
   searchPlacesTypesense,
@@ -665,6 +667,7 @@ export const appRouter = router({
           city: z.string().optional(),
           limit: z.number().min(1).max(5000).default(100),
           offset: z.number().min(0).default(0),
+          cursor: z.number().min(0).nullish(),
         })
       )
       .query(async ({ input }) => {
@@ -676,7 +679,7 @@ export const appRouter = router({
             city: input.city,
           },
           input.limit,
-          input.offset
+          input.cursor ?? input.offset
         );
       }),
 
@@ -2541,6 +2544,12 @@ export const appRouter = router({
     }),
   }),
 
+  // Each community moderation entrypoint requires an authenticated administrator.
+  communityReports: router({
+    list: adminProcedure.input(z.object({status:z.enum(['pending','all']).default('pending'),offset:z.number().int().min(0).default(0),limit:z.number().int().min(1).max(100).default(50)})).query(({input})=>createCommunityModeration(communityAdminClient).list(input.status,input.offset,input.limit)),
+    moderate: adminProcedure.input(z.object({id:z.string().uuid(),action:z.enum(['hide','dismiss','restore']),notes:z.string().max(4000).optional()})).mutation(({ctx,input})=>createCommunityModeration(communityAdminClient).moderate(input.id,input.action,String(ctx.user.id),input.notes)),
+  }),
+
   // ============ STORY MODERATION ============
   stories: router({
     getAll: adminProcedure
@@ -2794,26 +2803,24 @@ export const appRouter = router({
     getAll: adminProcedure
       .input(
         z.object({
-          limit: z.number().optional().default(50),
-          offset: z.number().optional().default(0),
-          status: z.string().optional(),
-          minRating: z.number().optional(),
-          maxRating: z.number().optional(),
+          limit: z.number().int().min(1).max(100).optional().default(50),
+          offset: z.number().int().min(0).optional().default(0),
+          status: z.enum(['live', 'pending', 'hidden', 'rejected']).optional(),
         }).optional()
       )
       .query(async ({ input }) => {
-        const { limit, offset, status, minRating, maxRating } = input || {};
-        return getReviews(limit, offset, status, minRating, maxRating);
+        const { limit, offset, status } = input || {};
+        return getReviews(limit, offset, status);
       }),
 
     getById: adminProcedure
-      .input(z.object({ id: z.string() }))
+      .input(z.object({ id: z.string().uuid() }))
       .query(async ({ input }) => {
         return getReviewById(input.id);
       }),
 
     getReports: adminProcedure
-      .input(z.object({ reviewId: z.string() }))
+      .input(z.object({ reviewId: z.string().uuid() }))
       .query(async ({ input }) => {
         return getReviewReports(input.reviewId);
       }),
@@ -2821,8 +2828,8 @@ export const appRouter = router({
     getReported: adminProcedure
       .input(
         z.object({
-          limit: z.number().optional().default(50),
-          offset: z.number().optional().default(0),
+          limit: z.number().int().min(1).max(100).optional().default(50),
+          offset: z.number().int().min(0).optional().default(0),
         }).optional()
       )
       .query(async ({ input }) => {
@@ -2833,8 +2840,8 @@ export const appRouter = router({
     getFlagged: adminProcedure
       .input(
         z.object({
-          limit: z.number().optional().default(50),
-          offset: z.number().optional().default(0),
+          limit: z.number().int().min(1).max(100).optional().default(50),
+          offset: z.number().int().min(0).optional().default(0),
         }).optional()
       )
       .query(async ({ input }) => {
@@ -2845,8 +2852,8 @@ export const appRouter = router({
     updateStatus: adminProcedure
       .input(
         z.object({
-          id: z.string(),
-          status: z.string(),
+          id: z.string().uuid(),
+          status: z.enum(['live', 'pending', 'hidden', 'rejected']),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -2862,7 +2869,7 @@ export const appRouter = router({
       }),
 
     approve: adminProcedure
-      .input(z.object({ id: z.string() }))
+      .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
         const success = await approveReview(input.id, adminId);
@@ -2878,8 +2885,8 @@ export const appRouter = router({
     reject: adminProcedure
       .input(
         z.object({
-          id: z.string(),
-          reason: z.string(),
+          id: z.string().uuid(),
+          reason: z.string().trim().min(1).max(4000),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -2895,21 +2902,21 @@ export const appRouter = router({
       }),
 
     delete: adminProcedure
-      .input(z.object({ id: z.string() }))
+      .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
         const success = await deleteReview(input.id, adminId);
         if (!success) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to delete review",
+            message: "Failed to archive review",
           });
         }
         return { success: true };
       }),
 
     dismissReports: adminProcedure
-      .input(z.object({ reviewId: z.string() }))
+      .input(z.object({ reviewId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const adminId = ctx.user?.id || "unknown";
         const success = await dismissReviewReports(input.reviewId, adminId);

@@ -292,7 +292,7 @@ export async function getLastKnownLocation(
 // Cleanup old cache entries periodically
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, entry] of geoCache.entries()) {
+  for (const [ip, entry] of Array.from(geoCache.entries())) {
     if ((now - entry.timestamp) > GEO_CACHE_TTL_MS) {
       geoCache.delete(ip);
     }

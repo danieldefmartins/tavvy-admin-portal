@@ -426,7 +426,7 @@ export const SecurityAlerts = {
 // Cleanup old cooldown entries periodically
 setInterval(() => {
   const now = Date.now();
-  for (const [key, timestamp] of alertCooldowns.entries()) {
+  for (const [key, timestamp] of Array.from(alertCooldowns.entries())) {
     if ((now - timestamp) > ALERT_COOLDOWN_MS * 2) {
       alertCooldowns.delete(key);
     }

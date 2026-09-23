@@ -87,10 +87,7 @@ export default function PlaceEdit() {
     { 
       enabled: !!placeId && !isNewPlace,
       retry: 2,
-      onError: (err) => {
-        console.error('[PlaceEdit] Failed to load place:', err);
-        toast.error(`Failed to load place: ${err.message}`);
-      }
+
     }
   );
   const { data: categories } = trpc.placeEdit.getCategories.useQuery();

@@ -1,3 +1,4 @@
+import CommunityReports from '@/components/CommunityReports';
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -408,6 +409,7 @@ export default function Moderation() {
         </div>
       )}
 
+      <CommunityReports />
       <Tabs value={view} onValueChange={(v) => setView(v as "flags" | "queue")}>
         <TabsList>
           <TabsTrigger value="flags">Content Flags</TabsTrigger>

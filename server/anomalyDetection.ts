@@ -438,7 +438,7 @@ export async function acknowledgeAnomaly(
 // Cleanup old entries periodically (every 30 minutes)
 setInterval(() => {
   const now = Date.now();
-  for (const [key, entry] of failedLoginAttempts.entries()) {
+  for (const [key, entry] of Array.from(failedLoginAttempts.entries())) {
     if ((now - entry.firstAttempt) > FAILED_LOGIN_WINDOW_MS) {
       failedLoginAttempts.delete(key);
     }

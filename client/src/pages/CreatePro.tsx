@@ -120,7 +120,7 @@ export default function CreatePro() {
       return;
     }
 
-    const submitData: Record<string, any> = {
+    const submitData = {
       business_name: formData.business_name.trim(),
       first_name: formData.first_name || undefined,
       last_name: formData.last_name || undefined,

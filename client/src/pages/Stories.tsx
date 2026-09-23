@@ -78,21 +78,21 @@ export default function Stories() {
   const limit = 50;
 
   // Queries
-  const { data: stats, isLoading: statsLoading } = trpc.stories.getStats.useQuery();
-  const { data: storiesData, isLoading: storiesLoading, refetch: refetchStories } = trpc.stories.getAll.useQuery({
+  const { data: stats, isLoading: statsLoading,error:statsError } = trpc.stories.getStats.useQuery();
+  const { data: storiesData, isLoading: storiesLoading,error:storiesError, refetch: refetchStories } = trpc.stories.getAll.useQuery({
     limit,
     offset: page * limit,
     status: filterStatus !== "all" ? filterStatus : undefined,
   });
-  const { data: reportedData, isLoading: reportedLoading, refetch: refetchReported } = trpc.stories.getReported.useQuery({
+  const { data: reportedData, isLoading: reportedLoading,error:reportedError, refetch: refetchReported } = trpc.stories.getReported.useQuery({
     limit,
     offset: page * limit,
   });
-  const { data: selectedStory, isLoading: storyLoading } = trpc.stories.getById.useQuery(
+  const { data: selectedStory, isLoading: storyLoading,error:storyError } = trpc.stories.getById.useQuery(
     { id: selectedStoryId! },
     { enabled: !!selectedStoryId }
   );
-  const { data: storyReports } = trpc.stories.getReports.useQuery(
+  const { data: storyReports,error:reportsError } = trpc.stories.getReports.useQuery(
     { storyId: selectedStoryId! },
     { enabled: !!selectedStoryId }
   );
@@ -212,7 +212,7 @@ export default function Stories() {
             <TableCell>
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <span className="truncate max-w-[150px]">{story.user_email || "Unknown User"}</span>
+                <span className="truncate max-w-[150px]">{story.user_name || story.user_email || "Unknown User"}</span>
               </div>
             </TableCell>
             <TableCell>
@@ -304,6 +304,7 @@ export default function Stories() {
         </Button>
       </div>
 
+      {(statsError||storiesError||reportedError||storyError||reportsError)&&<p role="alert" className="text-red-700">Moderation data could not be loaded. This does not mean there are no reports. Refresh and try again.</p>}
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -315,7 +316,7 @@ export default function Stories() {
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold">{stats?.totalStories?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold">{stats?.totalStories?.toLocaleString() || "—"}</div>
             )}
           </CardContent>
         </Card>
@@ -329,7 +330,7 @@ export default function Stories() {
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold text-green-600">{stats?.activeStories?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold text-green-600">{stats?.activeStories?.toLocaleString() || "—"}</div>
             )}
           </CardContent>
         </Card>
@@ -343,7 +344,7 @@ export default function Stories() {
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold text-red-600">{stats?.reportedStories?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold text-red-600">{stats?.reportedStories?.toLocaleString() || "—"}</div>
             )}
           </CardContent>
         </Card>
@@ -357,7 +358,7 @@ export default function Stories() {
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold text-gray-600">{stats?.removedStories?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold text-gray-600">{stats?.removedStories?.toLocaleString() || "—"}</div>
             )}
           </CardContent>
         </Card>
@@ -560,7 +561,7 @@ export default function Stories() {
                 <div>
                   <Label className="text-muted-foreground">Tags</Label>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedStory.tags.map((tag, i) => (
+                    {selectedStory.tags.map((tag:string, i:number) => (
                       <Badge key={i} variant="secondary">{tag}</Badge>
                     ))}
                   </div>
@@ -582,7 +583,7 @@ export default function Stories() {
                             <div>
                               <p className="font-medium">{report.reason}</p>
                               <p className="text-sm text-muted-foreground">
-                                Reported by: {report.reporter_email || "Unknown"}
+                                Reported by: {report.reporter_name || report.reporter_email || "Tavvy member"}
                               </p>
                             </div>
                             <span className="text-sm text-muted-foreground">

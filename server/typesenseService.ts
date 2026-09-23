@@ -17,7 +17,7 @@ const typesenseClient = new Typesense.Client({
       protocol: 'https',
     },
   ],
-  apiKey: '231eb42383d0a3a2832f47ec44b817e33692211d9cf2d158f49e5c3e608e6277',
+  apiKey: process.env.TYPESENSE_API_KEY || '', // Private scoped server credential only.
   connectionTimeoutSeconds: 10,
   numRetries: 3,
   retryIntervalSeconds: 0.5,

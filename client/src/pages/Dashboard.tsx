@@ -34,7 +34,7 @@ export default function Dashboard() {
   const { data: proStats, isLoading: proStatsLoading } = trpc.pros.getStats.useQuery();
   const { data: storyStats, isLoading: storyStatsLoading } = trpc.stories.getStats.useQuery();
   const { data: photoStats, isLoading: photoStatsLoading } = trpc.photos.getStats.useQuery();
-  const { data: reviewStats, isLoading: reviewStatsLoading } = trpc.reviewModeration.getStats.useQuery();
+  const { data: reviewStats, isLoading: reviewStatsLoading, error: reviewStatsError } = trpc.reviewModeration.getStats.useQuery();
 
   // Calculate total items needing attention
   const pendingItems = (storyStats?.reportedStories || 0) + 
@@ -168,21 +168,16 @@ export default function Dashboard() {
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {reviewStatsLoading ? (
+            {reviewStatsError ? <p role="alert" className="text-sm text-red-600">Unable to load review statistics</p> : reviewStatsLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
               <div className="text-2xl font-bold flex items-center gap-2">
                 {reviewStats?.totalReviews?.toLocaleString() || 0}
-                {reviewStats?.averageRating && (
-                  <span className="text-sm font-normal text-muted-foreground flex items-center">
-                    <Star className="h-3 w-3 text-yellow-500 fill-yellow-500 mr-1" />
-                    {reviewStats.averageRating.toFixed(1)}
-                  </span>
-                )}
+                <span className="text-sm text-muted-foreground">{reviewStats?.signalSelections || 0} selected signals</span>
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              {reviewStats?.approvedReviews || 0} approved
+              {reviewStatsError ? "—" : reviewStats?.approvedReviews || 0} live
             </p>
           </CardContent>
         </Card>
@@ -208,9 +203,9 @@ export default function Dashboard() {
                       {storyStats?.reportedStories} reported
                     </Badge>
                   )}
-                  {(storyStats?.flaggedStories || 0) > 0 && (
+                  {(storyStats?.reportedStories || 0) > 0 && (
                     <Badge variant="secondary" className="text-xs">
-                      {storyStats?.flaggedStories} flagged
+                      {storyStats?.reportedStories} flagged
                     </Badge>
                   )}
                 </div>

@@ -63,7 +63,6 @@ import {
   User,
   Calendar,
   Flag,
-  Star,
   ShieldAlert,
   ThumbsUp,
   ThumbsDown,
@@ -77,33 +76,30 @@ export default function Reviews() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [filterRating, setFilterRating] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "live" | "pending" | "hidden" | "rejected">("all");
   const [activeTab, setActiveTab] = useState("all");
   const limit = 50;
 
   // Queries
-  const { data: stats, isLoading: statsLoading } = trpc.reviewModeration.getStats.useQuery();
-  const { data: reviewsData, isLoading: reviewsLoading, refetch: refetchReviews } = trpc.reviewModeration.getAll.useQuery({
+  const { data: stats, isLoading: statsLoading, error: statsError } = trpc.reviewModeration.getStats.useQuery();
+  const { data: reviewsData, isLoading: reviewsLoading, error: reviewsError, refetch: refetchReviews } = trpc.reviewModeration.getAll.useQuery({
     limit,
     offset: page * limit,
     status: filterStatus !== "all" ? filterStatus : undefined,
-    minRating: filterRating !== "all" ? parseInt(filterRating) : undefined,
-    maxRating: filterRating !== "all" ? parseInt(filterRating) : undefined,
   });
-  const { data: reportedData, isLoading: reportedLoading, refetch: refetchReported } = trpc.reviewModeration.getReported.useQuery({
+  const { data: reportedData, isLoading: reportedLoading, error: reportedError, refetch: refetchReported } = trpc.reviewModeration.getReported.useQuery({
     limit,
     offset: page * limit,
   });
-  const { data: flaggedData, isLoading: flaggedLoading, refetch: refetchFlagged } = trpc.reviewModeration.getFlagged.useQuery({
+  const { data: flaggedData, isLoading: flaggedLoading, error: flaggedError, refetch: refetchFlagged } = trpc.reviewModeration.getFlagged.useQuery({
     limit,
     offset: page * limit,
   });
-  const { data: reviewDetails, isLoading: reviewLoading } = trpc.reviewModeration.getById.useQuery(
+  const { data: reviewDetails, isLoading: reviewLoading, error: detailError } = trpc.reviewModeration.getById.useQuery(
     { id: selectedReviewId! },
     { enabled: !!selectedReviewId }
   );
-  const { data: reviewReports } = trpc.reviewModeration.getReports.useQuery(
+  const { data: reviewReports, error: reportsError } = trpc.reviewModeration.getReports.useQuery(
     { reviewId: selectedReviewId! },
     { enabled: !!selectedReviewId }
   );
@@ -129,12 +125,12 @@ export default function Reviews() {
 
   const deleteMutation = trpc.reviewModeration.delete.useMutation({
     onSuccess: () => {
-      toast.success("Review deleted");
+      toast.success("Review archived");
       refetchAll();
       setShowDeleteDialog(false);
       setShowReviewDialog(false);
     },
-    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+    onError: (error) => toast.error(`Failed to archive: ${error.message}`),
   });
 
   const dismissReportsMutation = trpc.reviewModeration.dismissReports.useMutation({
@@ -145,7 +141,9 @@ export default function Reviews() {
     onError: (error) => toast.error(`Failed to dismiss reports: ${error.message}`),
   });
 
+  const utils = trpc.useUtils();
   const refetchAll = () => {
+    utils.reviewModeration.invalidate();
     refetchReviews();
     refetchReported();
     refetchFlagged();
@@ -177,38 +175,10 @@ export default function Reviews() {
     });
   };
 
-  const getStatusBadge = (status: string | null, isFlagged: boolean) => {
-    if (isFlagged) {
-      return <Badge variant="destructive">Flagged</Badge>;
-    }
-    switch (status?.toLowerCase()) {
-      case "approved":
-        return <Badge className="bg-green-500">Approved</Badge>;
-      case "rejected":
-        return <Badge variant="destructive">Rejected</Badge>;
-      case "pending":
-        return <Badge variant="secondary">Pending</Badge>;
-      default:
-        return <Badge variant="outline">Active</Badge>;
-    }
-  };
-
-  const renderStars = (rating: number) => {
-    return (
-      <div className="flex items-center gap-0.5">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`h-4 w-4 ${
-              star <= rating
-                ? "text-yellow-500 fill-yellow-500"
-                : "text-gray-300"
-            }`}
-          />
-        ))}
-      </div>
-    );
-  };
+  const getStatusBadge = (status: string | null) => <Badge variant={status === 'rejected' ? 'destructive' : status === 'live' ? 'default' : 'secondary'}>{status || 'Unknown'}</Badge>;
+  const renderTaps = (taps: { signal_id: string; label: string; signal_type: string; intensity: number }[]) => (
+    <div className="flex flex-wrap gap-1">{taps.map(tap => <Badge key={tap.signal_id} variant="outline">{tap.label} ×{tap.intensity}</Badge>)}{taps.length === 0 && <span>No signals recorded</span>}</div>
+  );
 
   const getCurrentData = () => {
     switch (activeTab) {
@@ -232,6 +202,7 @@ export default function Reviews() {
     }
   };
 
+  const listError = activeTab === 'reported' ? reportedError : activeTab === 'flagged' ? flaggedError : reviewsError;
   const currentData = getCurrentData();
   const reviews = currentData?.reviews || [];
   const totalReviews = currentData?.total || 0;
@@ -242,7 +213,7 @@ export default function Reviews() {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Rating</TableHead>
+          <TableHead>Signal taps</TableHead>
           <TableHead>Review</TableHead>
           <TableHead>Place</TableHead>
           <TableHead>User</TableHead>
@@ -256,11 +227,11 @@ export default function Reviews() {
         {reviewList.map((review) => (
           <TableRow key={review.id}>
             <TableCell>
-              {renderStars(review.rating)}
+              {renderTaps(review.taps)}
             </TableCell>
             <TableCell>
               <p className="max-w-[300px] truncate">
-                {review.review_text || <span className="text-muted-foreground italic">No text</span>}
+                {review.public_note || <span className="text-muted-foreground italic">No text</span>}
               </p>
             </TableCell>
             <TableCell>
@@ -272,11 +243,11 @@ export default function Reviews() {
             <TableCell>
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <span className="truncate max-w-[120px]">{review.user_email || "Unknown"}</span>
+                <span className="truncate max-w-[120px]">{review.user_name || "Unknown"}</span>
               </div>
             </TableCell>
             <TableCell>
-              {getStatusBadge(review.status, review.is_flagged)}
+              {getStatusBadge(review.status)}
             </TableCell>
             <TableCell>
               {review.report_count && review.report_count > 0 ? (
@@ -338,7 +309,7 @@ export default function Reviews() {
                     className="text-red-600"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
+                    Archive
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -376,14 +347,14 @@ export default function Reviews() {
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold">{stats?.totalReviews?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold">{statsError ? '—' : stats?.totalReviews?.toLocaleString() || 0}</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Rating</CardTitle>
+            <CardTitle className="text-sm font-medium">Selected Signals</CardTitle>
             <TrendingUp className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
@@ -391,8 +362,8 @@ export default function Reviews() {
               <Skeleton className="h-8 w-16" />
             ) : (
               <div className="text-2xl font-bold flex items-center gap-2">
-                {stats?.averageRating ? stats.averageRating.toFixed(1) : "0"}
-                <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                {statsError ? "—" : stats?.signalSelections?.toLocaleString() || "0"}
+                <MessageSquare className="h-5 w-5 text-yellow-500 fill-yellow-500" />
               </div>
             )}
           </CardContent>
@@ -400,14 +371,14 @@ export default function Reviews() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Approved</CardTitle>
+            <CardTitle className="text-sm font-medium">Live</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold text-green-600">{stats?.approvedReviews?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold text-green-600">{statsError ? '—' : stats?.approvedReviews?.toLocaleString() || 0}</div>
             )}
           </CardContent>
         </Card>
@@ -421,21 +392,21 @@ export default function Reviews() {
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold text-brand-600">{stats?.reportedReviews?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold text-brand-600">{statsError ? '—' : stats?.reportedReviews?.toLocaleString() || 0}</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Flagged</CardTitle>
+            <CardTitle className="text-sm font-medium">Rejected</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold text-red-600">{stats?.flaggedReviews?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold text-red-600">{statsError ? '—' : stats?.flaggedReviews?.toLocaleString() || 0}</div>
             )}
           </CardContent>
         </Card>
@@ -453,7 +424,7 @@ export default function Reviews() {
               )}
             </TabsTrigger>
             <TabsTrigger value="flagged" className="gap-2">
-              Flagged
+              Rejected
               {stats?.flaggedReviews && stats.flaggedReviews > 0 && (
                 <Badge variant="destructive" className="ml-1">{stats.flaggedReviews}</Badge>
               )}
@@ -462,30 +433,18 @@ export default function Reviews() {
 
           {activeTab === "all" && (
             <div className="flex gap-2">
-              <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v); setPage(0); }}>
+              <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v as typeof filterStatus); setPage(0); }}>
                 <SelectTrigger className="w-[130px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="live">Live</SelectItem><SelectItem value="hidden">Hidden</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filterRating} onValueChange={(v) => { setFilterRating(v); setPage(0); }}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Rating" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Ratings</SelectItem>
-                  <SelectItem value="5">5 Stars</SelectItem>
-                  <SelectItem value="4">4 Stars</SelectItem>
-                  <SelectItem value="3">3 Stars</SelectItem>
-                  <SelectItem value="2">2 Stars</SelectItem>
-                  <SelectItem value="1">1 Star</SelectItem>
-                </SelectContent>
-              </Select>
+
             </div>
           )}
         </div>
@@ -499,7 +458,7 @@ export default function Reviews() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {listError ? <p role="alert">Unable to load reviews: {listError.message}</p> : isLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <Skeleton key={i} className="h-16 w-full" />
@@ -558,7 +517,7 @@ export default function Reviews() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {reportedLoading ? (
+              {reportedError ? <p role="alert">Unable to load reports: {reportedError.message}</p> : reportedLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <Skeleton key={i} className="h-16 w-full" />
@@ -581,14 +540,14 @@ export default function Reviews() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-red-500" />
-                Flagged Reviews
+                Rejected Reviews
               </CardTitle>
               <CardDescription>
-                Reviews that have been flagged for policy violations
+                Reviews rejected during moderation
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {flaggedLoading ? (
+              {flaggedError ? <p role="alert">Unable to load rejected reviews: {flaggedError.message}</p> : flaggedLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <Skeleton key={i} className="h-16 w-full" />
@@ -597,7 +556,7 @@ export default function Reviews() {
               ) : (flaggedData?.reviews || []).length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500 opacity-50" />
-                  <p>No flagged reviews to review</p>
+                  <p>No rejected reviews</p>
                 </div>
               ) : (
                 renderReviewTable(flaggedData?.reviews || [])
@@ -607,6 +566,8 @@ export default function Reviews() {
         </TabsContent>
       </Tabs>
 
+      {listError && <p role="alert" className="text-red-600">Unable to load reviews: {listError.message} <Button onClick={refetchAll}>Retry</Button></p>}
+      {statsError && <p role="alert">Unable to load review statistics: {statsError.message}</p>}
       {/* Review Details Dialog */}
       <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -617,25 +578,25 @@ export default function Reviews() {
             </DialogDescription>
           </DialogHeader>
 
-          {reviewLoading ? (
+          {detailError ? <p role="alert">Unable to load review: {detailError.message}</p> : reviewLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-40 w-full" />
             </div>
           ) : reviewDetails ? (
             <div className="space-y-6">
-              {/* Rating */}
+              {/* Signal taps */}
               <div className="flex items-center gap-4">
-                {renderStars(reviewDetails.rating)}
-                <span className="text-2xl font-bold">{reviewDetails.rating}/5</span>
-                {getStatusBadge(reviewDetails.status, reviewDetails.is_flagged)}
+                {renderTaps(reviewDetails.taps)}
+                <span>{reviewDetails.tap_total} taps</span>
+                {getStatusBadge(reviewDetails.status)}
               </div>
 
               {/* Review Text */}
               <div>
                 <Label className="text-muted-foreground">Review</Label>
                 <div className="mt-2 p-4 bg-muted rounded-lg">
-                  {reviewDetails.review_text || <span className="text-muted-foreground italic">No review text provided</span>}
+                  {reviewDetails.public_note || <span className="text-muted-foreground italic">No review text provided</span>}
                 </div>
               </div>
 
@@ -652,7 +613,7 @@ export default function Reviews() {
                   <Label className="text-muted-foreground">Reviewer</Label>
                   <p className="font-medium flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    {reviewDetails.user_email || "Unknown"}
+                    {reviewDetails.user_name || "Unknown"}
                   </p>
                 </div>
                 <div>
@@ -665,16 +626,7 @@ export default function Reviews() {
                 </div>
               </div>
 
-              {reviewDetails.flag_reason && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <Label className="text-red-600 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Flag Reason
-                  </Label>
-                  <p className="mt-1 text-red-800">{reviewDetails.flag_reason}</p>
-                </div>
-              )}
-
+              {reportsError && <p role="alert">Unable to load reports: {reportsError.message}</p>}
               {/* Reports Section */}
               {reviewReports && reviewReports.length > 0 && (
                 <div>
@@ -690,7 +642,7 @@ export default function Reviews() {
                             <div>
                               <p className="font-medium">{report.reason}</p>
                               <p className="text-sm text-muted-foreground">
-                                Reported by: {report.reporter_email || "Unknown"}
+                                Reported by: {report.reporter_name || "Unknown"}
                               </p>
                             </div>
                             <span className="text-sm text-muted-foreground">
@@ -742,7 +694,7 @@ export default function Reviews() {
                   onClick={() => setShowDeleteDialog(true)}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  Archive
                 </Button>
               </div>
             </div>
@@ -791,9 +743,9 @@ export default function Reviews() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Review</AlertDialogTitle>
+            <AlertDialogTitle>Archive Review</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to permanently delete this review? This action cannot be undone.
+              Hide this review from public view? Its original text, taps and dated history will be preserved. You can approve it again later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -802,7 +754,7 @@ export default function Reviews() {
               onClick={handleDeleteReview}
               className="bg-red-600 hover:bg-red-700"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending ? "Archiving..." : "Archive"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
